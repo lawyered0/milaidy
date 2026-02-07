@@ -114,7 +114,11 @@ jobs:
         working-directory: apps/app
 
       - name: Build Capacitor plugins
-        run: bun run plugin:build
+        run: |
+          for d in gateway swabble camera screencapture canvas desktop location talkmode agent; do
+            echo "[plugin:$d] building..."
+            (cd plugins/$d && npm run build)
+          done
         working-directory: apps/app
         shell: bash
 
