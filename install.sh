@@ -2,9 +2,9 @@
 # ╔════════════════════════════════════════════════════════════════════════════╗
 # ║  milAIdy installer — macOS / Linux / WSL / Git Bash                      ║
 # ║                                                                          ║
-# ║  curl -fsSL https://raw.githubusercontent.com/elizaos/eliza/main/packages/milaidy/install.sh | bash
+# ║  curl -fsSL https://milady-ai.github.io/install.sh | bash               ║
 # ║                                                                          ║
-# ║  Or, if get.milady.ai is configured:                                    ║
+# ║  Or, with custom domain:                                                ║
 # ║    curl -fsSL https://get.milady.ai | bash                              ║
 # ║                                                                          ║
 # ║  For native Windows PowerShell, use install.ps1 instead.                 ║
@@ -608,7 +608,7 @@ main() {
   if [[ "$DETECTED_OS" == "windows" && -z "$DETECTED_ENV" ]]; then
     error "This bash script requires Git Bash, MSYS2, WSL, or Cygwin on Windows."
     error "For native Windows, use PowerShell instead:"
-    error "  irm https://raw.githubusercontent.com/elizaos/eliza/main/packages/milaidy/install.ps1 | iex"
+    error "  irm https://milady-ai.github.io/install.ps1 | iex"
     exit 1
   fi
 

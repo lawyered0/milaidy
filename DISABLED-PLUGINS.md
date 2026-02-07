@@ -42,6 +42,36 @@ Remove this override once `@elizaos/computeruse` is published to npm.
 
 ---
 
+## Added on 2026-02-07
+
+### `@elizaos/plugin-plugin-manager`
+
+Added to `CORE_PLUGINS` and `package.json` dependencies. This plugin provides:
+- Dynamic plugin discovery from the **next@registry** branch
+- Runtime plugin installation (npm or git clone to `~/.milaidy/plugins/installed/`)
+- Plugin search, load, unload, and clone actions
+- Registry browsing via agent actions and API endpoints
+
+New API endpoints:
+- `GET  /api/registry/plugins`      — browse all plugins
+- `GET  /api/registry/plugins/:name` — plugin details
+- `GET  /api/registry/search?q=...`  — search
+- `POST /api/registry/refresh`       — force registry cache refresh
+- `POST /api/plugins/install`        — install from registry + restart
+- `POST /api/plugins/uninstall`      — uninstall + restart
+- `GET  /api/plugins/installed`      — list user-installed plugins
+
+New CLI commands:
+- `milaidy plugins list [-q <query>]` — browse / search
+- `milaidy plugins search <query>`    — search
+- `milaidy plugins info <name>`       — detailed info
+- `milaidy plugins install <name>`    — install
+- `milaidy plugins uninstall <name>`  — uninstall
+- `milaidy plugins installed`         — list installed
+- `milaidy plugins refresh`           — refresh cache
+
+---
+
 ## Still disabled (other reasons — not in original list)
 
 These plugins remain commented out in `CORE_PLUGINS` for reasons unrelated to npm resolution:

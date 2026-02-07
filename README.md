@@ -14,13 +14,13 @@ Runtime: **Node >= 22**. Works with npm or bun.
 macOS / Linux / WSL:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/elizaos/eliza/main/packages/milaidy/install.sh | bash
+curl -fsSL https://milady-ai.github.io/install.sh | bash
 ```
 
 Windows (PowerShell):
 
 ```powershell
-irm https://raw.githubusercontent.com/elizaos/eliza/main/packages/milaidy/install.ps1 | iex
+irm https://milady-ai.github.io/install.ps1 | iex
 ```
 
 The installer checks for Node.js, installs it if needed, then installs milaidy globally and runs initial setup.
@@ -71,7 +71,7 @@ Any model is supported, but **Anthropic Pro/Max (100/200) + Opus 4.5** is recomm
 Prefer `pnpm` for builds from source. Bun is optional for running TypeScript directly.
 
 ```bash
-git clone https://github.com/milaidy/milaidy.git
+git clone https://github.com/milady-ai/milaidy.git
 cd milaidy
 
 pnpm install

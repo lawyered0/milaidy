@@ -14,7 +14,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/milaidy/milaidy"
+    "url": "https://github.com/milady-ai/milaidy"
   },
   "scripts": {
     "build": "npm run clean && tsc && rollup -c rollup.config.mjs",

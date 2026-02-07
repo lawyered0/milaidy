@@ -112,6 +112,7 @@
     "@elizaos/plugin-openrouter": "next",
     "@elizaos/plugin-pdf": "next",
     "@elizaos/plugin-personality": "next",
+    "@elizaos/plugin-plugin-manager": "next",
     "@elizaos/plugin-scheduling": "next",
     "@elizaos/plugin-scratchpad": "next",
     "@elizaos/plugin-secrets-manager": "next",

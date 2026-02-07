@@ -1226,6 +1226,176 @@ async function handleRequest(
     return;
   }
 
+  // ── GET /api/registry/plugins ──────────────────────────────────────────
+  if (method === "GET" && pathname === "/api/registry/plugins") {
+    const { getRegistryPlugins } = await import("../services/registry-client.js");
+    try {
+      const registry = await getRegistryPlugins();
+      const plugins = Array.from(registry.values());
+      json(res, { count: plugins.length, plugins });
+    } catch (err) {
+      error(res, `Failed to fetch registry: ${err instanceof Error ? err.message : String(err)}`, 502);
+    }
+    return;
+  }
+
+  // ── GET /api/registry/plugins/:name ─────────────────────────────────────
+  if (method === "GET" && pathname.startsWith("/api/registry/plugins/") && pathname.length > "/api/registry/plugins/".length) {
+    const name = decodeURIComponent(pathname.slice("/api/registry/plugins/".length));
+    const { getPluginInfo } = await import("../services/registry-client.js");
+
+    try {
+      const info = await getPluginInfo(name);
+      if (!info) {
+        error(res, `Plugin "${name}" not found in registry`, 404);
+        return;
+      }
+      json(res, { plugin: info });
+    } catch (err) {
+      error(res, `Failed to look up plugin: ${err instanceof Error ? err.message : String(err)}`, 502);
+    }
+    return;
+  }
+
+  // ── GET /api/registry/search?q=... ──────────────────────────────────────
+  if (method === "GET" && pathname === "/api/registry/search") {
+    const query = url.searchParams.get("q") || "";
+    if (!query.trim()) {
+      error(res, "Query parameter 'q' is required", 400);
+      return;
+    }
+
+    const { searchPlugins } = await import("../services/registry-client.js");
+
+    try {
+      const limitParam = url.searchParams.get("limit");
+      const limit = limitParam ? Math.min(Math.max(Number(limitParam), 1), 50) : 15;
+      const results = await searchPlugins(query, limit);
+      json(res, { query, count: results.length, results });
+    } catch (err) {
+      error(res, `Search failed: ${err instanceof Error ? err.message : String(err)}`, 502);
+    }
+    return;
+  }
+
+  // ── POST /api/registry/refresh ──────────────────────────────────────────
+  if (method === "POST" && pathname === "/api/registry/refresh") {
+    const { refreshRegistry } = await import("../services/registry-client.js");
+
+    try {
+      const registry = await refreshRegistry();
+      json(res, { ok: true, count: registry.size });
+    } catch (err) {
+      error(res, `Refresh failed: ${err instanceof Error ? err.message : String(err)}`, 502);
+    }
+    return;
+  }
+
+  // ── POST /api/plugins/install ───────────────────────────────────────────
+  // Install a plugin from the registry and restart the agent.
+  if (method === "POST" && pathname === "/api/plugins/install") {
+    const body = JSON.parse(await readBody(req)) as { name: string; autoRestart?: boolean };
+    const pluginName = body.name?.trim();
+
+    if (!pluginName) {
+      error(res, "Request body must include 'name' (plugin package name)", 400);
+      return;
+    }
+
+    const { installPlugin } = await import("../services/plugin-installer.js");
+
+    try {
+      const result = await installPlugin(pluginName, (progress) => {
+        logger.info(`[install] ${progress.phase}: ${progress.message}`);
+      });
+
+      if (!result.success) {
+        json(res, { ok: false, error: result.error }, 422);
+        return;
+      }
+
+      // If autoRestart is not explicitly false, restart the agent
+      if (body.autoRestart !== false && result.requiresRestart) {
+        const { requestRestart } = await import("../restart.js");
+        // Defer the restart slightly so the HTTP response can be sent first
+        setTimeout(() => {
+          requestRestart(`Plugin ${result.pluginName} installed`);
+        }, 500);
+      }
+
+      json(res, {
+        ok: true,
+        plugin: {
+          name: result.pluginName,
+          version: result.version,
+          installPath: result.installPath,
+        },
+        requiresRestart: result.requiresRestart,
+        message: result.requiresRestart
+          ? `${result.pluginName} installed. Agent will restart to load it.`
+          : `${result.pluginName} installed.`,
+      });
+    } catch (err) {
+      error(res, `Install failed: ${err instanceof Error ? err.message : String(err)}`, 500);
+    }
+    return;
+  }
+
+  // ── POST /api/plugins/uninstall ─────────────────────────────────────────
+  if (method === "POST" && pathname === "/api/plugins/uninstall") {
+    const body = JSON.parse(await readBody(req)) as { name: string; autoRestart?: boolean };
+    const pluginName = body.name?.trim();
+
+    if (!pluginName) {
+      error(res, "Request body must include 'name' (plugin package name)", 400);
+      return;
+    }
+
+    const { uninstallPlugin } = await import("../services/plugin-installer.js");
+
+    try {
+      const result = await uninstallPlugin(pluginName);
+
+      if (!result.success) {
+        json(res, { ok: false, error: result.error }, 422);
+        return;
+      }
+
+      if (body.autoRestart !== false && result.requiresRestart) {
+        const { requestRestart } = await import("../restart.js");
+        setTimeout(() => {
+          requestRestart(`Plugin ${pluginName} uninstalled`);
+        }, 500);
+      }
+
+      json(res, {
+        ok: true,
+        pluginName: result.pluginName,
+        requiresRestart: result.requiresRestart,
+        message: result.requiresRestart
+          ? `${pluginName} uninstalled. Agent will restart.`
+          : `${pluginName} uninstalled.`,
+      });
+    } catch (err) {
+      error(res, `Uninstall failed: ${err instanceof Error ? err.message : String(err)}`, 500);
+    }
+    return;
+  }
+
+  // ── GET /api/plugins/installed ──────────────────────────────────────────
+  // List plugins that were installed from the registry at runtime.
+  if (method === "GET" && pathname === "/api/plugins/installed") {
+    const { listInstalledPlugins } = await import("../services/plugin-installer.js");
+
+    try {
+      const installed = await listInstalledPlugins();
+      json(res, { count: installed.length, plugins: installed });
+    } catch (err) {
+      error(res, `Failed to list installed plugins: ${err instanceof Error ? err.message : String(err)}`, 500);
+    }
+    return;
+  }
+
   // ── GET /api/skills ─────────────────────────────────────────────────────
   if (method === "GET" && pathname === "/api/skills") {
     json(res, { skills: state.skills });

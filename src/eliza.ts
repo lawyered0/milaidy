@@ -8,8 +8,11 @@
  * @module eliza
  */
 import crypto from "node:crypto";
+import fs from "node:fs/promises";
+import path from "node:path";
 import process from "node:process";
 import * as readline from "node:readline";
+import { pathToFileURL } from "node:url";
 import {
   AgentRuntime,
   ChannelType,
@@ -109,6 +112,7 @@ const CORE_PLUGINS: readonly string[] = [
   "@elizaos/plugin-shell",
   "@elizaos/plugin-personality",
   "@elizaos/plugin-experience",
+  "@elizaos/plugin-plugin-manager",
   "@elizaos/plugin-form",
   "@elizaos/plugin-browser",
   "@elizaos/plugin-cli",
@@ -246,12 +250,28 @@ export function collectPluginNames(config: MilaidyConfig): Set<string> {
     }
   }
 
+  // User-installed plugins from config.plugins.installs
+  // These are plugins that were installed via the plugin-manager at runtime
+  // and tracked in milaidy.json so they persist across restarts.
+  const installs = config.plugins?.installs;
+  if (installs && typeof installs === "object") {
+    for (const [packageName, record] of Object.entries(installs)) {
+      if (record && typeof record === "object") {
+        pluginsToLoad.add(packageName);
+      }
+    }
+  }
+
   return pluginsToLoad;
 }
 
 /**
  * Resolve Milaidy plugins from config and auto-enable logic.
  * Returns an array of ElizaOS Plugin instances ready for AgentRuntime.
+ *
+ * Handles two categories of plugins:
+ * 1. Built-in/npm plugins — imported by package name (e.g. "@elizaos/plugin-discord")
+ * 2. User-installed plugins — imported by absolute path from ~/.milaidy/plugins/installed/
  */
 async function resolvePlugins(config: MilaidyConfig): Promise<ResolvedPlugin[]> {
   const plugins: ResolvedPlugin[] = [];
@@ -265,11 +285,27 @@ async function resolvePlugins(config: MilaidyConfig): Promise<ResolvedPlugin[]> 
   const pluginsToLoad = collectPluginNames(config);
   const corePluginSet = new Set<string>(CORE_PLUGINS);
 
+  // Build a map of user-installed plugins with their install paths
+  const installRecords = config.plugins?.installs ?? {};
+
   // Dynamically import each plugin
   for (const pluginName of pluginsToLoad) {
     const isCore = corePluginSet.has(pluginName);
+    const installRecord = installRecords[pluginName];
+
     try {
-      const mod = (await import(pluginName)) as PluginModuleShape;
+      let mod: PluginModuleShape;
+
+      if (installRecord?.installPath) {
+        // User-installed plugin — load from its install directory on disk.
+        // This works cross-platform including .app bundles where we can't
+        // modify the app's node_modules.
+        mod = await importFromPath(installRecord.installPath, pluginName);
+      } else {
+        // Built-in/npm plugin — import by package name from node_modules.
+        mod = (await import(pluginName)) as PluginModuleShape;
+      }
+
       const pluginInstance = extractPlugin(mod);
 
       if (pluginInstance) {
@@ -295,6 +331,56 @@ async function resolvePlugins(config: MilaidyConfig): Promise<ResolvedPlugin[]> 
   }
 
   return plugins;
+}
+
+/**
+ * Import a plugin module from its install directory on disk.
+ *
+ * Handles two install layouts:
+ *   1. npm layout:  <installPath>/node_modules/@scope/package/  (from `bun add`)
+ *   2. git layout:  <installPath>/ is the package root directly  (from `git clone`)
+ *
+ * @param installPath  Root directory of the installation (e.g. ~/.milaidy/plugins/installed/foo/).
+ * @param packageName  The npm package name (e.g. "@elizaos/plugin-discord") — used
+ *                     to navigate directly into node_modules when present.
+ */
+async function importFromPath(installPath: string, packageName: string): Promise<PluginModuleShape> {
+  const absPath = path.resolve(installPath);
+
+  // npm/bun layout:  installPath/node_modules/@scope/name/
+  // git layout:      installPath/ is the package itself
+  const nmCandidate = path.join(absPath, "node_modules", ...packageName.split("/"));
+  let pkgRoot = absPath;
+  try {
+    if ((await fs.stat(nmCandidate)).isDirectory()) pkgRoot = nmCandidate;
+  } catch { /* git layout — pkgRoot stays as absPath */ }
+
+  // Resolve entry point from package.json
+  const entryPoint = await resolvePackageEntry(pkgRoot);
+  return (await import(pathToFileURL(entryPoint).href)) as PluginModuleShape;
+}
+
+/** Read package.json exports/main to find the importable entry file. */
+async function resolvePackageEntry(pkgRoot: string): Promise<string> {
+  const fallback = path.join(pkgRoot, "dist", "index.js");
+  try {
+    const raw = await fs.readFile(path.join(pkgRoot, "package.json"), "utf-8");
+    const pkg = JSON.parse(raw) as {
+      main?: string;
+      exports?: Record<string, string | Record<string, string>> | string;
+    };
+
+    if (typeof pkg.exports === "object" && pkg.exports["."] !== undefined) {
+      const dot = pkg.exports["."];
+      const resolved = typeof dot === "string" ? dot : (dot.import || dot.default);
+      if (typeof resolved === "string") return path.resolve(pkgRoot, resolved);
+    }
+    if (typeof pkg.exports === "string") return path.resolve(pkgRoot, pkg.exports);
+    if (pkg.main) return path.resolve(pkgRoot, pkg.main);
+    return fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 // ---------------------------------------------------------------------------

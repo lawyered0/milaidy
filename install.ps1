@@ -8,10 +8,10 @@
     milaidy globally via npm or bun.
 
     Run with:
-      irm https://raw.githubusercontent.com/elizaos/eliza/main/packages/milaidy/install.ps1 | iex
+      irm https://milady-ai.github.io/install.ps1 | iex
 
     Or save and run:
-      Invoke-WebRequest -Uri https://raw.githubusercontent.com/elizaos/eliza/main/packages/milaidy/install.ps1 -OutFile install.ps1
+      Invoke-WebRequest -Uri https://milady-ai.github.io/install.ps1 -OutFile install.ps1
       .\install.ps1
 
 .PARAMETER SkipSetup
@@ -27,7 +27,7 @@
     Skip all prompts (assume yes).
 
 .EXAMPLE
-    irm https://raw.githubusercontent.com/elizaos/eliza/main/packages/milaidy/install.ps1 | iex
+    irm https://milady-ai.github.io/install.ps1 | iex
 #>
 
 [CmdletBinding()]

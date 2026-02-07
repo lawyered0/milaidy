@@ -102,6 +102,88 @@ describe("collectPluginNames", () => {
     const config = { features: { someFeature: true, another: { enabled: false } } } as unknown as MilaidyConfig;
     expect(() => collectPluginNames(config)).not.toThrow();
   });
+
+  // --- plugins.installs (user-installed from registry) ---
+
+  it("includes user-installed plugins from config.plugins.installs", () => {
+    const config = {
+      plugins: {
+        installs: {
+          "@elizaos/plugin-weather": {
+            source: "npm",
+            installPath: "/home/user/.milaidy/plugins/installed/_elizaos_plugin-weather",
+            version: "1.0.0",
+            installedAt: "2026-02-07T00:00:00Z",
+          },
+          "@elizaos/plugin-custom": {
+            source: "npm",
+            installPath: "/home/user/.milaidy/plugins/installed/_elizaos_plugin-custom",
+            version: "2.0.0",
+            installedAt: "2026-02-07T00:00:00Z",
+          },
+        },
+      },
+    } as unknown as MilaidyConfig;
+    const names = collectPluginNames(config);
+    expect(names.has("@elizaos/plugin-weather")).toBe(true);
+    expect(names.has("@elizaos/plugin-custom")).toBe(true);
+  });
+
+  it("includes plugin-plugin-manager in core plugins", () => {
+    const names = collectPluginNames({} as MilaidyConfig);
+    expect(names.has("@elizaos/plugin-plugin-manager")).toBe(true);
+  });
+
+  it("handles empty plugins.installs gracefully", () => {
+    const config = { plugins: { installs: {} } } as unknown as MilaidyConfig;
+    const names = collectPluginNames(config);
+    // Should still have all core plugins, no crash
+    expect(names.has("@elizaos/plugin-sql")).toBe(true);
+  });
+
+  it("handles undefined plugins.installs gracefully", () => {
+    const config = { plugins: {} } as unknown as MilaidyConfig;
+    expect(() => collectPluginNames(config)).not.toThrow();
+  });
+
+  it("handles null install records gracefully", () => {
+    const config = {
+      plugins: {
+        installs: {
+          "@elizaos/plugin-bad": null,
+        },
+      },
+    } as unknown as MilaidyConfig;
+    // null records should be skipped (the typeof check catches this)
+    const names = collectPluginNames(config);
+    expect(names.has("@elizaos/plugin-bad")).toBe(false);
+  });
+
+  it("user-installed plugins coexist with core and channel plugins", () => {
+    process.env.ANTHROPIC_API_KEY = "sk-test";
+    const config = {
+      channels: { discord: { token: "tok" } },
+      plugins: {
+        installs: {
+          "@elizaos/plugin-weather": {
+            source: "npm",
+            installPath: "/tmp/test",
+            version: "1.0.0",
+          },
+        },
+      },
+    } as unknown as MilaidyConfig;
+    const names = collectPluginNames(config);
+    // Core
+    expect(names.has("@elizaos/plugin-sql")).toBe(true);
+    expect(names.has("@elizaos/plugin-plugin-manager")).toBe(true);
+    // Channel
+    expect(names.has("@elizaos/plugin-discord")).toBe(true);
+    // Provider
+    expect(names.has("@elizaos/plugin-anthropic")).toBe(true);
+    // User-installed
+    expect(names.has("@elizaos/plugin-weather")).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------
