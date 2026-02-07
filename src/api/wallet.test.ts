@@ -261,7 +261,7 @@ describe("EVM key validation", () => {
     const badKey = `0x${"g".repeat(64)}`;
     const result = validateEvmPrivateKey(badKey);
     expect(result.valid).toBe(false);
-    expect(result.error).toContain("invalid hex characters");
+    expect(result.error).toContain("Invalid hex characters");
   });
 
   it("rejects an empty string", () => {

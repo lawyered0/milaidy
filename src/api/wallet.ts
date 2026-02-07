@@ -505,6 +505,12 @@ export async function fetchSolanaNfts(address: string, heliusKey: string): Promi
 
 // Utility
 
+/** Mask a secret string for safe display (e.g. logs, UI). */
+export function maskSecret(value: string): string {
+  if (value.length <= 8) return "****";
+  return `${value.slice(0, 4)}...${value.slice(-4)}`;
+}
+
 function formatWei(wei: bigint, decimals: number): string {
   if (wei <= 0n || decimals <= 0) return wei <= 0n ? "0" : wei.toString();
   const divisor = 10n ** BigInt(decimals);
