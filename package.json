@@ -141,6 +141,7 @@
     "commander": "^14.0.3",
     "dotenv": "^17.2.3",
     "json5": "^2.2.3",
+    "ws": "^8.19.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
@@ -148,6 +149,7 @@
     "@lit-labs/signals": "^0.2.0",
     "@lit/context": "^1.1.6",
     "@types/node": "^25.2.0",
+    "@types/ws": "^8.18.1",
     "@typescript/native-preview": "7.0.0-dev.20260202.1",
     "@vitest/coverage-v8": "^4.0.18",
     "lit": "^3.3.2",

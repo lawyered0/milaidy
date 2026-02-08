@@ -10,6 +10,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
+import { WebSocketServer, type WebSocket } from "ws";
 import {
   type AgentRuntime,
   ChannelType,
@@ -3436,6 +3437,111 @@ export async function startApiServer(opts?: {
     }
   });
 
+  // ── WebSocket Server ─────────────────────────────────────────────────────
+  const wss = new WebSocketServer({ noServer: true });
+  const wsClients = new Set<WebSocket>();
+
+  // Handle upgrade requests for WebSocket
+  server.on("upgrade", (request, socket, head) => {
+    try {
+      const { pathname } = new URL(
+        request.url ?? "/",
+        `http://${request.headers.host}`,
+      );
+      if (pathname === "/ws") {
+        wss.handleUpgrade(request, socket, head, (ws) => {
+          wss.emit("connection", ws, request);
+        });
+      } else {
+        socket.destroy();
+      }
+    } catch (err) {
+      logger.error(
+        `[milaidy-api] WebSocket upgrade error: ${err instanceof Error ? err.message : err}`,
+      );
+      socket.destroy();
+    }
+  });
+
+  // Handle WebSocket connections
+  wss.on("connection", (ws: WebSocket) => {
+    wsClients.add(ws);
+    addLog("info", "WebSocket client connected", "websocket");
+
+    // Send initial status
+    try {
+      ws.send(
+        JSON.stringify({
+          type: "status",
+          data: {
+            agentState: state.agentState,
+            agentName: state.agentName,
+            model: state.model,
+            startedAt: state.startedAt,
+          },
+        }),
+      );
+    } catch (err) {
+      logger.error(
+        `[milaidy-api] WebSocket send error: ${err instanceof Error ? err.message : err}`,
+      );
+    }
+
+    ws.on("message", (data) => {
+      try {
+        const msg = JSON.parse(data.toString());
+        if (msg.type === "ping") {
+          ws.send(JSON.stringify({ type: "pong" }));
+        }
+      } catch (err) {
+        logger.error(
+          `[milaidy-api] WebSocket message error: ${err instanceof Error ? err.message : err}`,
+        );
+      }
+    });
+
+    ws.on("close", () => {
+      wsClients.delete(ws);
+      addLog("info", "WebSocket client disconnected", "websocket");
+    });
+
+    ws.on("error", (err) => {
+      logger.error(
+        `[milaidy-api] WebSocket error: ${err instanceof Error ? err.message : err}`,
+      );
+      wsClients.delete(ws);
+    });
+  });
+
+  // Broadcast status to all connected WebSocket clients
+  const broadcastStatus = () => {
+    const statusData = {
+      type: "status",
+      data: {
+        agentState: state.agentState,
+        agentName: state.agentName,
+        model: state.model,
+        startedAt: state.startedAt,
+      },
+    };
+    const message = JSON.stringify(statusData);
+    for (const client of wsClients) {
+      if (client.readyState === 1) {
+        // OPEN
+        try {
+          client.send(message);
+        } catch (err) {
+          logger.error(
+            `[milaidy-api] WebSocket broadcast error: ${err instanceof Error ? err.message : err}`,
+          );
+        }
+      }
+    }
+  };
+
+  // Broadcast status every 5 seconds
+  const statusInterval = setInterval(broadcastStatus, 5000);
+
   /** Hot-swap the runtime reference (used after an in-process restart). */
   const updateRuntime = (rt: AgentRuntime): void => {
     state.runtime = rt;
@@ -3443,6 +3549,8 @@ export async function startApiServer(opts?: {
     state.agentName = rt.character.name ?? "Milaidy";
     state.startedAt = Date.now();
     addLog("info", `Runtime restarted — agent: ${state.agentName}`, "system");
+    // Broadcast status update immediately after restart
+    broadcastStatus();
   };
 
   return new Promise((resolve) => {
@@ -3462,6 +3570,8 @@ export async function startApiServer(opts?: {
         port: actualPort,
         close: () =>
           new Promise<void>((r) => {
+            clearInterval(statusInterval);
+            wss.close();
             server.close(() => r());
           }),
         updateRuntime,
