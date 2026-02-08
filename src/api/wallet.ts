@@ -430,6 +430,12 @@ export function validatePrivateKey(key: string): KeyValidationResult {
   return validateSolanaPrivateKey(trimmed);
 }
 
+/** Mask a secret string for safe display (e.g. logs, UI). */
+export function maskSecret(value: string): string {
+  if (!value || value.length <= 8) return "****";
+  return `${value.slice(0, 4)}...${value.slice(-4)}`;
+}
+
 // Key generation
 
 export function generateWalletKeys(): WalletKeys {
@@ -872,11 +878,7 @@ export async function fetchSolanaNfts(
 
 // Utility
 
-/** Mask a secret string for safe display (e.g. logs, UI). */
-export function maskSecret(value: string): string {
-  if (value.length <= 8) return "****";
-  return `${value.slice(0, 4)}...${value.slice(-4)}`;
-}
+// maskSecret is defined near the key-validation section above
 
 function formatWei(wei: bigint, decimals: number): string {
   if (wei <= 0n || decimals <= 0) return wei <= 0n ? "0" : wei.toString();
