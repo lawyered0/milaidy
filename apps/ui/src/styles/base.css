@@ -1,151 +1,89 @@
-/* Milaidy — black & white, web1 aesthetic */
+/* Milaidy — miladymaker.net green aesthetic */
 
 :root {
   /* Background */
-  --bg: #ffffff;
-  --bg-accent: #f5f5f5;
+  --bg: #f4ffee;
+  --bg-accent: #d9f0d6;
   --bg-elevated: #ffffff;
-  --bg-hover: #f0f0f0;
-  --bg-muted: #f5f5f5;
+  --bg-hover: #d9f0d6;
+  --bg-muted: #f4ffee;
 
   /* Card / Surface */
   --card: #ffffff;
-  --card-foreground: #222222;
-  --surface: #f5f5f5;
+  --card-foreground: #2f4d0c;
+  --surface: #f4ffee;
 
   /* Text */
-  --text: #222222;
-  --text-strong: #000000;
-  --chat-text: #222222;
-  --muted: #777777;
-  --muted-strong: #555555;
+  --text: #2f4d0c;
+  --text-strong: #2f4d0c;
+  --chat-text: #2f4d0c;
+  --muted: #5a7a3a;
+  --muted-strong: #3d6018;
 
-  /* Border — black lines */
-  --border: #000000;
-  --border-strong: #000000;
-  --border-hover: #000000;
-  --input: #000000;
-  --ring: #000000;
+  /* Border — dark green lines */
+  --border: #2f4d0c;
+  --border-strong: #2f4d0c;
+  --border-hover: #2f4d0c;
+  --input: #2f4d0c;
+  --ring: #2f4d0c;
 
-  /* Accent — black */
-  --accent: #000000;
-  --accent-hover: #333333;
-  --accent-muted: #555555;
-  --accent-subtle: rgba(0, 0, 0, 0.06);
+  /* Accent — dark green */
+  --accent: #2f4d0c;
+  --accent-hover: #3d6018;
+  --accent-muted: #5a7a3a;
+  --accent-subtle: rgba(47, 77, 12, 0.08);
   --accent-foreground: #ffffff;
-  --primary: #000000;
+  --primary: #2f4d0c;
   --primary-foreground: #ffffff;
 
-  /* Semantic — greyscale */
-  --ok: #444444;
-  --ok-muted: rgba(68, 68, 68, 0.7);
-  --ok-subtle: rgba(68, 68, 68, 0.08);
-  --destructive: #222222;
+  /* Semantic */
+  --ok: #2f4d0c;
+  --ok-muted: rgba(47, 77, 12, 0.7);
+  --ok-subtle: rgba(47, 77, 12, 0.08);
+  --destructive: #991b1b;
   --destructive-foreground: #ffffff;
-  --warn: #666666;
-  --warn-muted: rgba(102, 102, 102, 0.7);
-  --warn-subtle: rgba(102, 102, 102, 0.08);
-  --danger: #222222;
-  --info: #444444;
+  --warn: #92400e;
+  --warn-muted: rgba(146, 64, 14, 0.7);
+  --warn-subtle: rgba(146, 64, 14, 0.08);
+  --danger: #991b1b;
+  --info: #2f4d0c;
 
   /* Focus */
-  --focus: rgba(0, 0, 0, 0.15);
+  --focus: rgba(47, 77, 12, 0.15);
   --focus-ring: 0 0 0 2px var(--accent);
 
-  /* Typography — serif for web1 */
-  --mono: "Courier New", Courier, monospace;
-  --font-body: Georgia, "Times New Roman", "Palatino Linotype", serif;
-  --font-display: Georgia, "Times New Roman", "Palatino Linotype", serif;
+  /* miladymaker.net box/bar tokens */
+  --header-bar-bg: #2f4d0c;
+  --header-bar-fg: #fff;
+  --section-bar-bg: #b9d9b7;
+  --section-bar-fg: #2f4d0c;
+  --link-color: blue;
+  --link-hover-color: red;
 
-  /* No shadows — web1 uses borders */
+  /* Typography — Japanese sans-serif stack */
+  --mono: "Courier New", Courier, monospace;
+  --font-body: "Hiragino Kaku Gothic Pro", Osaka, Meiryo, "MS PGothic", arial, helvetica, clean, sans-serif;
+  --font-display: "Hiragino Kaku Gothic Pro", Osaka, Meiryo, "MS PGothic", arial, helvetica, clean, sans-serif;
+
+  /* No shadows */
   --shadow-sm: none;
   --shadow-md: none;
   --shadow-lg: none;
 
-  /* Radii — minimal for web1 */
-  --radius-sm: 2px;
-  --radius-md: 2px;
-  --radius-lg: 3px;
-  --radius-xl: 4px;
-  --radius-full: 9999px;
-  --radius: 2px;
+  /* Radii — sharp rectangles */
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-full: 0px;
+  --radius: 0px;
 
-  /* Transitions — snappy, no springs */
+  /* Transitions */
   --duration-fast: 100ms;
   --duration-normal: 150ms;
   --duration-slow: 250ms;
 
   color-scheme: light;
-}
-
-/* Dark theme overrides */
-:root[data-theme="dark"] {
-  /* Background */
-  --bg: #000000;
-  --bg-accent: #0a0a0a;
-  --bg-elevated: #000000;
-  --bg-hover: #0f0f0f;
-  --bg-muted: #0a0a0a;
-
-  /* Card / Surface */
-  --card: #000000;
-  --card-foreground: #dddddd;
-  --surface: #0a0a0a;
-
-  /* Text */
-  --text: #dddddd;
-  --text-strong: #ffffff;
-  --chat-text: #dddddd;
-  --muted: #888888;
-  --muted-strong: #aaaaaa;
-
-  /* Border — white lines */
-  --border: #ffffff;
-  --border-strong: #ffffff;
-  --border-hover: #ffffff;
-  --input: #ffffff;
-  --ring: #ffffff;
-
-  /* Accent — white */
-  --accent: #ffffff;
-  --accent-hover: #cccccc;
-  --accent-muted: #aaaaaa;
-  --accent-subtle: rgba(255, 255, 255, 0.06);
-  --accent-foreground: #000000;
-  --primary: #ffffff;
-  --primary-foreground: #000000;
-
-  /* Semantic — white/grey scale */
-  --ok: #bbbbbb;
-  --ok-muted: rgba(187, 187, 187, 0.7);
-  --ok-subtle: rgba(187, 187, 187, 0.08);
-  --destructive: #dddddd;
-  --destructive-foreground: #000000;
-  --warn: #999999;
-  --warn-muted: rgba(153, 153, 153, 0.7);
-  --warn-subtle: rgba(153, 153, 153, 0.08);
-  --danger: #dddddd;
-  --info: #bbbbbb;
-
-  /* Focus */
-  --focus: rgba(255, 255, 255, 0.15);
-  --focus-ring: 0 0 0 2px var(--accent);
-
-  /* Scrollbar — adjust for dark theme */
-  --scrollbar-track: transparent;
-  --scrollbar-thumb: #666666;
-  --scrollbar-thumb-hover: #999999;
-
-  color-scheme: dark;
-}
-
-/* Update scrollbar styles for dark theme */
-:root[data-theme="dark"] ::-webkit-scrollbar-thumb {
-  background: var(--scrollbar-thumb);
-}
-
-:root[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
-  background: var(--scrollbar-thumb-hover);
 }
 
 * {
@@ -160,7 +98,8 @@ body {
 body {
   margin: 0;
   font: 400 14px/1.65 var(--font-body);
-  background: var(--bg);
+  background-image: linear-gradient(#d9f0d6, #f4ffee, #f4ffee, white, white);
+  background-attachment: fixed;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
 }
@@ -174,12 +113,12 @@ milaidy-app {
 }
 
 a {
-  color: var(--accent);
+  color: blue;
   text-decoration: underline;
 }
 
 a:hover {
-  color: var(--accent-hover);
+  color: red;
 }
 
 button,
@@ -191,11 +130,11 @@ select {
 }
 
 ::selection {
-  background: var(--accent-subtle);
-  color: var(--text-strong);
+  background: #b9d9b7;
+  color: #2f4d0c;
 }
 
-/* Scrollbar — minimal */
+/* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -206,11 +145,11 @@ select {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #999999;
+  background: #b9d9b7;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #666666;
+  background: #9db89b;
 }
 
 /* Focus visible */

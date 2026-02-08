@@ -40,13 +40,11 @@ import { tabFromPath, pathForTab, type Tab, TAB_GROUPS, titleForTab } from "./na
 import "./database-viewer.js";
 
 const CHAT_STORAGE_KEY = "milaidy:chatMessages";
-const THEME_STORAGE_KEY = "milaidy:theme";
 
 @customElement("milaidy-app")
 export class MilaidyApp extends LitElement {
   // --- State ---
   @state() tab: Tab = "chat";
-  @state() isDarkMode: boolean = false;
   @state() connected = false;
   @state() agentStatus: AgentStatus | null = null;
   @state() onboardingComplete = false;
@@ -122,6 +120,7 @@ export class MilaidyApp extends LitElement {
   @state() pairingError: string | null = null;
   @state() pairingBusy = false;
 
+  private isMobileDevice = false;
   private nativeListenerHandles: Array<{ remove: () => Promise<void> }> = [];
   private actionNoticeTimer: number | null = null;
   private shareIngestTimer: number | null = null;
@@ -195,11 +194,10 @@ export class MilaidyApp extends LitElement {
   @state() importSuccess: string | null = null;
 
   // Onboarding wizard state
-  @state() onboardingStep: "welcome" | "name" | "style" | "theme" | "runMode" | "cloudProvider" | "modelSelection" | "llmProvider" | "inventorySetup" = "welcome";
+  @state() onboardingStep: "welcome" | "name" | "style" | "runMode" | "cloudProvider" | "modelSelection" | "llmProvider" | "inventorySetup" = "welcome";
   @state() onboardingOptions: OnboardingOptions | null = null;
   @state() onboardingName = "";
   @state() onboardingStyle = "";
-  @state() onboardingTheme: "light" | "dark" = "light";
   @state() onboardingRunMode: "local" | "cloud" | "" = "";
   @state() onboardingCloudProvider = "";
   @state() onboardingSmallModel = "claude-haiku";
@@ -218,7 +216,8 @@ export class MilaidyApp extends LitElement {
       overflow: hidden;
       font-family: var(--font-body);
       color: var(--text);
-      background: var(--bg);
+      background-image: linear-gradient(#d9f0d6, #f4ffee, #f4ffee, white, white);
+      background-attachment: fixed;
     }
 
     /* Layout */
@@ -227,9 +226,9 @@ export class MilaidyApp extends LitElement {
       flex-direction: column;
       flex: 1;
       min-height: 0;
-      max-width: 900px;
+      max-width: 80%;
       margin: 0 auto;
-      padding: 0 20px;
+      padding: 0 32px;
       width: 100%;
       box-sizing: border-box;
     }
@@ -237,17 +236,19 @@ export class MilaidyApp extends LitElement {
     .pairing-shell {
       max-width: 560px;
       margin: 60px auto;
-      padding: 24px;
+      padding: 0;
       border: 1px solid var(--border);
       background: var(--card);
-      border-radius: 10px;
+      border-radius: 0;
     }
 
     .pairing-title {
-      font-size: 18px;
-      font-weight: 600;
-      margin-bottom: 8px;
-      color: var(--text-strong);
+      font-size: 14px;
+      font-weight: bold;
+      margin-bottom: 0;
+      padding: 6px 12px;
+      color: var(--header-bar-fg);
+      background: var(--header-bar-bg);
     }
 
     .pairing-sub {
@@ -259,7 +260,7 @@ export class MilaidyApp extends LitElement {
     .pairing-input {
       width: 100%;
       padding: 10px 12px;
-      border-radius: 8px;
+      border-radius: 0;
       border: 1px solid var(--border);
       background: var(--bg-muted);
       color: var(--text);
@@ -280,22 +281,23 @@ export class MilaidyApp extends LitElement {
 
     /* Header */
     header {
-      border-bottom: 1px solid var(--border);
-      padding: 16px 0;
+      background: var(--header-bar-bg);
+      color: var(--header-bar-fg);
+      padding: 6px 12px;
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
 
     .logo {
-      font-size: 18px;
+      font-size: 14px;
       font-weight: bold;
-      color: var(--text-strong);
+      color: #fff;
       text-decoration: none;
     }
 
     .logo:hover {
-      color: var(--accent);
+      color: #fff;
       text-decoration: none;
     }
 
@@ -308,52 +310,32 @@ export class MilaidyApp extends LitElement {
 
     .status-pill {
       padding: 2px 10px;
-      border: 1px solid var(--border);
+      border: 1px solid rgba(255,255,255,0.5);
       font-size: 12px;
       font-family: var(--mono);
+      color: #fff;
     }
 
-    .status-pill.running { border-color: var(--ok); color: var(--ok); }
-    .status-pill.paused { border-color: var(--warn); color: var(--warn); }
-    .status-pill.stopped { border-color: var(--muted); color: var(--muted); }
-    .status-pill.restarting { border-color: var(--warn); color: var(--warn); }
-    .status-pill.error { border-color: var(--danger, #e74c3c); color: var(--danger, #e74c3c); }
+    .status-pill.running { border-color: #b9d9b7; color: #b9d9b7; }
+    .status-pill.paused { border-color: #fbbf24; color: #fbbf24; }
+    .status-pill.stopped { border-color: rgba(255,255,255,0.5); color: rgba(255,255,255,0.5); }
+    .status-pill.restarting { border-color: #fbbf24; color: #fbbf24; }
+    .status-pill.error { border-color: #f87171; color: #f87171; }
 
     .lifecycle-btn {
       padding: 4px 12px;
-      border: 1px solid var(--border);
-      background: var(--bg);
+      border: 1px solid rgba(255,255,255,0.5);
+      background: transparent;
+      color: #fff;
       cursor: pointer;
       font-size: 12px;
       font-family: var(--mono);
     }
 
     .lifecycle-btn:hover {
-      border-color: var(--accent);
-      color: var(--accent);
-    }
-
-    /* Theme toggle */
-    .theme-toggle {
-      padding: 8px;
-      border: 1px solid var(--border);
-      background: var(--bg);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: var(--radius-sm);
-      transition: all var(--duration-fast) ease;
-    }
-
-    .theme-toggle:hover {
-      border-color: var(--accent);
-      color: var(--accent);
-    }
-
-    .theme-toggle:focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: 1px;
+      border-color: #fff;
+      background: rgba(255,255,255,0.1);
+      color: #fff;
     }
 
     /* Wallet icon */
@@ -364,8 +346,9 @@ export class MilaidyApp extends LitElement {
 
     .wallet-btn {
       padding: 4px 8px;
-      border: 1px solid var(--border);
-      background: var(--bg);
+      border: 1px solid rgba(255,255,255,0.5);
+      background: transparent;
+      color: #fff;
       cursor: pointer;
       font-size: 14px;
       line-height: 1;
@@ -375,8 +358,8 @@ export class MilaidyApp extends LitElement {
     }
 
     .wallet-btn:hover {
-      border-color: var(--accent);
-      color: var(--accent);
+      border-color: #fff;
+      color: #fff;
     }
 
     .wallet-tooltip {
@@ -390,7 +373,7 @@ export class MilaidyApp extends LitElement {
       background: var(--bg);
       z-index: 100;
       min-width: 280px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+      box-shadow: 0 2px 8px rgba(47,77,12,0.12);
     }
 
     .wallet-wrapper:hover .wallet-tooltip {
@@ -657,8 +640,11 @@ export class MilaidyApp extends LitElement {
     }
 
     .setup-card h3 {
-      margin: 0 0 8px 0;
-      font-size: 15px;
+      margin: -20px -20px 12px -20px;
+      padding: 6px 12px;
+      font-size: 14px;
+      background: var(--section-bar-bg);
+      color: var(--section-bar-fg);
     }
 
     .setup-card p {
@@ -677,7 +663,11 @@ export class MilaidyApp extends LitElement {
     }
 
     .setup-card a {
-      color: var(--accent);
+      color: blue;
+    }
+
+    .setup-card a:hover {
+      color: red;
     }
 
     .setup-input-row {
@@ -708,28 +698,29 @@ export class MilaidyApp extends LitElement {
 
     /* Navigation */
     nav {
-      border-bottom: 1px solid var(--border);
-      padding: 8px 0;
+      background: var(--section-bar-bg);
+      padding: 6px 12px;
     }
 
     nav a {
       display: inline-block;
-      padding: 4px 12px;
+      padding: 2px 8px;
       margin-right: 4px;
-      color: var(--muted);
-      text-decoration: none;
+      color: blue;
+      text-decoration: underline;
       font-size: 13px;
-      border-bottom: 2px solid transparent;
+      border-bottom: none;
     }
 
     nav a:hover {
-      color: var(--text);
-      text-decoration: none;
+      color: red;
+      text-decoration: underline;
     }
 
     nav a.active {
-      color: var(--accent);
-      border-bottom-color: var(--accent);
+      color: var(--section-bar-fg);
+      font-weight: bold;
+      text-decoration: none;
     }
 
     /* Main content */
@@ -751,10 +742,12 @@ export class MilaidyApp extends LitElement {
     }
 
     h2 {
-      font-size: 18px;
-      font-weight: normal;
-      margin: 0 0 8px 0;
-      color: var(--text-strong);
+      font-size: 14px;
+      font-weight: bold;
+      margin: 0;
+      padding: 6px 12px;
+      background: var(--section-bar-bg);
+      color: var(--section-bar-fg);
     }
 
     .subtitle {
@@ -816,7 +809,7 @@ export class MilaidyApp extends LitElement {
     .onboarding-speech {
       background: var(--card);
       border: 1px solid var(--border);
-      border-radius: 12px;
+      border-radius: 0;
       padding: 16px 20px;
       margin: 0 auto 24px;
       max-width: 360px;
@@ -859,7 +852,7 @@ export class MilaidyApp extends LitElement {
 
     .onboarding-option.selected {
       border-color: var(--accent);
-      background: var(--accent-subtle);
+      background: var(--section-bar-bg);
     }
 
     .onboarding-option .label {
@@ -893,10 +886,6 @@ export class MilaidyApp extends LitElement {
       -webkit-overflow-scrolling: touch;
     }
 
-    .theme-option {
-      transition: border-color 0.15s, background 0.15s;
-    }
-
     .inventory-chain-block {
       margin-bottom: 12px;
     }
@@ -923,17 +912,18 @@ export class MilaidyApp extends LitElement {
 
     .btn {
       padding: 8px 24px;
-      border: 1px solid var(--accent);
-      background: var(--accent);
-      color: var(--accent-foreground);
+      border: 1px solid var(--border);
+      background: var(--section-bar-bg);
+      color: var(--section-bar-fg);
       cursor: pointer;
       font-size: 14px;
       margin-top: 20px;
     }
 
     .btn:hover:not(:disabled) {
-      background: var(--accent-hover);
-      border-color: var(--accent-hover);
+      background: var(--header-bar-bg);
+      border-color: var(--header-bar-bg);
+      color: var(--header-bar-fg);
     }
 
     .btn:disabled {
@@ -943,11 +933,11 @@ export class MilaidyApp extends LitElement {
 
     .btn-outline {
       background: transparent;
-      color: var(--accent);
+      color: var(--text);
     }
 
     .btn-outline:hover {
-      background: var(--accent-subtle);
+      background: var(--section-bar-bg);
     }
 
     .btn-row {
@@ -996,17 +986,23 @@ export class MilaidyApp extends LitElement {
     .chat-msg {
       margin-bottom: 16px;
       line-height: 1.6;
+      border: 1px solid var(--border);
+      background: var(--card);
     }
 
     .chat-msg .role {
       font-weight: bold;
       font-size: 13px;
-      color: var(--muted-strong);
-      margin-bottom: 2px;
+      padding: 4px 12px;
+      margin-bottom: 0;
     }
 
-    .chat-msg.user .role { color: var(--text-strong); }
-    .chat-msg.assistant .role { color: var(--accent); }
+    .chat-msg .msg-body {
+      padding: 8px 12px;
+    }
+
+    .chat-msg.user .role { background: var(--section-bar-bg); color: var(--section-bar-fg); }
+    .chat-msg.assistant .role { background: var(--header-bar-bg); color: var(--header-bar-fg); }
 
     .chat-input-row {
       display: flex;
@@ -1254,7 +1250,7 @@ export class MilaidyApp extends LitElement {
       padding: 2px 8px;
       font-size: 10px;
       font-family: var(--mono);
-      border-radius: 10px;
+      border-radius: 0;
       border: 1px solid var(--border);
     }
 
@@ -1317,7 +1313,7 @@ export class MilaidyApp extends LitElement {
       display: inline-block;
       padding: 1px 6px;
       font-size: 10px;
-      border-radius: 8px;
+      border-radius: 0;
       background: var(--bg-muted);
       color: var(--muted);
       border: 1px solid var(--border);
@@ -1326,7 +1322,7 @@ export class MilaidyApp extends LitElement {
     .store-detail-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.5);
+      background: rgba(47,77,12,0.35);
       z-index: 200;
       display: flex;
       align-items: center;
@@ -1428,7 +1424,7 @@ export class MilaidyApp extends LitElement {
 
   connectedCallback(): void {
     super.connectedCallback();
-    this.initializeTheme();
+    this.isMobileDevice = this.detectMobile();
     this.initializeApp();
     window.addEventListener("popstate", this.handlePopState);
     window.addEventListener("keydown", this.handleGlobalKeydown);
@@ -3593,7 +3589,6 @@ export class MilaidyApp extends LitElement {
       this.onboardingStep = "welcome";
       this.onboardingName = "";
       this.onboardingStyle = "";
-      this.onboardingTheme = this.isDarkMode ? "dark" : "light";
       this.onboardingRunMode = "";
       this.onboardingCloudProvider = "";
       this.onboardingSmallModel = "claude-haiku";
@@ -3814,12 +3809,6 @@ export class MilaidyApp extends LitElement {
         this.onboardingStep = "style";
         break;
       case "style":
-        this.onboardingStep = "theme";
-        break;
-      case "theme": {
-        this.isDarkMode = this.onboardingTheme === "dark";
-        this.updateThemeAttribute();
-        localStorage.setItem(THEME_STORAGE_KEY, this.onboardingTheme);
         if (this.isMobileDevice) {
           this.onboardingRunMode = "cloud";
           if (opts && opts.cloudProviders.length === 1) {
@@ -3832,7 +3821,6 @@ export class MilaidyApp extends LitElement {
           this.onboardingStep = "runMode";
         }
         break;
-      }
       case "runMode":
         if (this.onboardingRunMode === "cloud") {
           if (opts && opts.cloudProviders.length === 1) {
@@ -3868,20 +3856,17 @@ export class MilaidyApp extends LitElement {
       case "style":
         this.onboardingStep = "name";
         break;
-      case "theme":
+      case "runMode":
         this.onboardingStep = "style";
         break;
-      case "runMode":
-        this.onboardingStep = "theme";
-        break;
       case "cloudProvider":
-        this.onboardingStep = this.isMobileDevice ? "theme" : "runMode";
+        this.onboardingStep = this.isMobileDevice ? "style" : "runMode";
         break;
       case "modelSelection":
         if (this.onboardingOptions && this.onboardingOptions.cloudProviders.length > 1) {
           this.onboardingStep = "cloudProvider";
         } else {
-          this.onboardingStep = this.isMobileDevice ? "theme" : "runMode";
+          this.onboardingStep = this.isMobileDevice ? "style" : "runMode";
         }
         break;
       case "llmProvider":
@@ -3907,6 +3892,8 @@ export class MilaidyApp extends LitElement {
 
     await client.submitOnboarding({
       name: this.onboardingName,
+      theme: "light",
+      runMode: (this.onboardingRunMode || "local") as "local" | "cloud",
       bio: style?.bio ?? ["An autonomous AI agent."],
       systemPrompt,
       style: style?.style,
@@ -3937,11 +3924,11 @@ export class MilaidyApp extends LitElement {
     const selected = Math.min(this.commandActiveIndex, Math.max(0, items.length - 1));
     return html`
       <div
-        style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:999;"
+        style="position:fixed;inset:0;background:rgba(47,77,12,0.35);z-index:999;"
         @click=${this.closeCommandPalette}
       >
         <div
-          style="max-width:720px;margin:8vh auto 0;border:1px solid var(--border);background:var(--card);padding:12px;"
+          style="max-width:720px;margin:8vh auto 0;border:1px solid #2f4d0c;background:white;padding:12px;"
           @click=${(e: Event) => e.stopPropagation()}
         >
           <div style="display:flex;align-items:center;gap:8px;">
@@ -4122,7 +4109,6 @@ export class MilaidyApp extends LitElement {
           ${this.renderCloudCreditBadge()}
         </div>
         <div style="display:flex;align-items:center;gap:12px;">
-          ${this.renderThemeToggle()}
           <div class="status-bar">
           <span class="status-pill ${state}">${state}</span>
           ${state === "not_started" || state === "stopped"
@@ -4139,27 +4125,6 @@ export class MilaidyApp extends LitElement {
           <button class="lifecycle-btn" @click=${this.openCommandPalette} title="Command palette (Cmd/Ctrl+K)">Cmd+K</button>
         </div>
       </header>
-    `;
-  }
-
-  private renderThemeToggle() {
-    return html`
-      <button
-        class="theme-toggle"
-        @click=${this.toggleTheme}
-        title=${this.isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
-        aria-label=${this.isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
-      >
-        ${this.isDarkMode 
-          ? html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="5"/>
-              <path d="m12 1 1.5 1.5M12 1l-1.5 1.5M21 12l-1.5 1.5M21 12l1.5 1.5M12 21l-1.5-1.5M12 21l1.5-1.5M3 12l1.5-1.5M3 12l-1.5-1.5"/>
-            </svg>` 
-          : html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-            </svg>`
-        }
-      </button>
     `;
   }
 
@@ -6434,7 +6399,6 @@ export class MilaidyApp extends LitElement {
           ${this.onboardingStep === "welcome" ? this.renderOnboardingWelcome() : ""}
           ${this.onboardingStep === "name" ? this.renderOnboardingName(opts) : ""}
           ${this.onboardingStep === "style" ? this.renderOnboardingStyle(opts) : ""}
-          ${this.onboardingStep === "theme" ? this.renderOnboardingTheme() : ""}
           ${this.onboardingStep === "runMode" ? this.renderOnboardingRunMode() : ""}
           ${this.onboardingStep === "cloudProvider" ? this.renderOnboardingCloudProvider(opts) : ""}
           ${this.onboardingStep === "modelSelection" ? this.renderOnboardingModelSelection(opts) : ""}
@@ -6531,35 +6495,6 @@ export class MilaidyApp extends LitElement {
           @click=${this.handleOnboardingNext}
           ?disabled=${!this.onboardingStyle}
         >Next</button>
-      </div>
-    `;
-  }
-
-  private renderOnboardingTheme() {
-    return html`
-      <img class="onboarding-avatar" src="/pfp.jpg" alt="milAIdy" style="width:100px;height:100px;" />
-      <div class="onboarding-speech">do you prefer it light or dark?</div>
-      <div class="onboarding-options" style="flex-direction:row;gap:12px;">
-        <div
-          class="onboarding-option theme-option ${this.onboardingTheme === "light" ? "selected" : ""}"
-          @click=${() => { this.onboardingTheme = "light"; }}
-          style="flex:1;text-align:center;padding:20px 16px;"
-        >
-          <div style="font-size:28px;margin-bottom:8px;">&#9728;</div>
-          <div class="label">Light</div>
-        </div>
-        <div
-          class="onboarding-option theme-option ${this.onboardingTheme === "dark" ? "selected" : ""}"
-          @click=${() => { this.onboardingTheme = "dark"; }}
-          style="flex:1;text-align:center;padding:20px 16px;"
-        >
-          <div style="font-size:28px;margin-bottom:8px;">&#9790;</div>
-          <div class="label">Dark</div>
-        </div>
-      </div>
-      <div class="btn-row">
-        <button class="btn btn-outline" @click=${() => this.handleOnboardingBack()}>Back</button>
-        <button class="btn" @click=${this.handleOnboardingNext}>Next</button>
       </div>
     `;
   }
@@ -6811,33 +6746,6 @@ export class MilaidyApp extends LitElement {
     `;
   }
 
-  // --- Theme Management ---
-
-  private initializeTheme(): void {
-    // Load theme preference from localStorage
-    const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
-    if (savedTheme === "dark" || savedTheme === "light") {
-      this.isDarkMode = savedTheme === "dark";
-      this.onboardingTheme = savedTheme;
-    } else {
-      // Detect system preference if no saved preference
-      this.isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      this.onboardingTheme = this.isDarkMode ? "dark" : "light";
-    }
-    this.updateThemeAttribute();
-    // Detect mobile device for onboarding flow
-    this.isMobileDevice = this.detectMobile();
-  }
-
-  private updateThemeAttribute(): void {
-    document.documentElement.setAttribute('data-theme', this.isDarkMode ? 'dark' : 'light');
-  }
-
-  private toggleTheme(): void {
-    this.isDarkMode = !this.isDarkMode;
-    this.updateThemeAttribute();
-    localStorage.setItem(THEME_STORAGE_KEY, this.isDarkMode ? "dark" : "light");
-  }
 }
 
 declare global {
