@@ -111,7 +111,7 @@
     "@elizaos/plugin-google-genai": "2.0.0-alpha.3",
     "@elizaos/plugin-groq": "next",
     "@elizaos/plugin-imessage": "next",
-    "@elizaos/plugin-knowledge": "next",
+    "@elizaos/plugin-knowledge": "2.0.0-alpha.3",
     "@elizaos/plugin-local-embedding": "next",
     "@elizaos/plugin-mattermost": "next",
     "@elizaos/plugin-mcp": "next",
