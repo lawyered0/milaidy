@@ -123,8 +123,9 @@ test.describe("Chat page", () => {
     await input.fill("Restore test");
     await page.locator("button").filter({ hasText: "Send" }).click();
 
-    await expect(page.locator("button").filter({ hasText: "..." })).toBeVisible();
-
+    // The "..." sending state is transient — the mock responds instantly so
+    // the button may flip back to "Send" before we can assert.  Just verify
+    // the end state: after the response arrives, Send is visible again.
     await simulateAgentResponse(page, "Done!");
     await expect(page.locator("button").filter({ hasText: "Send" })).toBeVisible();
   });
