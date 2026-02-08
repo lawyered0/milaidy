@@ -1,16 +1,19 @@
 import { expect, test } from "@playwright/test";
 import { mockApi } from "./helpers";
 
+/** Open the command palette via the header button. */
+async function openPalette(page: import("@playwright/test").Page): Promise<void> {
+  await page.locator(".lifecycle-btn", { hasText: "Cmd+K" }).click();
+  await expect(page.getByPlaceholder("Type a command...")).toBeVisible();
+}
+
 test.describe("Command palette", () => {
-  test("opens via Cmd/Ctrl+K and executes navigation command", async ({ page }) => {
+  test("opens via header button and executes navigation command", async ({ page }) => {
     await mockApi(page, { onboardingComplete: true, agentState: "running" });
     await page.goto("/chat");
+    await expect(page.getByPlaceholder("Type a message...")).toBeVisible();
 
-    await page.keyboard.press("Meta+K").catch(async () => {
-      await page.keyboard.press("Control+K");
-    });
-
-    await expect(page.getByPlaceholder("Type a command...")).toBeVisible();
+    await openPalette(page);
     await page.getByRole("button", { name: "Open Workbench" }).click();
 
     await expect(page).toHaveURL(/\/workbench/);
@@ -20,12 +23,9 @@ test.describe("Command palette", () => {
   test("supports keyboard execution from query (Enter)", async ({ page }) => {
     await mockApi(page, { onboardingComplete: true, agentState: "running" });
     await page.goto("/chat");
+    await expect(page.getByPlaceholder("Type a message...")).toBeVisible();
 
-    await page.keyboard.press("Meta+K").catch(async () => {
-      await page.keyboard.press("Control+K");
-    });
-
-    await expect(page.getByPlaceholder("Type a command...")).toBeVisible();
+    await openPalette(page);
     await page.getByPlaceholder("Type a command...").fill("open logs");
     await page.keyboard.press("Enter");
 

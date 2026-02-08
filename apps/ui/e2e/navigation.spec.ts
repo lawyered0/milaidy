@@ -47,7 +47,7 @@ test.describe("Navigation", () => {
     await page.getByRole("link", { name: "Skills" }).click();
 
     await expect(page).toHaveURL(/\/skills/);
-    await expect(page.getByText("View available agent skills")).toBeVisible();
+    await expect(page.getByText("View loaded skills and install more from GitHub/Skills marketplace.")).toBeVisible();
   });
 
   test("navigates to config tab", async ({ page }) => {

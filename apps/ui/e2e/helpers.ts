@@ -356,6 +356,13 @@ export async function mockApi(page: Page, opts: MockApiOptions = {}): Promise<vo
     });
   });
 
+  await page.route("**/api/auth/status", async (route: Route) => {
+    await route.fulfill({
+      status: 200, contentType: "application/json",
+      body: JSON.stringify({ required: false, pairingEnabled: false, expiresAt: null }),
+    });
+  });
+
   await page.route("**/api/onboarding/status", async (route: Route) => {
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ complete: onboardingComplete }) });
   });
@@ -1294,6 +1301,27 @@ export async function mockApi(page: Page, opts: MockApiOptions = {}): Promise<vo
     await route.fulfill({
       status: 200, contentType: "application/json",
       body: JSON.stringify({ ok: true, servers: mcpServerStatuses }),
+    });
+  });
+
+  await page.route("**/api/cloud/status", async (route: Route) => {
+    await route.fulfill({
+      status: 200, contentType: "application/json",
+      body: JSON.stringify({ connected: false }),
+    });
+  });
+
+  await page.route("**/api/cloud/credits", async (route: Route) => {
+    await route.fulfill({
+      status: 200, contentType: "application/json",
+      body: JSON.stringify({ provider: null, credits: null, limit: null }),
+    });
+  });
+
+  await page.route("**/api/skills/marketplace/config", async (route: Route) => {
+    await route.fulfill({
+      status: 200, contentType: "application/json",
+      body: JSON.stringify({ apiKeySet: false }),
     });
   });
 

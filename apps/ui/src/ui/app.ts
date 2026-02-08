@@ -3165,7 +3165,7 @@ export class MilaidyApp extends LitElement {
       }
       const [registry, installed] = await Promise.all([
         client.getRegistryPlugins(),
-        client.getInstalledRegistryPlugins(),
+        client.getInstalledPlugins(),
       ]);
       this.marketplacePlugins = registry.plugins;
       this.marketplaceInstalled = installed.plugins;
@@ -3992,6 +3992,7 @@ export class MilaidyApp extends LitElement {
         ${this.renderNav()}
         <main class=${this.tab === "chat" ? "chat-active" : ""}>${this.renderView()}</main>
       </div>
+      ${this.renderCommandPalette()}
     `;
   }
 

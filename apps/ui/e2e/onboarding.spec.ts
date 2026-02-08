@@ -60,8 +60,8 @@ test.describe("Onboarding Wizard", () => {
     await page.getByText("uwu~").click();
     await page.getByText("Next").click();
 
-    // Step 4: Provider (conversational speech bubble)
-    await expect(page.getByText("which AI provider do you want to use?")).toBeVisible();
+    // Step 4: Run mode (conversational speech bubble)
+    await expect(page.getByText("where should I run?")).toBeVisible();
   });
 
   test("shows provider options with Eliza Cloud first", async ({ page }) => {
@@ -74,8 +74,11 @@ test.describe("Onboarding Wizard", () => {
     await page.getByText("Next").click();
     await page.getByText("uwu~").click();
     await page.getByText("Next").click();
+    // Step 4: Run mode
+    await page.getByText("Local").click();
+    await page.getByText("Next").click();
 
-    // Step 4: Provider
+    // Step 5: Provider
     const providers = page.locator(".onboarding-option");
     const firstProvider = providers.first();
     await expect(firstProvider.getByText("Eliza Cloud")).toBeVisible();
@@ -95,6 +98,9 @@ test.describe("Onboarding Wizard", () => {
     await page.getByText("Next").click();
     await page.getByText("uwu~").click();
     await page.getByText("Next").click();
+    // Step 4: Run mode
+    await page.getByText("Local").click();
+    await page.getByText("Next").click();
 
     // Select Anthropic (requires key)
     await page.getByText("Anthropic").click();
@@ -105,25 +111,26 @@ test.describe("Onboarding Wizard", () => {
     await expect(page.getByPlaceholder("API Key")).not.toBeVisible();
   });
 
-  test("shows channel setup step and allows skip", async ({ page }) => {
+  test("shows skills marketplace step and allows skip", async ({ page }) => {
     await mockApi(page, { onboardingComplete: false });
     await page.goto("/");
 
-    // Get to channels step
+    // Get to skills marketplace step
     await page.getByText("Continue").click();
     await page.getByText("Reimu").click();
     await page.getByText("Next").click();
     await page.getByText("uwu~").click();
     await page.getByText("Next").click();
+    // Step 4: Run mode
+    await page.getByText("Local").click();
+    await page.getByText("Next").click();
+    // Step 5: Provider
     await page.getByText("Eliza Cloud").click();
     await page.getByText("Next").click();
 
-    // Step 5: Channels
-    await expect(page.getByText("Connect to messaging")).toBeVisible();
-    await expect(page.getByText("Telegram Bot Token")).toBeVisible();
-    await expect(page.getByText("Discord Bot Token")).toBeVisible();
+    // Step 6: Skills Marketplace
+    await expect(page.getByText("want to connect to the Skills Marketplace?")).toBeVisible();
     await expect(page.getByRole("button", { name: "Skip" })).toBeVisible();
-    await expect(page.getByText("Finish")).toBeVisible();
   });
 
   test("completes onboarding and shows chat view", async ({ page }) => {
@@ -136,11 +143,14 @@ test.describe("Onboarding Wizard", () => {
     await page.getByText("Next").click();
     await page.getByText("uwu~").click();
     await page.getByText("Next").click();
+    // Step 4: Run mode
+    await page.getByText("Local").click();
+    await page.getByText("Next").click();
+    // Step 5: Provider
     await page.getByText("Eliza Cloud").click();
     await page.getByText("Next").click();
 
-    // After onboarding POST, the mock returns complete: true on reload
-    // but since we mock agent/start too, the UI should transition
+    // Step 6: Skills Marketplace — skip it
     await page.getByRole("button", { name: "Skip" }).click();
 
     // Should now show the main app (agent started)

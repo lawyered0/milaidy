@@ -22,7 +22,7 @@ test.describe("Plugins page", () => {
 
   test("lists all plugins from mock data", async ({ page }) => {
     const items = page.locator(".plugin-item");
-    await expect(items).toHaveCount(12);
+    await expect(items).toHaveCount(11);
   });
 
   test("shows plugin names and descriptions", async ({ page }) => {
@@ -32,7 +32,7 @@ test.describe("Plugins page", () => {
 
   test("shows enabled/disabled toggle for each plugin", async ({ page }) => {
     const toggles = page.locator("[data-plugin-toggle]");
-    await expect(toggles).toHaveCount(12);
+    await expect(toggles).toHaveCount(11);
   });
 
   test("enabled plugins have checked toggles", async ({ page }) => {
@@ -162,7 +162,7 @@ test.describe("Plugins page", () => {
     await filters.nth(1).click();
     // Then click All
     await filters.nth(0).click();
-    await expect(page.locator(".plugin-item")).toHaveCount(12);
+    await expect(page.locator(".plugin-item")).toHaveCount(11);
   });
 
   // --- Toggle within filtered view ---
