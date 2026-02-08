@@ -5297,12 +5297,10 @@ export async function startApiServer(opts?: {
   const broadcastStatus = () => {
     const statusData = {
       type: "status",
-      data: {
-        agentState: state.agentState,
-        agentName: state.agentName,
-        model: state.model,
-        startedAt: state.startedAt,
-      },
+      state: state.agentState,
+      agentName: state.agentName,
+      model: state.model,
+      startedAt: state.startedAt,
     };
     const message = JSON.stringify(statusData);
     for (const client of wsClients) {
