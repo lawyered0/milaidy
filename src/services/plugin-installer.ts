@@ -21,7 +21,7 @@
  * @module services/plugin-installer
  */
 
-import { exec } from "node:child_process";
+import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -31,7 +31,7 @@ import { loadMilaidyConfig, saveMilaidyConfig } from "../config/config.js";
 import { requestRestart } from "../runtime/restart.js";
 import { getPluginInfo, type RegistryPluginInfo } from "./registry-client.js";
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 // ---------------------------------------------------------------------------
 // Input validation — prevent shell injection
@@ -158,7 +158,7 @@ function pluginDir(pluginName: string): string {
 async function detectPackageManager(): Promise<"bun" | "pnpm" | "npm"> {
   for (const cmd of ["bun", "pnpm", "npm"] as const) {
     try {
-      await execAsync(`${cmd} --version`);
+      await execFileAsync(cmd, ["--version"]);
       return cmd;
     } catch {
       // not available
@@ -434,13 +434,13 @@ async function runPackageInstall(
 
   switch (pm) {
     case "bun":
-      await execAsync(`bun add ${spec}`, { cwd: targetDir });
+      await execFileAsync("bun", ["add", spec], { cwd: targetDir });
       break;
     case "pnpm":
-      await execAsync(`pnpm add ${spec} --dir "${targetDir}"`);
+      await execFileAsync("pnpm", ["add", spec, "--dir", targetDir]);
       break;
     default:
-      await execAsync(`npm install ${spec} --prefix "${targetDir}"`);
+      await execFileAsync("npm", ["install", spec, "--prefix", targetDir]);
   }
 }
 
@@ -458,8 +458,9 @@ async function gitCloneInstall(
   await fs.mkdir(tempDir, { recursive: true });
 
   try {
-    await execAsync(
-      `git clone --branch "${branch}" --single-branch --depth 1 "${info.gitUrl}" "${tempDir}"`,
+    await execFileAsync(
+      "git",
+      ["clone", "--branch", branch, "--single-branch", "--depth", "1", info.gitUrl, tempDir],
       { env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } },
     );
 
@@ -470,14 +471,14 @@ async function gitCloneInstall(
     });
 
     const pm = await detectPackageManager();
-    await execAsync(`${pm} install`, { cwd: tempDir });
+    await execFileAsync(pm, ["install"], { cwd: tempDir });
 
     // If there's a typescript/ subdirectory (monorepo plugin structure),
     // build it and use that as the install target.
     const tsDir = path.join(tempDir, "typescript");
     try {
       await fs.access(tsDir);
-      await execAsync(`${pm} run build`, { cwd: tsDir }).catch(() => {
+      await execFileAsync(pm, ["run", "build"], { cwd: tsDir }).catch(() => {
         logger.warn(
           `[plugin-installer] build step failed for ${info.name}, continuing...`,
         );
