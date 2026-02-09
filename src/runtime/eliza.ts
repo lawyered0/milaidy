@@ -1461,6 +1461,12 @@ export async function startEliza(
   // 2d. Propagate database config into process.env for plugin-sql
   applyDatabaseConfigToEnv(config);
 
+  // 2d-ii. In development, allow destructive migrations (e.g. dropping tables
+  //        removed between plugin versions) so the runtime doesn't silently stall.
+  if (process.env.NODE_ENV !== "production" && !process.env.ELIZA_ALLOW_DESTRUCTIVE_MIGRATIONS) {
+    process.env.ELIZA_ALLOW_DESTRUCTIVE_MIGRATIONS = "true";
+  }
+
   // 2e. Prevent @elizaos/core from auto-loading @elizaos/plugin-bootstrap.
   //     Milaidy uses @elizaos/plugin-trust which provides the settings/roles
   //     providers and actions.  plugin-bootstrap (v1.x) is incompatible with
