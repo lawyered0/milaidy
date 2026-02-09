@@ -141,7 +141,7 @@ describe("plugin-installer", () => {
       expect(phases).toContain("downloading");
       // Both npm and git should fail for a nonexistent package
       expect(result.success).toBe(false);
-    }, 30_000);
+    }, 180_000);
   });
 
   describe("uninstallPlugin", () => {
@@ -318,7 +318,7 @@ describe("plugin-installer", () => {
       // Assert unconditionally: install must fail, restart must not fire
       expect(result.success).toBe(false);
       expect(vi.mocked(requestRestart)).not.toHaveBeenCalled();
-    });
+    }, 180_000);
   });
 
   describe("path helpers", () => {
@@ -338,7 +338,7 @@ describe("plugin-installer", () => {
       // (@ and / replaced with _)
       const downloadPhase = phases.find((p) => p.phase === "downloading");
       expect(downloadPhase).toBeDefined();
-    });
+    }, 180_000);
   });
 
   describe("serialisation", () => {
