@@ -1099,6 +1099,7 @@ export class MilaidyApp extends LitElement {
       align-items: flex-end;
       border-top: 1px solid var(--border);
       padding-top: 12px;
+      padding-bottom: 16px;
     }
 
     .chat-input {

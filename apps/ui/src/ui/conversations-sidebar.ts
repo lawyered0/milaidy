@@ -52,8 +52,8 @@ export class ConversationsSidebar extends LitElement {
       padding: 8px 12px;
       border: 1px solid var(--border);
       border-radius: 6px;
-      background: var(--accent, #6366f1);
-      color: white;
+      background: var(--accent);
+      color: var(--accent-foreground);
       font-size: 13px;
       font-weight: 500;
       cursor: pointer;
@@ -81,12 +81,12 @@ export class ConversationsSidebar extends LitElement {
     }
 
     .conv-item:hover {
-      background: var(--hover, #f1f5f9);
+      background: var(--bg-hover);
     }
 
     .conv-item.active {
-      background: var(--hover, #f1f5f9);
-      border-left-color: var(--accent, #6366f1);
+      background: var(--bg-hover);
+      border-left-color: var(--accent);
     }
 
     .conv-info {
@@ -105,7 +105,7 @@ export class ConversationsSidebar extends LitElement {
 
     .conv-time {
       font-size: 11px;
-      color: var(--text-muted, #64748b);
+      color: var(--muted);
       margin-top: 2px;
     }
 
@@ -113,7 +113,7 @@ export class ConversationsSidebar extends LitElement {
       opacity: 0;
       border: none;
       background: none;
-      color: var(--text-muted, #64748b);
+      color: var(--muted);
       cursor: pointer;
       font-size: 14px;
       padding: 2px 4px;
@@ -126,14 +126,14 @@ export class ConversationsSidebar extends LitElement {
     }
 
     .conv-delete:hover {
-      color: #dc2626;
-      background: #fef2f2;
+      color: var(--destructive);
+      background: var(--destructive-subtle);
     }
 
     .rename-input {
       width: 100%;
       padding: 4px 6px;
-      border: 1px solid var(--accent, #6366f1);
+      border: 1px solid var(--accent);
       border-radius: 4px;
       background: var(--card);
       color: var(--text);
@@ -144,7 +144,7 @@ export class ConversationsSidebar extends LitElement {
     .empty-state {
       padding: 24px 12px;
       text-align: center;
-      color: var(--text-muted, #64748b);
+      color: var(--muted);
       font-size: 12px;
     }
   `;
