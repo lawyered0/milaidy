@@ -4214,7 +4214,94 @@ async function handleRequest(
   if (method === "PUT" && pathname === "/api/config") {
     const body = await readJsonBody(req, res);
     if (!body) return;
-    Object.assign(state.config, body);
+
+    // --- Security: validate and safely merge config updates ----------------
+
+    // Only accept known top-level keys from MilaidyConfig.
+    // Unknown or dangerous keys are silently dropped.
+    const ALLOWED_TOP_KEYS = new Set([
+      "meta",
+      "auth",
+      "env",
+      "wizard",
+      "diagnostics",
+      "logging",
+      "update",
+      "browser",
+      "ui",
+      "skills",
+      "plugins",
+      "models",
+      "nodeHost",
+      "agents",
+      "tools",
+      "bindings",
+      "broadcast",
+      "audio",
+      "messages",
+      "commands",
+      "approvals",
+      "session",
+      "web",
+      "channels",
+      "cron",
+      "hooks",
+      "discovery",
+      "talk",
+      "gateway",
+      "memory",
+      "database",
+      "cloud",
+      "x402",
+      "mcp",
+      "features",
+    ]);
+
+    // Keys that could enable prototype pollution.
+    const BLOCKED_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+    /**
+     * Deep-merge `src` into `target`, only touching keys present in `src`.
+     * Prevents prototype pollution by rejecting dangerous key names at every
+     * level.  Performs a recursive merge for plain objects so that partial
+     * updates don't wipe sibling keys.
+     */
+    function safeMerge(
+      target: Record<string, unknown>,
+      src: Record<string, unknown>,
+    ): void {
+      for (const key of Object.keys(src)) {
+        if (BLOCKED_KEYS.has(key)) continue;
+        const srcVal = src[key];
+        const tgtVal = target[key];
+        if (
+          srcVal !== null &&
+          typeof srcVal === "object" &&
+          !Array.isArray(srcVal) &&
+          tgtVal !== null &&
+          typeof tgtVal === "object" &&
+          !Array.isArray(tgtVal)
+        ) {
+          safeMerge(
+            tgtVal as Record<string, unknown>,
+            srcVal as Record<string, unknown>,
+          );
+        } else {
+          target[key] = srcVal;
+        }
+      }
+    }
+
+    // Filter to allowed top-level keys, then deep-merge.
+    const filtered: Record<string, unknown> = {};
+    for (const key of Object.keys(body)) {
+      if (ALLOWED_TOP_KEYS.has(key) && !BLOCKED_KEYS.has(key)) {
+        filtered[key] = body[key];
+      }
+    }
+
+    safeMerge(state.config as Record<string, unknown>, filtered);
+
     try {
       saveMilaidyConfig(state.config);
     } catch {
