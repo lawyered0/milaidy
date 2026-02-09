@@ -162,6 +162,15 @@ for (const dir of fs.readdirSync(pluginsDir).sort()) {
     const category = categorize(id);
     const envKey = findEnvKey(configKeys);
 
+    // Extract version
+    const version = pkg.version ?? null;
+
+    // Extract plugin dependencies (only @elizaos/plugin-* references)
+    const allDeps = { ...(pkg.dependencies ?? {}), ...(pkg.peerDependencies ?? {}) };
+    const pluginDeps = Object.keys(allDeps)
+      .filter((dep) => dep.startsWith("@elizaos/plugin-"))
+      .map((dep) => dep.replace("@elizaos/plugin-", ""));
+
     entries.push({
       id,
       dirName: dir,
@@ -171,6 +180,8 @@ for (const dir of fs.readdirSync(pluginsDir).sort()) {
       category,
       envKey,
       configKeys,
+      version: version || undefined,
+      pluginDeps: pluginDeps.length > 0 ? pluginDeps : undefined,
       pluginParameters:
         Object.keys(pluginParams).length > 0 ? pluginParams : undefined,
     });
@@ -190,5 +201,5 @@ const manifest = {
   plugins: entries,
 };
 
-fs.writeFileSync(outputPath, JSON.stringify(manifest, null, 2) + "\n");
+fs.writeFileSync(outputPath, `${JSON.stringify(manifest, null, 2)}\n`);
 console.log(`Generated ${outputPath} (${entries.length} plugins)`);

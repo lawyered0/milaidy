@@ -1,7 +1,7 @@
 {
   "$schema": "plugin-index-v1",
-  "generatedAt": "2026-02-08T05:45:00.000Z",
-  "count": 93,
+  "generatedAt": "2026-02-09T02:48:57.322Z",
+  "count": 97,
   "plugins": [
     {
       "id": "acp",
@@ -11,7 +11,11 @@
       "description": "",
       "category": "feature",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4",
+      "pluginDeps": [
+        "cli"
+      ]
     },
     {
       "id": "agent-orchestrator",
@@ -21,7 +25,8 @@
       "description": "Agent orchestration plugin for ElizaOS (task lifecycle + agent providers)",
       "category": "feature",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     },
     {
       "id": "agent-skills",
@@ -38,6 +43,7 @@
         "BUNDLED_SKILLS_DIRS",
         "OTTO_BUNDLED_SKILLS_DIR"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "SKILLS_DIR": {
           "type": "string",
@@ -86,6 +92,7 @@
         "ANTHROPIC_EXPERIMENTAL_TELEMETRY",
         "ANTHROPIC_BROWSER_BASE_URL"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "ANTHROPIC_API_KEY": {
           "type": "string",
@@ -130,7 +137,133 @@
       "description": "Autonomous trading plugin with LLM-powered strategies for Solana",
       "category": "feature",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4",
+      "pluginDeps": [
+        "solana"
+      ]
+    },
+    {
+      "id": "babylon",
+      "dirName": "plugin-babylon",
+      "name": "Babylon",
+      "npmName": "@elizaos/plugin-babylon",
+      "description": "Babylon prediction market platform integration for ElizaOS with autonomous trading, social features, and A2A protocol support",
+      "category": "feature",
+      "envKey": null,
+      "configKeys": [
+        "BABYLON_API_URL",
+        "BABYLON_AGENT_ID",
+        "CRON_SECRET",
+        "BABYLON_GAME_PRIVATE_KEY",
+        "BASE_SEPOLIA_RPC_URL",
+        "EVM_PRIVATE_KEY",
+        "EVM_PROVIDER_URL",
+        "BASE_IDENTITY_REGISTRY_ADDRESS",
+        "BABYLON_APP_URL",
+        "BABYLON_AUTONOMOUS_MODE",
+        "BABYLON_ALLOW_USER_ACTIONS",
+        "BABYLON_PRIVY_APP_ID",
+        "BABYLON_PRIVY_APP_SECRET",
+        "BABYLON_AGENT0_RPC_URL",
+        "BABYLON_AGENT0_REGISTRY_ADDRESS"
+      ],
+      "version": "1.0.0",
+      "pluginParameters": {
+        "BABYLON_API_URL": {
+          "type": "string",
+          "description": "Babylon API base URL",
+          "required": false,
+          "example": "https://api.babylon.market"
+        },
+        "BABYLON_AGENT_ID": {
+          "type": "string",
+          "description": "Agent ID (defaults to 'babylon-agent-alice' in dev)",
+          "required": false,
+          "example": "alpha-trader"
+        },
+        "CRON_SECRET": {
+          "type": "string",
+          "description": "CRON secret for A2A authentication (generate with: openssl rand -hex 32)",
+          "required": false,
+          "sensitive": true
+        },
+        "BABYLON_GAME_PRIVATE_KEY": {
+          "type": "string",
+          "description": "Babylon-specific wallet private key (optional, falls back to EVM_PRIVATE_KEY)",
+          "required": false,
+          "sensitive": true,
+          "example": "0x..."
+        },
+        "BASE_SEPOLIA_RPC_URL": {
+          "type": "string",
+          "description": "Base Sepolia RPC URL (optional, falls back to EVM_PROVIDER_URL)",
+          "required": false,
+          "example": "https://sepolia.base.org"
+        },
+        "EVM_PRIVATE_KEY": {
+          "type": "string",
+          "description": "Fallback wallet private key from plugin-evm (used if BABYLON_GAME_PRIVATE_KEY not set)",
+          "required": false,
+          "sensitive": true,
+          "example": "0x..."
+        },
+        "EVM_PROVIDER_URL": {
+          "type": "string",
+          "description": "Fallback RPC URL from plugin-evm (used if BASE_SEPOLIA_RPC_URL not set)",
+          "required": false,
+          "example": "https://sepolia.base.org"
+        },
+        "BASE_IDENTITY_REGISTRY_ADDRESS": {
+          "type": "string",
+          "description": "ERC-8004 Identity Registry contract address",
+          "required": false,
+          "example": "0x4102F9b209796b53a18B063A438D05C7C9Af31A2"
+        },
+        "BABYLON_APP_URL": {
+          "type": "string",
+          "description": "Base URL for A2A agent card endpoints",
+          "required": false,
+          "sensitive": false,
+          "example": "https://your-app.com"
+        },
+        "BABYLON_AUTONOMOUS_MODE": {
+          "type": "boolean",
+          "description": "Enable autonomous agent mode for independent trading and social engagement",
+          "required": false,
+          "example": "false"
+        },
+        "BABYLON_ALLOW_USER_ACTIONS": {
+          "type": "boolean",
+          "description": "Allow users to execute actions through the agent",
+          "required": false,
+          "example": "true"
+        },
+        "BABYLON_PRIVY_APP_ID": {
+          "type": "string",
+          "description": "Privy App ID for embedded wallet creation (optional, falls back to dev wallet)",
+          "required": false,
+          "sensitive": true
+        },
+        "BABYLON_PRIVY_APP_SECRET": {
+          "type": "string",
+          "description": "Privy App Secret for wallet management",
+          "required": false,
+          "sensitive": true
+        },
+        "BABYLON_AGENT0_RPC_URL": {
+          "type": "string",
+          "description": "RPC URL for on-chain agent registration (ERC-8004)",
+          "required": false,
+          "example": "https://sepolia.base.org"
+        },
+        "BABYLON_AGENT0_REGISTRY_ADDRESS": {
+          "type": "string",
+          "description": "Agent0 registry contract address for on-chain identity",
+          "required": false,
+          "example": "0x..."
+        }
+      }
     },
     {
       "id": "blooio",
@@ -140,7 +273,8 @@
       "description": "Blooio plugin for iMessage/SMS messaging integration",
       "category": "feature",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     },
     {
       "id": "bluebubbles",
@@ -150,7 +284,8 @@
       "description": "",
       "category": "connector",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     },
     {
       "id": "bluesky",
@@ -177,6 +312,7 @@
         "BLUESKY_MAX_ACTIONS_PROCESSING",
         "BLUESKY_ENABLE_DMS"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "BLUESKY_ENABLED": {
           "type": "boolean",
@@ -299,6 +435,10 @@
         "BROWSER_HEADLESS",
         "CAPSOLVER_API_KEY"
       ],
+      "version": "2.0.0-alpha.6",
+      "pluginDeps": [
+        "cli"
+      ],
       "pluginParameters": {
         "BROWSERBASE_API_KEY": {
           "type": "string",
@@ -340,7 +480,11 @@
       "description": "CLI framework plugin for ElizaOS agents - provides command registration, execution, and utilities",
       "category": "feature",
       "envKey": null,
-      "configKeys": ["CLI_NAME", "CLI_VERSION"],
+      "configKeys": [
+        "CLI_NAME",
+        "CLI_VERSION"
+      ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "CLI_NAME": {
           "type": "string",
@@ -364,7 +508,11 @@
       "description": "Coder tools plugin for ElizaOS (filesystem + shell + git)",
       "category": "feature",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.5",
+      "pluginDeps": [
+        "shell"
+      ]
     },
     {
       "id": "commands",
@@ -381,6 +529,7 @@
         "COMMANDS_BASH_ENABLED",
         "COMMANDS_RESTART_ENABLED"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "COMMANDS_ENABLED": {
           "type": "boolean",
@@ -432,6 +581,7 @@
         "COMPUTERUSE_MODE",
         "COMPUTERUSE_MCP_SERVER"
       ],
+      "version": "2.0.0-alpha.6",
       "pluginParameters": {
         "COMPUTERUSE_ENABLED": {
           "type": "boolean",
@@ -458,7 +608,8 @@
       "description": "ElizaOS Copilot Proxy Model Provider - TypeScript implementation",
       "category": "feature",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     },
     {
       "id": "cron",
@@ -468,7 +619,11 @@
       "description": "Cron scheduling plugin for ElizaOS agents - schedule recurring or one-time jobs that execute actions, run prompts, or trigger events",
       "category": "feature",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4",
+      "pluginDeps": [
+        "cli"
+      ]
     },
     {
       "id": "directives",
@@ -484,6 +639,7 @@
         "ALLOW_ELEVATED",
         "ALLOW_EXEC"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "DEFAULT_THINKING": {
           "type": "string",
@@ -534,6 +690,7 @@
         "DISCORD_SHOULD_RESPOND_ONLY_TO_MENTIONS",
         "DISCORD_LISTEN_CHANNEL_IDS"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "DISCORD_API_TOKEN": {
           "type": "string",
@@ -609,6 +766,7 @@
         "EDGE_TTS_PROXY",
         "EDGE_TTS_TIMEOUT_MS"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "EDGE_TTS_VOICE": {
           "type": "string",
@@ -690,6 +848,7 @@
         "ELEVENLABS_STT_NUM_SPEAKERS",
         "ELEVENLABS_STT_TAG_AUDIO_EVENTS"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "ELEVENLABS_API_KEY": {
           "type": "string",
@@ -809,7 +968,8 @@
       "description": "",
       "category": "feature",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     },
     {
       "id": "elizacloud",
@@ -841,6 +1001,7 @@
         "ELIZAOS_CLOUD_ENABLED",
         "ELIZAOS_CLOUD_APP_VERSION"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "ELIZAOS_CLOUD_API_KEY": {
           "type": "string",
@@ -983,9 +1144,13 @@
       "npmName": "@elizaos/plugin-evm",
       "description": "",
       "category": "feature",
-      "envKey": null,
+      "envKey": "ALCHEMY_API_KEY",
       "configKeys": [
         "EVM_PRIVATE_KEY",
+        "EVM_RPC_PROVIDER",
+        "ALCHEMY_API_KEY",
+        "INFURA_API_KEY",
+        "ANKR_API_KEY",
         "ETHEREUM_PROVIDER_ETHEREUM",
         "ETHEREUM_PROVIDER_BASE",
         "ETHEREUM_PROVIDER_ARBITRUM",
@@ -995,6 +1160,7 @@
         "SEPOLIA_RPC_URL",
         "BASE_SEPOLIA_RPC_URL"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "EVM_PRIVATE_KEY": {
           "type": "string",
@@ -1002,27 +1168,51 @@
           "required": true,
           "sensitive": true
         },
+        "EVM_RPC_PROVIDER": {
+          "type": "string",
+          "description": "Preferred RPC provider: 'alchemy', 'infura', 'ankr', or 'elizacloud'. If set, this provider is used first for all chains it supports, with fallback to others.",
+          "required": false,
+          "sensitive": false
+        },
+        "ALCHEMY_API_KEY": {
+          "type": "string",
+          "description": "Alchemy API key for RPC access. Supports Ethereum, Polygon, Arbitrum, Optimism, Base, Avalanche, BSC, and many more chains.",
+          "required": false,
+          "sensitive": true
+        },
+        "INFURA_API_KEY": {
+          "type": "string",
+          "description": "Infura API key for RPC access. Supports Ethereum, Polygon, Arbitrum, Optimism, Base, Avalanche, Linea, and more.",
+          "required": false,
+          "sensitive": true
+        },
+        "ANKR_API_KEY": {
+          "type": "string",
+          "description": "Ankr premium API key for RPC access. Supports the broadest range of EVM chains.",
+          "required": false,
+          "sensitive": true
+        },
         "ETHEREUM_PROVIDER_ETHEREUM": {
           "type": "string",
-          "description": "Custom RPC URL for Ethereum mainnet. For other chains, set ETHEREUM_PROVIDER_<CHAINNAME> (or EVM_PROVIDER_<CHAINNAME>) in your .env.",
+          "description": "Custom RPC URL for Ethereum mainnet (overrides provider-based RPC). For other chains, set ETHEREUM_PROVIDER_<CHAINNAME> (or EVM_PROVIDER_<CHAINNAME>) in your .env.",
           "required": false,
           "sensitive": false
         },
         "ETHEREUM_PROVIDER_BASE": {
           "type": "string",
-          "description": "Custom RPC URL for Base mainnet.",
+          "description": "Custom RPC URL for Base mainnet (overrides provider-based RPC).",
           "required": false,
           "sensitive": false
         },
         "ETHEREUM_PROVIDER_ARBITRUM": {
           "type": "string",
-          "description": "Custom RPC URL for Arbitrum One.",
+          "description": "Custom RPC URL for Arbitrum One (overrides provider-based RPC).",
           "required": false,
           "sensitive": false
         },
         "ETHEREUM_PROVIDER_OPTIMISM": {
           "type": "string",
-          "description": "Custom RPC URL for Optimism mainnet.",
+          "description": "Custom RPC URL for Optimism mainnet (overrides provider-based RPC).",
           "required": false,
           "sensitive": false
         },
@@ -1063,7 +1253,8 @@
       "description": "Experience learning plugin for ElizaOS - records and recalls transferable agent learnings",
       "category": "feature",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     },
     {
       "id": "farcaster",
@@ -1090,6 +1281,7 @@
         "FARCASTER_HUB_URL",
         "FARCASTER_MODE"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "FARCASTER_DRY_RUN": {
           "type": "boolean",
@@ -1210,6 +1402,7 @@
         "FEISHU_ALLOWED_CHATS",
         "FEISHU_TEST_CHAT_ID"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "FEISHU_APP_ID": {
           "type": "string",
@@ -1251,7 +1444,8 @@
       "description": "Guardrails for agent-guided user journeys - forms as agent guidance rails for ElizaOS",
       "category": "feature",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.6"
     },
     {
       "id": "github",
@@ -1271,6 +1465,7 @@
         "GITHUB_APP_PRIVATE_KEY",
         "GITHUB_INSTALLATION_ID"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "GITHUB_API_TOKEN": {
           "type": "string",
@@ -1328,10 +1523,11 @@
       "dirName": "plugin-gmail-watch",
       "name": "Gmail Watch",
       "npmName": "@elizaos/plugin-gmail-watch",
-      "description": "Gmail Pub/Sub watcher \u2013 spawns gog gmail watch serve and auto-renews",
+      "description": "Gmail Pub/Sub watcher – spawns gog gmail watch serve and auto-renews",
       "category": "feature",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     },
     {
       "id": "goals",
@@ -1341,7 +1537,8 @@
       "description": "Goals management plugin for ElizaOS - tracking and achieving objectives",
       "category": "feature",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.6"
     },
     {
       "id": "google-chat",
@@ -1351,7 +1548,8 @@
       "description": "",
       "category": "connector",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     },
     {
       "id": "google-genai",
@@ -1371,6 +1569,7 @@
         "LARGE_MODEL",
         "IMAGE_MODEL"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "GOOGLE_GENERATIVE_AI_API_KEY": {
           "type": "string",
@@ -1445,6 +1644,7 @@
         "GROQ_TTS_MODEL",
         "GROQ_TTS_VOICE"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "GROQ_API_KEY": {
           "type": "string",
@@ -1492,7 +1692,8 @@
       "description": "",
       "category": "connector",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     },
     {
       "id": "inmemorydb",
@@ -1502,7 +1703,8 @@
       "description": "Pure in-memory, ephemeral database storage for elizaOS - no persistence, completely forgets on reset",
       "category": "database",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     },
     {
       "id": "instagram",
@@ -1518,6 +1720,7 @@
         "INSTAGRAM_VERIFICATION_CODE",
         "INSTAGRAM_PROXY"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "INSTAGRAM_USERNAME": {
           "type": "string",
@@ -1544,6 +1747,17 @@
           "sensitive": false
         }
       }
+    },
+    {
+      "id": "iq",
+      "dirName": "plugin-iq",
+      "name": "Iq",
+      "npmName": "@elizaos/plugin-iq",
+      "description": "IQ on-chain chat plugin for Eliza agents on Solana",
+      "category": "feature",
+      "envKey": null,
+      "configKeys": [],
+      "version": "1.0.0"
     },
     {
       "id": "knowledge",
@@ -1578,6 +1792,7 @@
         "KNOWLEDGE_PATH",
         "LOAD_DOCS_ON_STARTUP"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "CTX_KNOWLEDGE_ENABLED": {
           "type": "boolean",
@@ -1739,7 +1954,8 @@
       "description": "",
       "category": "connector",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     },
     {
       "id": "linear",
@@ -1754,6 +1970,7 @@
         "LINEAR_WORKSPACE_ID",
         "LINEAR_DEFAULT_TEAM_KEY"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "LINEAR_API_KEY": {
           "type": "string",
@@ -1792,6 +2009,7 @@
         "LOCAL_EMBEDDING_DIMENSIONS",
         "CUDA_VISIBLE_DEVICES"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "MODELS_DIR": {
           "type": "string",
@@ -1858,6 +2076,7 @@
         "LOCAL_EMBEDDING_DIMENSIONS",
         "CUDA_VISIBLE_DEVICES"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "MODELS_DIR": {
           "type": "string",
@@ -1915,7 +2134,8 @@
       "description": "Simple JSON-based local database storage for elizaOS - no SQL, no migrations",
       "category": "database",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     },
     {
       "id": "lp-manager",
@@ -1925,7 +2145,14 @@
       "description": "A unified plugin for managing liquidity positions on Solana DEXs (Raydium, Orca, Meteora) and EVM DEXs (Uniswap, PancakeSwap, Aerodrome).",
       "category": "feature",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4",
+      "pluginDeps": [
+        "anthropic",
+        "discord",
+        "telegram",
+        "evm"
+      ]
     },
     {
       "id": "matrix",
@@ -1935,7 +2162,8 @@
       "description": "",
       "category": "connector",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     },
     {
       "id": "mattermost",
@@ -1945,7 +2173,8 @@
       "description": "Mattermost integration plugin for elizaOS agents - TypeScript implementation",
       "category": "connector",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     },
     {
       "id": "mcp",
@@ -1955,7 +2184,11 @@
       "description": "elizaOS plugin to integrate with MCP (Model Context Protocol) servers",
       "category": "feature",
       "envKey": null,
-      "configKeys": ["PATH", "mcp"],
+      "configKeys": [
+        "PATH",
+        "mcp"
+      ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "PATH": {
           "type": "string",
@@ -1979,7 +2212,8 @@
       "description": "Memory management plugin for ElizaOS (TypeScript)",
       "category": "feature",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     },
     {
       "id": "minecraft",
@@ -1989,7 +2223,8 @@
       "description": "Minecraft automation plugin for ElizaOS (Mineflayer bridge)",
       "category": "feature",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     },
     {
       "id": "moltbook",
@@ -1999,7 +2234,8 @@
       "description": "Moltbook social plugin for Eliza agents - Reddit-style platform for AI agents",
       "category": "feature",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     },
     {
       "id": "msteams",
@@ -2009,7 +2245,22 @@
       "description": "Microsoft Teams integration for ElizaOS",
       "category": "connector",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
+    },
+    {
+      "id": "mysticism",
+      "dirName": "plugin-mysticism",
+      "name": "Mysticism",
+      "npmName": "@elizaos/plugin-mysticism",
+      "description": "Mystical divination engines for ElizaOS — Tarot, I Ching, and Astrology readings",
+      "category": "feature",
+      "envKey": null,
+      "configKeys": [],
+      "version": "2.0.0-alpha.1",
+      "pluginDeps": [
+        "form"
+      ]
     },
     {
       "id": "n8n",
@@ -2026,6 +2277,7 @@
         "N8N_API_KEY",
         "N8N_HOST"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "ANTHROPIC_API_KEY": {
           "type": "string",
@@ -2066,7 +2318,8 @@
       "description": "Nextcloud Talk plugin for elizaOS - TypeScript implementation",
       "category": "connector",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     },
     {
       "id": "nostr",
@@ -2076,7 +2329,8 @@
       "description": "",
       "category": "connector",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     },
     {
       "id": "ollama",
@@ -2095,6 +2349,7 @@
         "SMALL_MODEL",
         "LARGE_MODEL"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "OLLAMA_API_ENDPOINT": {
           "type": "string",
@@ -2174,6 +2429,7 @@
         "OPENAI_BROWSER_BASE_URL",
         "OPENAI_BROWSER_EMBEDDING_URL"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "OPENAI_API_KEY": {
           "type": "string",
@@ -2322,6 +2578,7 @@
         "OPENROUTER_AUTO_CLEANUP_IMAGES",
         "OPENROUTER_TOOL_EXECUTION_MAX_STEPS"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "OPENROUTER_API_KEY": {
           "type": "string",
@@ -2449,7 +2706,8 @@
       "description": "",
       "category": "feature",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     },
     {
       "id": "personality",
@@ -2459,7 +2717,8 @@
       "description": "ElizaOS plugin for agent self-modification and character evolution",
       "category": "feature",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     },
     {
       "id": "plugin-manager",
@@ -2469,13 +2728,8 @@
       "description": "Plugin manager for ElizaOS",
       "category": "feature",
       "envKey": null,
-      "configKeys": ["API_KEY"],
-      "pluginParameters": {
-        "API_KEY": {
-          "type": "string",
-          "description": "API key for the service"
-        }
-      }
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     },
     {
       "id": "polymarket",
@@ -2492,6 +2746,10 @@
         "CLOB_API_KEY",
         "CLOB_API_SECRET",
         "CLOB_API_PASSPHRASE"
+      ],
+      "version": "2.0.0-alpha.4",
+      "pluginDeps": [
+        "evm"
       ],
       "pluginParameters": {
         "POLYMARKET_PRIVATE_KEY": {
@@ -2547,6 +2805,7 @@
         "PROSE_STATE_MODE",
         "PROSE_SKILLS_DIR"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "PROSE_WORKSPACE_DIR": {
           "type": "string",
@@ -2570,7 +2829,8 @@
       "description": "RLM (Recursive Language Model) plugin for elizaOS - enables processing of arbitrarily long contexts",
       "category": "feature",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     },
     {
       "id": "roblox",
@@ -2589,6 +2849,7 @@
         "ROBLOX_POLL_INTERVAL",
         "ROBLOX_DRY_RUN"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "ROBLOX_API_KEY": {
           "type": "string",
@@ -2645,7 +2906,8 @@
       "description": "Retro 1980s SAM Text-to-Speech plugin for ElizaOS agents",
       "category": "feature",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     },
     {
       "id": "rolodex",
@@ -2655,7 +2917,8 @@
       "description": "A plugin for ElizaOS that allows you to manage entites, relationships and associations",
       "category": "feature",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     },
     {
       "id": "rss",
@@ -2671,6 +2934,7 @@
         "RSS_FEED_FORMAT",
         "RSS_CHECK_INTERVAL_MINUTES"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "RSS_FEEDS": {
           "type": "string",
@@ -2719,6 +2983,7 @@
         "AWS_S3_SSL_ENABLED",
         "AWS_S3_FORCE_PATH_STYLE"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "AWS_ACCESS_KEY_ID": {
           "type": "string",
@@ -2778,7 +3043,8 @@
       "description": "Scheduling and calendar coordination plugin for ElizaOS agents",
       "category": "feature",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.6"
     },
     {
       "id": "scratchpad",
@@ -2788,7 +3054,11 @@
       "description": "File-based memory storage plugin for ElizaOS - persistent notes and memories",
       "category": "feature",
       "envKey": null,
-      "configKeys": ["SCRATCHPAD_BASE_PATH", "SCRATCHPAD_MAX_FILE_SIZE"],
+      "configKeys": [
+        "SCRATCHPAD_BASE_PATH",
+        "SCRATCHPAD_MAX_FILE_SIZE"
+      ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "SCRATCHPAD_BASE_PATH": {
           "type": "string",
@@ -2818,6 +3088,7 @@
         "ENABLE_ENCRYPTION",
         "ENABLE_ACCESS_LOGGING"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "ENCRYPTION_SALT": {
           "type": "string",
@@ -2855,6 +3126,7 @@
         "SHELL_ALLOW_BACKGROUND",
         "SHELL_JOB_TTL_MS"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "SHELL_ALLOWED_DIRECTORY": {
           "type": "string",
@@ -2919,6 +3191,7 @@
         "SIGNAL_CLI_PATH",
         "SIGNAL_SHOULD_IGNORE_GROUP_MESSAGES"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "SIGNAL_ACCOUNT_NUMBER": {
           "type": "string",
@@ -2954,7 +3227,8 @@
       "description": "Retro 1980s SAM Text-to-Speech plugin for ElizaOS agents",
       "category": "feature",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     },
     {
       "id": "slack",
@@ -2973,6 +3247,7 @@
         "SLACK_SHOULD_IGNORE_BOT_MESSAGES",
         "SLACK_SHOULD_RESPOND_ONLY_TO_MENTIONS"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "SLACK_BOT_TOKEN": {
           "type": "string",
@@ -3023,10 +3298,11 @@
       "dirName": "plugin-social-alpha",
       "name": "Social Alpha",
       "npmName": "@elizaos/plugin-social-alpha",
-      "description": "Social Alpha Plugin \u2014 Tracks token recommendations (shills/FUD), builds trust scores based on P&L outcomes, and exposes a Social Alpha Provider with win rate, rank, and recommender analytics.",
+      "description": "Social Alpha Plugin — Tracks token recommendations (shills/FUD), builds trust scores based on P&L outcomes, and exposes a Social Alpha Provider with win rate, rank, and recommender analytics.",
       "category": "feature",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     },
     {
       "id": "solana",
@@ -3049,6 +3325,7 @@
         "SOLANA_PRIVATE_KEY",
         "WALLET_PRIVATE_KEY"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "SOL_ADDRESS": {
           "type": "string",
@@ -3127,7 +3404,8 @@
       "description": "",
       "category": "database",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.6"
     },
     {
       "id": "tee",
@@ -3137,7 +3415,12 @@
       "description": "Trusted Execution Environment (TEE) integration plugin for elizaOS - Multi-language support (TypeScript, Python, Rust)",
       "category": "feature",
       "envKey": null,
-      "configKeys": ["TEE_MODE", "TEE_VENDOR", "WALLET_SECRET_SALT"],
+      "configKeys": [
+        "TEE_MODE",
+        "TEE_VENDOR",
+        "WALLET_SECRET_SALT"
+      ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "TEE_MODE": {
           "type": "string",
@@ -3175,6 +3458,7 @@
         "TELEGRAM_ALLOWED_CHATS",
         "TELEGRAM_TEST_CHAT_ID"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "TELEGRAM_API_ROOT": {
           "type": "string",
@@ -3210,7 +3494,8 @@
       "description": "",
       "category": "connector",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     },
     {
       "id": "todo",
@@ -3220,7 +3505,11 @@
       "description": "Multi-language Todo list plugin for elizaOS with TypeScript, Python, and Rust implementations",
       "category": "feature",
       "envKey": null,
-      "configKeys": ["ENABLE_REMINDERS", "REMINDER_INTERVAL_MS"],
+      "configKeys": [
+        "ENABLE_REMINDERS",
+        "REMINDER_INTERVAL_MS"
+      ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "ENABLE_REMINDERS": {
           "type": "boolean",
@@ -3246,7 +3535,8 @@
       "description": "Trajectory logging plugin for ElizaOS - capture agent interaction trajectories for RL training",
       "category": "feature",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     },
     {
       "id": "trust",
@@ -3256,7 +3546,11 @@
       "description": "Trust and permission management plugin for ElizaOS",
       "category": "feature",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4",
+      "pluginDeps": [
+        "anthropic"
+      ]
     },
     {
       "id": "tts",
@@ -3273,6 +3567,7 @@
         "TTS_SUMMARIZE",
         "TTS_DEFAULT_VOICE"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "TTS_AUTO_MODE": {
           "type": "string",
@@ -3318,7 +3613,8 @@
       "description": "Twilio plugin for bidirectional voice and text messaging integration",
       "category": "feature",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     },
     {
       "id": "twitch",
@@ -3328,7 +3624,8 @@
       "description": "",
       "category": "connector",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     },
     {
       "id": "vercel-ai-gateway",
@@ -3350,6 +3647,7 @@
         "AI_GATEWAY_IMAGE_MODEL",
         "AI_GATEWAY_TIMEOUT_MS"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "AI_GATEWAY_API_KEY": {
           "type": "string",
@@ -3428,7 +3726,11 @@
       "description": "Vision plugin for ElizaOS - provides camera integration and visual awareness",
       "category": "feature",
       "envKey": null,
-      "configKeys": ["CAMERA_NAME", "PIXEL_CHANGE_THRESHOLD"],
+      "configKeys": [
+        "CAMERA_NAME",
+        "PIXEL_CHANGE_THRESHOLD"
+      ],
+      "version": "2.0.0-alpha.5",
       "pluginParameters": {
         "CAMERA_NAME": {
           "type": "string",
@@ -3448,7 +3750,8 @@
       "description": "HTTP webhook ingress for external triggers (wake, agent, mapped hooks)",
       "category": "feature",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     },
     {
       "id": "whatsapp",
@@ -3458,7 +3761,19 @@
       "description": "WhatsApp Cloud API plugin for ElizaOS",
       "category": "connector",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
+    },
+    {
+      "id": "x402",
+      "dirName": "plugin-x402",
+      "name": "X402",
+      "npmName": "@elizaos/plugin-x402",
+      "description": "x402 HTTP payment protocol plugin for ElizaOS - send and receive crypto payments",
+      "category": "feature",
+      "envKey": null,
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     },
     {
       "id": "xai",
@@ -3488,6 +3803,7 @@
         "X_ENABLE_ACTIONS",
         "X_MAX_POST_LENGTH"
       ],
+      "version": "2.0.0-alpha.4",
       "pluginParameters": {
         "XAI_API_KEY": {
           "type": "string",
@@ -3713,7 +4029,8 @@
       "description": "",
       "category": "connector",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     },
     {
       "id": "zalouser",
@@ -3723,7 +4040,8 @@
       "description": "",
       "category": "connector",
       "envKey": null,
-      "configKeys": []
+      "configKeys": [],
+      "version": "2.0.0-alpha.4"
     }
   ]
 }
