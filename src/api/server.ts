@@ -2577,6 +2577,10 @@ async function handleRequest(
   // ── POST /api/skills/:id/open ─────────────────────────────────────────
   if (method === "POST" && pathname.match(/^\/api\/skills\/[^/]+\/open$/)) {
     const skillId = decodeURIComponent(pathname.split("/")[3]);
+    if (!/^[a-z0-9][a-z0-9-]*$/.test(skillId)) {
+      error(res, "Invalid skill ID", 400);
+      return;
+    }
     const workspaceDir =
       state.config.agents?.defaults?.workspace ??
       resolveDefaultAgentWorkspaceDir();
@@ -2634,14 +2638,14 @@ async function handleRequest(
       return;
     }
 
-    const { exec } = await import("node:child_process");
-    const cmd =
+    const { execFile } = await import("node:child_process");
+    const opener =
       process.platform === "darwin"
-        ? `open "${skillPath}"`
+        ? "open"
         : process.platform === "win32"
-          ? `explorer "${skillPath}"`
-          : `xdg-open "${skillPath}"`;
-    exec(cmd, (err) => {
+          ? "explorer"
+          : "xdg-open";
+    execFile(opener, [skillPath], (err) => {
       if (err)
         logger.warn(
           `[milaidy-api] Failed to open skill folder: ${err.message}`,
@@ -2658,6 +2662,10 @@ async function handleRequest(
     !pathname.includes("/marketplace")
   ) {
     const skillId = decodeURIComponent(pathname.slice("/api/skills/".length));
+    if (!/^[a-z0-9][a-z0-9-]*$/.test(skillId)) {
+      error(res, "Invalid skill ID", 400);
+      return;
+    }
     const workspaceDir =
       state.config.agents?.defaults?.workspace ??
       resolveDefaultAgentWorkspaceDir();
