@@ -894,10 +894,10 @@ function validateSkillId(
     !skillId ||
     !SAFE_SKILL_ID_RE.test(skillId) ||
     skillId === "." ||
-    skillId === ".." ||
     skillId.includes("..")
   ) {
-    error(res, `Invalid skill ID: "${skillId}"`, 400);
+    const safeDisplay = skillId.slice(0, 80).replace(/[^\x20-\x7e]/g, "?");
+    error(res, `Invalid skill ID: "${safeDisplay}"`, 400);
     return null;
   }
   return skillId;
@@ -2847,13 +2847,16 @@ async function handleRequest(
       return;
     }
 
+    const uninstallId = validateSkillId(body.id.trim(), res);
+    if (!uninstallId) return;
+
     try {
       const workspaceDir =
         state.config.agents?.defaults?.workspace ??
         resolveDefaultAgentWorkspaceDir();
       const result = await uninstallMarketplaceSkill(
         workspaceDir,
-        body.id.trim(),
+        uninstallId,
       );
       json(res, { ok: true, skill: result });
     } catch (err) {
