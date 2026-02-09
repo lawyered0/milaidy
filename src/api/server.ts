@@ -698,7 +698,28 @@ async function discoverSkills(
   // ── Primary path: pull from AgentSkillsService (most accurate) ──────────
   if (runtime) {
     try {
-      const service = runtime.getService("AGENT_SKILLS_SERVICE");
+      // If the service isn't registered yet (it starts asynchronously after
+      // runtime.initialize()), wait briefly for it to finish loading so the
+      // first UI request doesn't return an empty skill list.
+      let service = runtime.getService("AGENT_SKILLS_SERVICE");
+      if (!service) {
+        try {
+          const loadTimeout = new Promise<never>((_resolve, reject) =>
+            setTimeout(
+              () => reject(new Error("timeout")),
+              10_000,
+            ),
+          );
+          await Promise.race([
+            runtime.getServiceLoadPromise("AGENT_SKILLS_SERVICE"),
+            loadTimeout,
+          ]);
+          service = runtime.getService("AGENT_SKILLS_SERVICE");
+        } catch {
+          // Timeout or promise rejected — continue to fallback.
+        }
+      }
+
       // eslint-disable-next-line -- runtime service is loosely typed; cast via unknown
       const svc = service as unknown as
         | {
@@ -1296,6 +1317,40 @@ function getModelOptions(): {
   };
 }
 
+function getOpenRouterModelOptions(): Array<{
+  id: string;
+  name: string;
+  description: string;
+}> {
+  return [
+    {
+      id: "anthropic/claude-sonnet-4",
+      name: "Claude Sonnet 4",
+      description: "Balanced speed & intelligence (recommended)",
+    },
+    {
+      id: "anthropic/claude-opus-4",
+      name: "Claude Opus 4",
+      description: "Most capable, slower",
+    },
+    {
+      id: "openai/gpt-4o",
+      name: "GPT-4o",
+      description: "OpenAI's flagship model",
+    },
+    {
+      id: "google/gemini-2.5-pro-preview",
+      name: "Gemini 2.5 Pro",
+      description: "Google's latest model",
+    },
+    {
+      id: "deepseek/deepseek-chat-v3",
+      name: "DeepSeek V3",
+      description: "Cost-effective alternative",
+    },
+  ];
+}
+
 function getInventoryProviderOptions(): Array<{
   id: string;
   name: string;
@@ -1852,6 +1907,7 @@ async function handleRequest(
       providers: getProviderOptions(),
       cloudProviders: getCloudProviderOptions(),
       models: getModelOptions(),
+      openrouterModels: getOpenRouterModelOptions(),
       inventoryProviders: getInventoryProviderOptions(),
       sharedStyleRules: "Keep responses brief. Be helpful and concise.",
     });
@@ -1936,6 +1992,14 @@ async function handleRequest(
           (config.env as Record<string, string>)[providerOpt.envKey] =
             body.providerApiKey as string;
           process.env[providerOpt.envKey] = body.providerApiKey as string;
+        }
+      }
+
+      // OpenRouter requires explicit model selection — persist the chosen model
+      if (body.provider === "openrouter" && body.openrouterModel) {
+        const agentEntry = config.agents?.list?.[0] as Record<string, unknown> | undefined;
+        if (agentEntry) {
+          agentEntry.model = body.openrouterModel as string;
         }
       }
     }

@@ -263,11 +263,13 @@ export function collectPluginNames(config: MilaidyConfig): Set<string> {
   const hasExplicitAllowList = allowList && allowList.length > 0;
 
   // If there's an explicit allow list, respect it and skip auto-detection —
-  // but always include @elizaos/plugin-sql since the runtime requires it for
-  // database access (memory, todos, entities, etc.).
+  // but always include core plugins that the runtime depends on:
+  //   - @elizaos/plugin-sql: database access (memory, todos, entities)
+  //   - @elizaos/plugin-agent-skills: skill loading and discovery
   if (hasExplicitAllowList) {
     const names = new Set<string>(allowList);
     names.add("@elizaos/plugin-sql");
+    names.add("@elizaos/plugin-agent-skills");
     return names;
   }
 
@@ -1156,6 +1158,7 @@ async function runFirstTimeSetup(
 
   let providerEnvKey: string | undefined;
   let providerApiKey: string | undefined;
+  let selectedOpenRouterModel: string | undefined;
 
   // In cloud mode, skip provider selection entirely.
   if (runMode === "cloud") {
@@ -1207,6 +1210,44 @@ async function runFirstTimeSetup(
           if (clack.isCancel(apiKeyInput)) cancelOnboarding();
 
           providerApiKey = apiKeyInput.trim();
+        }
+
+        // OpenRouter requires explicit model selection (it's a gateway to many models)
+        if (chosen.id === "openrouter" && providerApiKey) {
+          const modelChoice = await clack.select({
+            message: `${name}: Which model should I use via OpenRouter?`,
+            options: [
+              {
+                value: "anthropic/claude-sonnet-4",
+                label: "Claude Sonnet 4",
+                hint: "balanced speed & intelligence (recommended)",
+              },
+              {
+                value: "anthropic/claude-opus-4",
+                label: "Claude Opus 4",
+                hint: "most capable, slower",
+              },
+              {
+                value: "openai/gpt-4o",
+                label: "GPT-4o",
+                hint: "OpenAI's flagship model",
+              },
+              {
+                value: "google/gemini-2.5-pro-preview",
+                label: "Gemini 2.5 Pro",
+                hint: "Google's latest model",
+              },
+              {
+                value: "deepseek/deepseek-chat-v3",
+                label: "DeepSeek V3",
+                hint: "cost-effective alternative",
+              },
+            ],
+          });
+
+          if (clack.isCancel(modelChoice)) cancelOnboarding();
+
+          selectedOpenRouterModel = modelChoice as string;
         }
       }
     }
@@ -1373,6 +1414,15 @@ async function runFirstTimeSetup(
     // Also set immediately in process.env for the current run
     process.env[providerEnvKey] = providerApiKey;
   }
+
+  // Persist the selected OpenRouter model in the agent config
+  if (selectedOpenRouterModel) {
+    const agentList = updated.agents?.list;
+    if (agentList && agentList.length > 0) {
+      (agentList[0] as Record<string, unknown>).model = selectedOpenRouterModel;
+    }
+  }
+
   if (process.env.EVM_PRIVATE_KEY && !hasEvmKey) {
     envBucket.EVM_PRIVATE_KEY = process.env.EVM_PRIVATE_KEY;
   }
@@ -1647,7 +1697,6 @@ export async function startEliza(
   //     this.adapter is undefined, so plugins that use runtime.db will fail.
   if (sqlPlugin) {
     await runtime.registerPlugin(sqlPlugin.plugin);
-    console.log("sqlPlugin", sqlPlugin);
 
     // 7c. Eagerly initialize the database adapter so it's fully ready (connection
     //     open, schema bootstrapped) BEFORE other plugins run their init().
@@ -1672,20 +1721,55 @@ export async function startEliza(
     );
   }
 
-  // 7c. Eagerly initialize the database adapter so it's fully ready (connection
-  //     open, schema bootstrapped) BEFORE other plugins run their init().
-  //     runtime.initialize() also calls adapter.init() but that happens AFTER
-  //     all plugin inits — too late for plugins that need runtime.db during init.
-  //     The call is idempotent (runtime.initialize checks adapter.isReady()).
-  if (runtime.adapter && !(await runtime.adapter.isReady())) {
-    await runtime.adapter.init();
-    logger.info(
-      "[milaidy] Database adapter initialized early (before plugin inits)",
-    );
-  }
-
   // 8. Initialize the runtime (registers remaining plugins, starts services)
   await runtime.initialize();
+
+  // 8b. Wait for AgentSkillsService to finish loading.
+  //     runtime.initialize() resolves the internal initPromise which unblocks
+  //     service registration, but services start asynchronously.  Without this
+  //     explicit await the runtime would be returned to the caller (API server,
+  //     dev-server) before skills are loaded, causing the /api/skills endpoint
+  //     to return an empty list.
+  try {
+    const skillServicePromise = runtime.getServiceLoadPromise(
+      "AGENT_SKILLS_SERVICE",
+    );
+    // Give the service up to 30 s to load (matches the core runtime timeout).
+    const timeout = new Promise<never>((_resolve, reject) => {
+      setTimeout(() => {
+        reject(
+          new Error(
+            "[milaidy] AgentSkillsService timed out waiting to initialise (30 s)",
+          ),
+        );
+      }, 30_000);
+    });
+    await Promise.race([skillServicePromise, timeout]);
+
+    // Log skill-loading summary now that the service is guaranteed ready.
+    const svc = runtime.getService("AGENT_SKILLS_SERVICE") as
+      | {
+          getCatalogStats?: () => {
+            loaded: number;
+            total: number;
+            storageType: string;
+          };
+        }
+      | null
+      | undefined;
+    if (svc?.getCatalogStats) {
+      const stats = svc.getCatalogStats();
+      logger.info(
+        `[milaidy] AgentSkills ready — ${stats.loaded} skills loaded, ` +
+          `${stats.total} in catalog (storage: ${stats.storageType})`,
+      );
+    }
+  } catch (err) {
+    // Non-fatal — the agent can operate without skills.
+    logger.warn(
+      `[milaidy] AgentSkillsService did not initialise in time: ${formatError(err)}`,
+    );
+  }
 
   // 9. Graceful shutdown handler
   //
@@ -1781,18 +1865,99 @@ export async function startEliza(
               "main",
           });
 
-          // Create new runtime with updated plugins
+          // Re-resolve bundled skills directory for the fresh runtime
+          let freshBundledSkillsDir: string | null = null;
+          try {
+            const { getSkillsDir } = (await import("@elizaos/skills")) as {
+              getSkillsDir: () => string;
+            };
+            freshBundledSkillsDir = getSkillsDir();
+          } catch {
+            // @elizaos/skills not available — non-fatal
+          }
+
+          const freshWorkspaceDir =
+            freshConfig.agents?.defaults?.workspace ?? workspaceDir;
+          const freshWorkspaceSkillsDir = freshWorkspaceDir
+            ? `${freshWorkspaceDir}/skills`
+            : null;
+
+          // Separate plugin-sql for pre-registration (same as initial boot)
+          const freshSqlPlugin = resolvedPlugins.find(
+            (p) => p.name === "@elizaos/plugin-sql",
+          );
+          const freshOtherPlugins = resolvedPlugins.filter(
+            (p) => p.name !== "@elizaos/plugin-sql",
+          );
+
+          // Create new runtime with updated plugins and skill settings
           const newRuntime = new AgentRuntime({
             character: runtime.character,
             plugins: [
               freshMilaidyPlugin,
-              ...resolvedPlugins.map((p) => p.plugin),
+              ...freshOtherPlugins.map((p) => p.plugin),
             ],
             ...(runtimeLogLevel ? { logLevel: runtimeLogLevel } : {}),
             enableAutonomy: false,
+            settings: {
+              ...(freshBundledSkillsDir
+                ? { BUNDLED_SKILLS_DIRS: freshBundledSkillsDir }
+                : {}),
+              ...(freshWorkspaceSkillsDir
+                ? { WORKSPACE_SKILLS_DIR: freshWorkspaceSkillsDir }
+                : {}),
+              ...(freshConfig.skills?.allowBundled
+                ? {
+                    SKILLS_ALLOWLIST:
+                      freshConfig.skills.allowBundled.join(","),
+                  }
+                : {}),
+              ...(freshConfig.skills?.denyBundled
+                ? {
+                    SKILLS_DENYLIST:
+                      freshConfig.skills.denyBundled.join(","),
+                  }
+                : {}),
+              ...(freshConfig.skills?.load?.extraDirs?.length
+                ? {
+                    EXTRA_SKILLS_DIRS:
+                      freshConfig.skills.load.extraDirs.join(","),
+                  }
+                : {}),
+            },
           });
 
+          // Pre-register plugin-sql so DB is ready before other plugins init
+          if (freshSqlPlugin) {
+            await newRuntime.registerPlugin(freshSqlPlugin.plugin);
+            if (
+              newRuntime.adapter &&
+              !(await newRuntime.adapter.isReady())
+            ) {
+              await newRuntime.adapter.init();
+            }
+          }
+
           await newRuntime.initialize();
+
+          // Wait for AgentSkillsService to finish loading skills
+          try {
+            const svcPromise = newRuntime.getServiceLoadPromise(
+              "AGENT_SKILLS_SERVICE",
+            );
+            const svcTimeout = new Promise<never>((_r, rej) =>
+              setTimeout(
+                () => rej(new Error("timeout")),
+                30_000,
+              ),
+            );
+            await Promise.race([svcPromise, svcTimeout]);
+          } catch {
+            logger.warn(
+              "[milaidy] Hot-reload: AgentSkillsService did not initialise in time",
+            );
+          }
+
           runtime = newRuntime;
           logger.info("[milaidy] Hot-reload: Runtime restarted successfully");
           return newRuntime;
