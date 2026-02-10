@@ -41,6 +41,8 @@ export class CircularIncludeError extends ConfigIncludeError {
   }
 }
 
+const BLOCKED_MERGE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
 export function deepMerge(target: unknown, source: unknown): unknown {
   if (Array.isArray(target) && Array.isArray(source)) {
     return [...target, ...source];
@@ -48,6 +50,7 @@ export function deepMerge(target: unknown, source: unknown): unknown {
   if (isPlainObject(target) && isPlainObject(source)) {
     const result: Record<string, unknown> = { ...target };
     for (const key of Object.keys(source)) {
+      if (BLOCKED_MERGE_KEYS.has(key)) continue; // prevent prototype pollution
       result[key] =
         key in result ? deepMerge(result[key], source[key]) : source[key];
     }
