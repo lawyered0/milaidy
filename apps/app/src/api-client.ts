@@ -104,6 +104,7 @@ export interface StylePreset {
   };
   adjectives: string[];
   topics: string[];
+  postExamples: string[];
   messageExamples: MessageExample[][];
 }
 
@@ -164,6 +165,15 @@ export interface OnboardingOptions {
   sharedStyleRules: string;
 }
 
+/** Configuration for a single messaging connector. */
+export interface ConnectorConfig {
+  enabled?: boolean;
+  botToken?: string;
+  token?: string;
+  apiKey?: string;
+  [key: string]: string | boolean | number | string[] | Record<string, unknown> | undefined;
+}
+
 export interface OnboardingData {
   name: string;
   theme: string;
@@ -177,6 +187,7 @@ export interface OnboardingData {
   };
   adjectives?: string[];
   topics?: string[];
+  postExamples?: string[];
   messageExamples?: MessageExample[][];
   // Cloud-specific
   cloudProvider?: string;
@@ -186,12 +197,25 @@ export interface OnboardingData {
   provider?: string;
   providerApiKey?: string;
   openrouterModel?: string;
+  subscriptionProvider?: string;
+  // Messaging channel setup
+  channels?: Record<string, unknown>;
   // Inventory / wallet setup
   inventoryProviders?: Array<{
     chain: string;
     rpcProvider: string;
     rpcApiKey?: string;
   }>;
+  // Connector setup (Telegram, Discord, etc.)
+  connectors?: Record<string, ConnectorConfig>;
+  telegramToken?: string;
+  discordToken?: string;
+  whatsappSessionPath?: string;
+  twilioAccountSid?: string;
+  twilioAuthToken?: string;
+  twilioPhoneNumber?: string;
+  blooioApiKey?: string;
+  blooioPhoneNumber?: string;
 }
 
 export interface PluginParamDef {
@@ -214,7 +238,7 @@ export interface PluginInfo {
   enabled: boolean;
   configured: boolean;
   envKey: string | null;
-  category: "ai-provider" | "connector" | "database" | "feature";
+  category: "ai-provider" | "connector" | "database" | "app" | "feature";
   source: "bundled" | "store";
   parameters: PluginParamDef[];
   validationErrors: Array<{ field: string; message: string }>;
@@ -222,6 +246,20 @@ export interface PluginInfo {
   npmName?: string;
   version?: string;
   pluginDeps?: string[];
+}
+
+export interface CorePluginEntry {
+  npmName: string;
+  id: string;
+  name: string;
+  isCore: boolean;
+  loaded: boolean;
+  enabled: boolean;
+}
+
+export interface CorePluginsResponse {
+  core: CorePluginEntry[];
+  optional: CorePluginEntry[];
 }
 
 export interface ChatMessage {
@@ -508,6 +546,28 @@ export interface McpServerStatus {
   error?: string;
 }
 
+// Voice / TTS config
+export type VoiceProvider = "elevenlabs" | "simple-voice" | "edge";
+
+export interface VoiceConfig {
+  provider?: VoiceProvider;
+  elevenlabs?: {
+    apiKey?: string;
+    voiceId?: string;
+    modelId?: string;
+    stability?: number;
+    similarityBoost?: number;
+    speed?: number;
+  };
+  edge?: {
+    voice?: string;
+    lang?: string;
+    rate?: string;
+    pitch?: string;
+    volume?: string;
+  };
+}
+
 // Character
 export interface CharacterData {
   name?: string;
@@ -725,6 +785,38 @@ export class MilaidyClient {
     });
   }
 
+  async startAnthropicLogin(): Promise<{ authUrl: string }> {
+    return this.fetch("/api/subscription/anthropic/start", { method: "POST" });
+  }
+
+  async exchangeAnthropicCode(code: string): Promise<{ success: boolean; expiresAt?: string }> {
+    return this.fetch("/api/subscription/anthropic/exchange", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    });
+  }
+
+  async submitAnthropicSetupToken(token: string): Promise<{ success: boolean }> {
+    return this.fetch("/api/subscription/anthropic/setup-token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    });
+  }
+
+  async startOpenAILogin(): Promise<{ authUrl: string; state: string; instructions: string }> {
+    return this.fetch("/api/subscription/openai/start", { method: "POST" });
+  }
+
+  async exchangeOpenAICode(code: string): Promise<{ success: boolean; expiresAt?: string; accountId?: string }> {
+    return this.fetch("/api/subscription/openai/exchange", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    });
+  }
+
   async startAgent(): Promise<AgentStatus> {
     const res = await this.fetch<{ status: AgentStatus }>("/api/agent/start", { method: "POST" });
     return res.status;
@@ -766,15 +858,49 @@ export class MilaidyClient {
     });
   }
 
+  // ── Connectors ──────────────────────────────────────────────────────
+
+  async getConnectors(): Promise<{ connectors: Record<string, ConnectorConfig> }> {
+    return this.fetch("/api/connectors");
+  }
+
+  async saveConnector(name: string, config: ConnectorConfig): Promise<{ connectors: Record<string, ConnectorConfig> }> {
+    return this.fetch("/api/connectors", {
+      method: "POST",
+      body: JSON.stringify({ name, config }),
+    });
+  }
+
+  async deleteConnector(name: string): Promise<{ connectors: Record<string, ConnectorConfig> }> {
+    return this.fetch(`/api/connectors/${encodeURIComponent(name)}`, {
+      method: "DELETE",
+    });
+  }
+
   async getPlugins(): Promise<{ plugins: PluginInfo[] }> {
     return this.fetch("/api/plugins");
   }
 
-  async updatePlugin(id: string, config: Record<string, unknown>): Promise<void> {
-    await this.fetch(`/api/plugins/${id}`, {
+  async getCorePlugins(): Promise<CorePluginsResponse> {
+    return this.fetch("/api/plugins/core");
+  }
+
+  async toggleCorePlugin(npmName: string, enabled: boolean): Promise<{ ok: boolean; restarting?: boolean; message?: string }> {
+    return this.fetch("/api/plugins/core/toggle", {
+      method: "POST",
+      body: JSON.stringify({ npmName, enabled }),
+    });
+  }
+
+  async updatePlugin(id: string, config: Record<string, unknown>): Promise<{ ok: boolean; restarting?: boolean }> {
+    return this.fetch(`/api/plugins/${id}`, {
       method: "PUT",
       body: JSON.stringify(config),
     });
+  }
+
+  async restart(): Promise<{ ok: boolean }> {
+    return this.fetch("/api/restart", { method: "POST" });
   }
 
   async getSkills(): Promise<{ skills: SkillInfo[] }> {
@@ -1301,6 +1427,12 @@ export class MilaidyClient {
     return this.fetch(`/api/conversations/${encodeURIComponent(id)}/messages`, {
       method: "POST",
       body: JSON.stringify({ text }),
+    });
+  }
+
+  async requestGreeting(id: string): Promise<{ text: string; agentName: string; generated: boolean }> {
+    return this.fetch(`/api/conversations/${encodeURIComponent(id)}/greeting`, {
+      method: "POST",
     });
   }
 

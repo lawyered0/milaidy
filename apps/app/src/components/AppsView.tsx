@@ -47,7 +47,7 @@ export function AppsView() {
         setState("activeGameApp", app.name);
         setState("activeGameDisplayName", app.displayName ?? app.name);
         setState("activeGameViewerUrl", result.viewer.url);
-        setState("tab", "game" as never);
+        setState("tab", "game");
       }
     } catch (err) {
       setActionNotice(

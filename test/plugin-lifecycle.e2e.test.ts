@@ -6,7 +6,7 @@
  * flow end-to-end through HTTP.
  */
 import http from "node:http";
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { startApiServer } from "../src/api/server.js";
 
 // ---------------------------------------------------------------------------
@@ -233,6 +233,68 @@ describe("Plugin Lifecycle E2E", () => {
       );
       expect(status).toBe(200);
       expect((data.plugin as Record<string, unknown>).enabled).toBe(true);
+    });
+  });
+
+  // ===================================================================
+  //  2b. Capability toggle persists features flag
+  // ===================================================================
+
+  describe("capability feature-flag persistence", () => {
+    it("toggling a capability plugin (vision) persists features.vision in config", async () => {
+      // First check if vision plugin exists in the list
+      const { data: listData } = await http$(
+        server.port,
+        "GET",
+        "/api/plugins",
+      );
+      const plugins = listData.plugins as Array<Record<string, unknown>>;
+      const vision = plugins.find((p) => p.id === "vision");
+      if (!vision) return; // vision plugin not available in this env
+
+      // Disable vision
+      const { status: offStatus, data: offData } = await http$(
+        server.port,
+        "PUT",
+        "/api/plugins/vision",
+        { enabled: false },
+      );
+      expect(offStatus).toBe(200);
+      expect(offData.ok).toBe(true);
+      expect((offData.plugin as Record<string, unknown>).enabled).toBe(false);
+
+      // Read saved config to verify features.vision was persisted
+      const { status: cfgStatus, data: cfgData } = await http$(
+        server.port,
+        "GET",
+        "/api/config",
+      );
+      expect(cfgStatus).toBe(200);
+      const savedConfig = cfgData.config as Record<string, unknown> | undefined;
+      const features = (savedConfig ?? cfgData).features as
+        | Record<string, unknown>
+        | undefined;
+      // The features.vision flag should have been written
+      expect(features?.vision).toBe(false);
+
+      // Re-enable vision
+      const { status: onStatus, data: onData } = await http$(
+        server.port,
+        "PUT",
+        "/api/plugins/vision",
+        { enabled: true },
+      );
+      expect(onStatus).toBe(200);
+      expect((onData.plugin as Record<string, unknown>).enabled).toBe(true);
+
+      // Verify features.vision is now true
+      const { data: cfgData2 } = await http$(server.port, "GET", "/api/config");
+      const savedConfig2 =
+        (cfgData2.config as Record<string, unknown> | undefined) ?? cfgData2;
+      const features2 = savedConfig2.features as
+        | Record<string, unknown>
+        | undefined;
+      expect(features2?.vision).toBe(true);
     });
   });
 

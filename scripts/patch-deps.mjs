@@ -9,8 +9,8 @@
  * This can be removed once @elizaos/plugin-sql publishes a version with the
  * fix (already merged in source: WorldStore.create uses onConflictDoNothing).
  */
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

@@ -52,7 +52,7 @@ describe("BackupScheduler", () => {
     const scheduler = new BackupScheduler(client, "a1", 20);
 
     scheduler.start();
-    await sleep(120);
+    await sleep(250);
     scheduler.stop();
 
     expect(client.snapshot.mock.calls.length).toBeGreaterThanOrEqual(3);

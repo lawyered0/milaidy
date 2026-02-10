@@ -6,6 +6,8 @@
  * @module hooks/loader
  */
 
+import { homedir } from "node:os";
+import { resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { logger } from "@elizaos/core";
 import type { InternalHooksConfig } from "../config/types.hooks.js";
@@ -13,6 +15,34 @@ import { type DiscoveryOptions, discoverHooks } from "./discovery.js";
 import { checkEligibility, resolveHookConfig } from "./eligibility.js";
 import { clearHooks, registerHook } from "./registry.js";
 import type { HookHandler } from "./types.js";
+
+// ---------- Path Safety ----------
+
+/** Directories from which hook modules may be loaded. */
+function getSafeHookRoots(
+  workspacePath?: string,
+  bundledDir?: string,
+): string[] {
+  const roots: string[] = [resolve(homedir(), ".milaidy", "hooks")];
+  if (bundledDir) roots.push(resolve(bundledDir));
+  if (workspacePath) {
+    roots.push(resolve(workspacePath.replace(/^~/, homedir()), "hooks"));
+  }
+  return roots;
+}
+
+/**
+ * Ensure a module path resolves to a file under one of the allowed hook
+ * roots.  Blocks absolute paths to arbitrary locations and path-traversal
+ * attacks (e.g. "../../etc/malicious").
+ */
+function isPathUnderRoots(modulePath: string, roots: string[]): boolean {
+  const resolved = resolve(modulePath);
+  return roots.some((root) => {
+    const r = root.endsWith(sep) ? root : root + sep;
+    return resolved.startsWith(r) || resolved === root;
+  });
+}
 
 // ---------- Dynamic Handler Loading ----------
 
@@ -92,14 +122,26 @@ export async function loadHooks(
   // Clear existing hooks (for reload)
   clearHooks();
 
+  // Validate config-supplied extraDirs: only allow paths under ~/.milaidy/
+  // to prevent config injection from scanning attacker-controlled directories.
+  const safeExtraDirs = [...(options.extraDirs ?? [])];
+  const milaidyHome = resolve(homedir(), ".milaidy");
+  for (const dir of internalConfig?.load?.extraDirs ?? []) {
+    const resolved = resolve(dir.replace(/^~/, homedir()));
+    if (resolved.startsWith(milaidyHome + sep) || resolved === milaidyHome) {
+      safeExtraDirs.push(dir);
+    } else {
+      logger.warn(
+        `[hooks] Rejected config extraDir "${dir}": must be under ~/.milaidy/`,
+      );
+    }
+  }
+
   // Discover hooks
   const entries = await discoverHooks({
     workspacePath: options.workspacePath,
     bundledDir: options.bundledDir,
-    extraDirs: [
-      ...(options.extraDirs ?? []),
-      ...(internalConfig?.load?.extraDirs ?? []),
-    ],
+    extraDirs: safeExtraDirs,
   });
 
   const result: LoadHooksResult = {
@@ -167,7 +209,22 @@ export async function loadHooks(
 
   // Load legacy config handlers (backwards compatibility)
   if (internalConfig?.handlers) {
+    const safeRoots = getSafeHookRoots(
+      options.workspacePath,
+      options.bundledDir,
+    );
+
     for (const legacyHandler of internalConfig.handlers) {
+      // Validate module path is under a known hook directory to prevent
+      // arbitrary code execution via config-injected module paths.
+      if (!isPathUnderRoots(legacyHandler.module, safeRoots)) {
+        logger.warn(
+          `[hooks] Rejected legacy handler: module path "${legacyHandler.module}" is outside allowed hook directories`,
+        );
+        result.failed.push(legacyHandler.module);
+        continue;
+      }
+
       try {
         const handler = await loadHandlerModule(
           legacyHandler.module,

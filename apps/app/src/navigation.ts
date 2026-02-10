@@ -2,13 +2,13 @@
  * Navigation — tabs + onboarding.
  */
 
-export type Tab = "chat" | "apps" | "game" | "inventory" | "plugins" | "skills" | "database" | "config" | "logs";
+export type Tab = "chat" | "apps" | "game" | "inventory" | "features" | "connectors" | "skills" | "character" | "config" | "admin";
 
 export const TAB_GROUPS = [
   { label: "Chat", tabs: ["chat"] as Tab[] },
   { label: "Play", tabs: ["apps"] as Tab[] },
-  { label: "Manage", tabs: ["inventory", "plugins", "skills", "database"] as Tab[] },
-  { label: "Settings", tabs: ["config", "logs"] as Tab[] },
+  { label: "Manage", tabs: ["inventory", "features", "connectors", "skills"] as Tab[] },
+  { label: "Settings", tabs: ["character", "config", "admin"] as Tab[] },
 ] as const;
 
 const TAB_PATHS: Record<Tab, string> = {
@@ -16,11 +16,20 @@ const TAB_PATHS: Record<Tab, string> = {
   apps: "/apps",
   game: "/game",
   inventory: "/inventory",
-  plugins: "/plugins",
+  features: "/features",
+  connectors: "/connectors",
   skills: "/skills",
-  database: "/database",
+  character: "/character",
   config: "/config",
-  logs: "/logs",
+  admin: "/admin",
+};
+
+/** Legacy path redirects — old paths that now map to new tabs. */
+const LEGACY_PATHS: Record<string, Tab> = {
+  "/database": "admin",
+  "/logs": "admin",
+  "/game": "apps",
+  "/plugins": "features",
 };
 
 const PATH_TO_TAB = new Map(
@@ -43,10 +52,11 @@ export function tabFromPath(pathname: string, basePath = ""): Tab | null {
   let normalized = normalizePath(p).toLowerCase();
   if (normalized.endsWith("/index.html")) normalized = "/";
   if (normalized === "/") return "chat";
-  return PATH_TO_TAB.get(normalized) ?? null;
+  // Check current paths first, then legacy redirects
+  return PATH_TO_TAB.get(normalized) ?? LEGACY_PATHS[normalized] ?? null;
 }
 
-export function normalizeBasePath(basePath: string): string {
+function normalizeBasePath(basePath: string): string {
   if (!basePath) return "";
   let base = basePath.trim();
   if (!base.startsWith("/")) base = `/${base}`;
@@ -55,7 +65,7 @@ export function normalizeBasePath(basePath: string): string {
   return base;
 }
 
-export function normalizePath(p: string): string {
+function normalizePath(p: string): string {
   if (!p) return "/";
   let normalized = p.trim();
   if (!normalized.startsWith("/")) normalized = `/${normalized}`;
@@ -69,26 +79,13 @@ export function titleForTab(tab: Tab): string {
     case "apps": return "Apps";
     case "game": return "Game";
     case "inventory": return "Inventory";
-    case "plugins": return "Plugins";
+    case "features": return "Features";
+    case "connectors": return "Connectors";
     case "skills": return "Skills";
-    case "database": return "Database";
+    case "character": return "Character";
     case "config": return "Config";
-    case "logs": return "Logs";
+    case "admin": return "Admin";
     default: return "Milaidy";
   }
 }
 
-export function subtitleForTab(tab: Tab): string {
-  switch (tab) {
-    case "chat": return "";
-    case "apps": return "";
-    case "game": return "";
-    case "inventory": return "Tokens and NFTs across all wallets.";
-    case "plugins": return "";
-    case "skills": return "";
-    case "database": return "";
-    case "config": return "";
-    case "logs": return "";
-    default: return "";
-  }
-}

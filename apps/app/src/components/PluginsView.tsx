@@ -1,11 +1,71 @@
 /**
- * Plugins management view — configure and enable/disable plugins.
+ * Plugin list views — Features and Connectors.
+ *
+ * FeaturesView shows "feature" category plugins (excluding always-on hidden ones).
+ * ConnectorsView shows "connector" category plugins.
+ *
+ * Both share the same card/field rendering via the internal PluginListView component.
  */
 
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "../AppContext.js";
 import { client } from "../api-client";
 import type { PluginInfo, PluginParamDef } from "../api-client";
+
+/* ── Always-on plugins (hidden from all views) ────────────────────────── */
+
+/**
+ * Plugin IDs hidden from Features/Connectors views.
+ * Core plugins are visible in Admin > Plugins instead.
+ */
+const ALWAYS_ON_PLUGIN_IDS = new Set([
+  // Core (always loaded)
+  "sql",
+  "local-embedding",
+  "knowledge",
+  "agent-skills",
+  "directives",
+  "commands",
+  "personality",
+  "experience",
+  // Optional core (shown in admin)
+  "agent-orchestrator",
+  "shell",
+  "plugin-manager",
+  "cli",
+  "code",
+  "edge-tts",
+  "pdf",
+  "scratchpad",
+  "secrets-manager",
+  "todo",
+  "trust",
+  "form",
+  "goals",
+  "scheduling",
+  // Internal / infrastructure
+  "elizacloud",
+  "evm",
+  "memory",
+  "rolodex",
+  "tts",
+  "elevenlabs",
+  "cron",
+  "webhooks",
+  "browser",
+  "vision",
+  "computeruse",
+]);
+
+/**
+ * Toggleable capability plugins shown as quick-toggle buttons at the top
+ * of the Features view. These are enabled by default but can be turned off.
+ */
+const CAPABILITY_TOGGLE_IDS: { id: string; label: string }[] = [
+  { id: "browser", label: "Browser" },
+  { id: "vision", label: "Vision" },
+  { id: "computeruse", label: "Computer Use" },
+];
 
 /* ── Helpers ────────────────────────────────────────────────────────── */
 
@@ -59,23 +119,22 @@ function isAdvancedParam(param: PluginParamDef): boolean {
   );
 }
 
-type Categories = "all" | "ai-provider" | "connector" | "feature";
-const CATEGORIES: Categories[] = ["all", "ai-provider", "connector", "feature"];
-const CATEGORY_LABELS: Record<string, string> = {
-  all: "All",
-  "ai-provider": "AI Provider",
-  connector: "Connector",
-  feature: "Feature",
-};
-
 type StatusFilter = "all" | "enabled";
 
-/* ── Component ──────────────────────────────────────────────────────── */
+/* ── Shared PluginListView ─────────────────────────────────────────── */
 
-export function PluginsView() {
+interface PluginListViewProps {
+  /** Which category to show. */
+  category: "feature" | "connector";
+  /** Label used in search placeholder and empty state messages. */
+  label: string;
+  /** Whether to show the "Add Plugin" button. */
+  showAddPlugin?: boolean;
+}
+
+function PluginListView({ category, label, showAddPlugin = false }: PluginListViewProps) {
   const {
     plugins,
-    pluginFilter,
     pluginStatusFilter,
     pluginSearch,
     pluginSettingsOpen,
@@ -102,24 +161,31 @@ export function PluginsView() {
 
   // ── Derived data ───────────────────────────────────────────────────
 
-  const nonDbPlugins = useMemo(() => plugins.filter((p: PluginInfo) => p.category !== "database"), [plugins]);
+  /** All plugins in the target category, excluding always-on hidden plugins. */
+  const categoryPlugins = useMemo(
+    () =>
+      plugins.filter(
+        (p: PluginInfo) =>
+          p.category === category &&
+          !ALWAYS_ON_PLUGIN_IDS.has(p.id),
+      ),
+    [plugins, category],
+  );
 
   const filtered = useMemo(() => {
     const searchLower = pluginSearch.toLowerCase();
-    return nonDbPlugins.filter((p: PluginInfo) => {
-      const matchesCategory = pluginFilter === "all" || p.category === pluginFilter;
+    return categoryPlugins.filter((p: PluginInfo) => {
       const matchesStatus =
         pluginStatusFilter === "all" ||
-        (pluginStatusFilter === "enabled" && p.enabled) ||
-        (pluginStatusFilter === "disabled" && !p.enabled);
+        (pluginStatusFilter === "enabled" && p.enabled);
       const matchesSearch =
         !searchLower ||
         p.name.toLowerCase().includes(searchLower) ||
         (p.description ?? "").toLowerCase().includes(searchLower) ||
         p.id.toLowerCase().includes(searchLower);
-      return matchesCategory && matchesStatus && matchesSearch;
+      return matchesStatus && matchesSearch;
     });
-  }, [nonDbPlugins, pluginFilter, pluginStatusFilter, pluginSearch]);
+  }, [categoryPlugins, pluginStatusFilter, pluginSearch]);
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
@@ -133,7 +199,7 @@ export function PluginsView() {
     });
   }, [filtered]);
 
-  const enabledCount = useMemo(() => nonDbPlugins.filter((p: PluginInfo) => p.enabled).length, [nonDbPlugins]);
+  const enabledCount = useMemo(() => categoryPlugins.filter((p: PluginInfo) => p.enabled).length, [categoryPlugins]);
 
   // ── Handlers ───────────────────────────────────────────────────────
 
@@ -211,7 +277,7 @@ export function PluginsView() {
 
   const renderField = (plugin: PluginInfo, param: PluginParamDef) => {
     const fieldType = autoFieldType(param);
-    const label = autoLabel(param.key, plugin.id);
+    const fieldLabel = autoLabel(param.key, plugin.id);
     const configValue = pluginConfigs[plugin.id]?.[param.key];
     const currentValue =
       configValue !== undefined ? configValue : param.isSet && !param.sensitive ? (param.currentValue ?? "") : "";
@@ -227,7 +293,7 @@ export function PluginsView() {
               param.isSet ? "bg-ok" : param.required ? "bg-destructive" : "bg-muted"
             }`}
           />
-          <span>{label}</span>
+          <span>{fieldLabel}</span>
           {param.required && (
             <span className="text-[10px] text-destructive font-normal">required</span>
           )}
@@ -352,8 +418,6 @@ export function PluginsView() {
     const setCount = hasParams ? p.parameters.filter((param: PluginParamDef) => param.isSet).length : 0;
     const totalCount = hasParams ? p.parameters.length : 0;
     const allParamsSet = !hasParams || setCount === totalCount;
-    const progress = totalCount > 0 ? (setCount / totalCount) * 100 : 100;
-    const categoryLabel = p.category === "ai-provider" ? "ai provider" : p.category;
     const generalParams = hasParams ? p.parameters.filter((param: PluginParamDef) => !isAdvancedParam(param)) : [];
     const advancedParams = hasParams ? p.parameters.filter((param: PluginParamDef) => isAdvancedParam(param)) : [];
     const advancedOpen = pluginAdvancedOpen.has(p.id);
@@ -393,9 +457,6 @@ export function PluginsView() {
 
           {/* Badges */}
           <div className="flex items-center gap-1.5 shrink-0">
-            <span className="text-[10px] px-1.5 py-px border border-border bg-surface text-muted lowercase tracking-wide whitespace-nowrap">
-              {categoryLabel}
-            </span>
             {!allParamsSet && hasParams && (
               <span className="text-[10px] px-1.5 py-px border border-warn bg-warn-subtle text-warn lowercase tracking-wide whitespace-nowrap">
                 {setCount}/{totalCount}
@@ -419,15 +480,6 @@ export function PluginsView() {
                   allParamsSet ? "bg-ok" : "bg-destructive"
                 }`}
               />
-              <div
-                className="w-[52px] h-[5px] bg-surface border border-border overflow-hidden"
-                title={`${setCount}/${totalCount} configured`}
-              >
-                <div
-                  className="h-full bg-accent transition-[width] duration-300"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
             </div>
           )}
 
@@ -562,14 +614,14 @@ export function PluginsView() {
 
   return (
     <div>
-      {/* Toolbar: search + category filters + status toggle — all one row */}
+      {/* Toolbar: search + status toggle */}
       <div className="flex items-center gap-2 mb-3.5 flex-wrap">
         {/* Search */}
         <div className="relative flex-1 min-w-[180px]">
           <input
             type="text"
             className="w-full py-[5px] px-3 pr-8 border border-border bg-card text-[13px] transition-colors duration-150 focus:border-accent focus:outline-none placeholder:text-muted placeholder:italic"
-            placeholder="Search plugins..."
+            placeholder={`Search ${label.toLowerCase()}...`}
             value={pluginSearch}
             onChange={(e) => setState("pluginSearch", e.target.value)}
           />
@@ -585,28 +637,6 @@ export function PluginsView() {
           )}
         </div>
 
-        {/* Category filters */}
-        <div className="flex gap-1 flex-wrap">
-          {CATEGORIES.map((cat) => (
-            <button
-              key={cat}
-              type="button"
-              className={`px-2.5 py-[3px] border text-[11px] cursor-pointer transition-colors duration-150 ${
-                pluginFilter === cat
-                  ? "bg-accent text-accent-fg border-accent"
-                  : "bg-surface text-txt border-border hover:bg-bg-hover"
-              }`}
-              onClick={() => setState("pluginFilter", cat)}
-            >
-              {CATEGORY_LABELS[cat]} (
-              {cat === "all"
-                ? nonDbPlugins.length
-                : nonDbPlugins.filter((p: PluginInfo) => p.category === cat).length}
-              )
-            </button>
-          ))}
-        </div>
-
         {/* Status toggle: All / Enabled */}
         <div className="flex gap-1 shrink-0">
           {(["all", "enabled"] as const).map((s) => (
@@ -620,26 +650,28 @@ export function PluginsView() {
               }`}
               onClick={() => setState("pluginStatusFilter", s as StatusFilter)}
             >
-              {s === "all" ? "All" : `Enabled (${enabledCount})`}
+              {s === "all" ? `All (${categoryPlugins.length})` : `Enabled (${enabledCount})`}
             </button>
           ))}
         </div>
 
-        {/* Add plugin button */}
-        <button
-          type="button"
-          className="px-2.5 py-[3px] border border-accent bg-accent text-accent-fg text-[11px] cursor-pointer shrink-0 hover:bg-accent-hover hover:border-accent-hover"
-          onClick={() => setAddDirOpen(true)}
-        >
-          + Add Plugin
-        </button>
+        {/* Add plugin button (only for Features) */}
+        {showAddPlugin && (
+          <button
+            type="button"
+            className="px-2.5 py-[3px] border border-accent bg-accent text-accent-fg text-[11px] cursor-pointer shrink-0 hover:bg-accent-hover hover:border-accent-hover"
+            onClick={() => setAddDirOpen(true)}
+          >
+            + Add Plugin
+          </button>
+        )}
       </div>
 
       {/* Plugin list */}
       <div className="overflow-y-auto">
         {sorted.length === 0 ? (
           <div className="text-center py-10 px-5 text-muted border border-dashed border-border">
-            {pluginSearch ? "No plugins match your search." : "No plugins in this category."}
+            {pluginSearch ? `No ${label.toLowerCase()} match your search.` : `No ${label.toLowerCase()} available.`}
           </div>
         ) : (
           <div className="flex flex-col gap-[1px]">
@@ -715,3 +747,73 @@ export function PluginsView() {
     </div>
   );
 }
+
+/* ── Capability toggles bar ─────────────────────────────────────────── */
+
+function CapabilityToggles() {
+  const { plugins, handlePluginToggle, loadPlugins } = useApp();
+
+  useEffect(() => {
+    void loadPlugins();
+  }, [loadPlugins]);
+
+  /** Resolve each capability to its plugin data (if found). */
+  const capabilities = useMemo(
+    () =>
+      CAPABILITY_TOGGLE_IDS.map((cap) => ({
+        ...cap,
+        plugin: plugins.find((p: PluginInfo) => p.id === cap.id) ?? null,
+      })),
+    [plugins],
+  );
+
+  return (
+    <div className="flex items-center gap-2 mb-4 p-3 border border-border bg-card">
+      <span className="text-xs font-bold text-txt mr-1">Capabilities</span>
+      {capabilities.map(({ id, label, plugin }) => {
+        const enabled = plugin?.enabled ?? false;
+        return (
+          <button
+            key={id}
+            type="button"
+            className={`inline-flex items-center gap-1.5 px-3 py-[5px] border text-[11px] font-semibold cursor-pointer transition-colors duration-150 ${
+              enabled
+                ? "bg-accent text-accent-fg border-accent"
+                : "bg-surface text-muted border-border hover:text-txt hover:bg-bg-hover"
+            }`}
+            onClick={() => {
+              if (plugin) void handlePluginToggle(id, !enabled);
+            }}
+            disabled={!plugin}
+            title={plugin ? `${enabled ? "Disable" : "Enable"} ${label}` : `${label} plugin not available`}
+          >
+            <span
+              className={`inline-block w-[7px] h-[7px] rounded-full ${
+                enabled ? "bg-white/80" : "bg-muted"
+              }`}
+            />
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ── Exported views ────────────────────────────────────────────────── */
+
+/** Features view — shows capability toggles + "feature" category plugins. */
+export function FeaturesView() {
+  return (
+    <div>
+      <CapabilityToggles />
+      <PluginListView category="feature" label="Features" showAddPlugin />
+    </div>
+  );
+}
+
+/** Connectors view — shows "connector" category plugins. */
+export function ConnectorsView() {
+  return <PluginListView category="connector" label="Connectors" />;
+}
+

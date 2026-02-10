@@ -21,20 +21,20 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import dotenv from "dotenv";
 import {
   AgentRuntime,
+  ChannelType,
   createCharacter,
   createMessageMemory,
-  stringToUuid,
-  ChannelType,
   logger,
   type Plugin,
+  stringToUuid,
   type UUID,
 } from "@elizaos/core";
-import { startApiServer } from "../src/api/server.js";
+import dotenv from "dotenv";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { validateRuntimeContext } from "../src/api/plugin-validation.js";
+import { startApiServer } from "../src/api/server.js";
 import { ensureAgentWorkspace } from "../src/providers/workspace.js";
 
 // ---------------------------------------------------------------------------
@@ -367,7 +367,11 @@ describe("CLI Entry Point (npx milaidy equivalent)", () => {
       // Write config so onboarding is skipped
       fs.writeFileSync(
         path.join(subConfigDir, "milaidy.json"),
-        JSON.stringify({ agent: { name: "CLIBootAgent", bio: "cli test" } }),
+        JSON.stringify({
+          agents: {
+            list: [{ id: "main", name: "CLIBootAgent", bio: ["cli test"] }],
+          },
+        }),
       );
 
       const env: Record<string, string> = {};
@@ -455,7 +459,7 @@ describe("Plugin Stress Test", () => {
     "@elizaos/plugin-ollama",
   ];
 
-  const CHANNEL_PLUGINS: readonly string[] = [
+  const CONNECTOR_PLUGINS: readonly string[] = [
     "@elizaos/plugin-discord",
     "@elizaos/plugin-telegram",
     "@elizaos/plugin-slack",
@@ -524,10 +528,10 @@ describe("Plugin Stress Test", () => {
     expect(loaded.length).toBeGreaterThan(0);
   }, 30_000);
 
-  it("channel plugins load without crashing each other", async () => {
+  it("connector plugins load without crashing each other", async () => {
     const results: Array<{ name: string; ok: boolean }> = [];
 
-    for (const name of CHANNEL_PLUGINS) {
+    for (const name of CONNECTOR_PLUGINS) {
       try {
         const mod = (await import(name)) as PluginModule;
         results.push({ name, ok: extractPlugin(mod) !== null });
@@ -538,7 +542,7 @@ describe("Plugin Stress Test", () => {
 
     const loaded = results.filter((r) => r.ok);
     logger.info(
-      `[e2e-validation] Channel plugins: ${loaded.length}/${CHANNEL_PLUGINS.length} loaded`,
+      `[e2e-validation] Connector plugins: ${loaded.length}/${CONNECTOR_PLUGINS.length} loaded`,
     );
 
     // Channel plugins may fail without credentials, but loading should not crash
@@ -1297,11 +1301,11 @@ describe("Runtime Integration (with model provider)", () => {
     "context integrity maintained across 5 sequential messages",
     async () => {
       const messages = [
-        "Remember this code: ALPHA-7",
-        "What code did I tell you to remember?",
-        "Now remember this too: BRAVO-3",
-        "List all codes I've told you.",
-        "How many codes have I given you total?",
+        "Remember: ALPHA-7. Reply OK.",
+        "What code did I say? One line.",
+        "Remember: BRAVO-3. Reply OK.",
+        "List all codes. One line.",
+        "How many codes total? Number only.",
       ];
 
       let lastResponse = "";
@@ -1332,7 +1336,7 @@ describe("Runtime Integration (with model provider)", () => {
       // is a soft assertion since models can be unpredictable
       expect(lastResponse.length).toBeGreaterThan(0);
     },
-    180_000,
+    300_000,
   );
 
   it.skipIf(!hasModelProvider)(

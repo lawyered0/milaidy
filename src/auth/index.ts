@@ -5,28 +5,28 @@
  * Adds server-side credential storage and env var injection on top.
  */
 
-// Anthropic (Claude Pro/Max)
-export { startAnthropicLogin, refreshAnthropicToken } from "./anthropic.js";
 export type { AnthropicFlow } from "./anthropic.js";
-
-// OpenAI Codex (ChatGPT Plus/Pro)
-export { startCodexLogin, refreshCodexToken } from "./openai-codex.js";
-export type { CodexFlow } from "./openai-codex.js";
-
+// Anthropic (Claude Pro/Max)
+export { refreshAnthropicToken, startAnthropicLogin } from "./anthropic.js";
+// Claude Code setup token runtime support
+export { applyClaudeCodeStealth } from "./apply-stealth.js";
 // Credential storage + management
 export {
-  saveCredentials,
-  loadCredentials,
+  applySubscriptionCredentials,
   deleteCredentials,
-  hasValidCredentials,
   getAccessToken,
   getSubscriptionStatus,
-  applySubscriptionCredentials,
+  hasValidCredentials,
+  loadCredentials,
+  saveCredentials,
 } from "./credentials.js";
+export type { CodexFlow } from "./openai-codex.js";
+// OpenAI Codex (ChatGPT Plus/Pro)
+export { refreshCodexToken, startCodexLogin } from "./openai-codex.js";
 
 // Types
 export type {
   OAuthCredentials,
-  SubscriptionProvider,
   StoredCredentials,
+  SubscriptionProvider,
 } from "./types.js";

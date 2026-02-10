@@ -111,6 +111,26 @@ if (typeof globalThis.document === "undefined") {
   });
 }
 
+// Simple in-memory storage mock
+function createMockStorage(): Storage {
+  const store = new Map<string, string>();
+  return {
+    getItem: vi.fn((key: string) => store.get(key) ?? null),
+    setItem: vi.fn((key: string, value: string) => { store.set(key, value); }),
+    removeItem: vi.fn((key: string) => { store.delete(key); }),
+    clear: vi.fn(() => { store.clear(); }),
+    get length() { return store.size; },
+    key: vi.fn((index: number) => [...store.keys()][index] ?? null),
+  } as Storage;
+}
+
+if (typeof globalThis.localStorage === "undefined") {
+  Object.defineProperty(globalThis, "localStorage", { value: createMockStorage(), writable: true, configurable: true });
+}
+if (typeof globalThis.sessionStorage === "undefined") {
+  Object.defineProperty(globalThis, "sessionStorage", { value: createMockStorage(), writable: true, configurable: true });
+}
+
 if (typeof globalThis.window === "undefined") {
   Object.defineProperty(globalThis, "window", {
     value: {
@@ -121,10 +141,20 @@ if (typeof globalThis.window === "undefined") {
       screenX: 0, screenY: 0, outerWidth: 1920, outerHeight: 1080,
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
+      localStorage: globalThis.localStorage,
+      sessionStorage: globalThis.sessionStorage,
     },
     writable: true,
     configurable: true,
   });
+} else {
+  const win = globalThis.window as unknown as Record<string, unknown>;
+  if (!win.sessionStorage) {
+    Object.defineProperty(win, "sessionStorage", { value: createMockStorage(), writable: true, configurable: true });
+  }
+  if (!win.localStorage) {
+    Object.defineProperty(win, "localStorage", { value: createMockStorage(), writable: true, configurable: true });
+  }
 }
 
 if (typeof globalThis.WebSocket === "undefined") {
@@ -165,10 +195,53 @@ if (typeof globalThis.Notification === "undefined") {
 if (typeof globalThis.AudioContext === "undefined") {
   Object.defineProperty(globalThis, "AudioContext", {
     value: class {
-      currentTime = 0; destination = {};
+      currentTime = 0;
+      state = "running";
+      destination = {};
       createOscillator = vi.fn(() => ({ connect: vi.fn(() => ({ connect: vi.fn() })), frequency: { value: 0 }, type: "sine", start: vi.fn(), stop: vi.fn() }));
       createGain = vi.fn(() => ({ connect: vi.fn(() => ({ connect: vi.fn() })), gain: { setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() } }));
+      createAnalyser = vi.fn(() => ({
+        fftSize: 2048,
+        smoothingTimeConstant: 0.8,
+        connect: vi.fn(),
+        getFloatTimeDomainData: vi.fn((arr: Float32Array) => { arr.fill(0); }),
+      }));
+      createBufferSource = vi.fn(() => ({
+        buffer: null,
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+        start: vi.fn(),
+        stop: vi.fn(),
+        onended: null as (() => void) | null,
+      }));
+      decodeAudioData = vi.fn(async () => ({ duration: 1, length: 44100, sampleRate: 44100 }));
+      resume = vi.fn(async () => {});
+      close = vi.fn(async () => {});
     },
     writable: true, configurable: true,
   });
 }
+
+// ---------------------------------------------------------------------------
+// SpeechSynthesis mocks (for voice chat testing)
+// ---------------------------------------------------------------------------
+
+if (typeof globalThis.SpeechSynthesisUtterance === "undefined") {
+  Object.defineProperty(globalThis, "SpeechSynthesisUtterance", {
+    value: class {
+      text = "";
+      rate = 1;
+      pitch = 1;
+      lang = "";
+      onstart: (() => void) | null = null;
+      onend: (() => void) | null = null;
+      onerror: ((e: { error: string }) => void) | null = null;
+      constructor(text?: string) { this.text = text ?? ""; }
+    },
+    writable: true, configurable: true,
+  });
+}
+
+// Note: SpeechSynthesis instance is NOT mocked globally to avoid breaking
+// TalkModeWeb tests that expect synthesis to be unavailable. Tests needing
+// SpeechSynthesis should create their own mock instances locally.

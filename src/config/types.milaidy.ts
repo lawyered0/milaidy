@@ -513,6 +513,28 @@ export type UpdateConfig = {
   checkIntervalSeconds?: number;
 };
 
+// --- Connector types ---
+
+/** JSON-serializable value for connector configuration fields. */
+export type ConnectorFieldValue =
+  | string
+  | number
+  | boolean
+  | string[]
+  | { [key: string]: ConnectorFieldValue | undefined }
+  | undefined;
+
+/**
+ * Configuration for a single messaging connector (e.g. Telegram, Discord).
+ *
+ * Common fields:
+ * - `enabled` — disable without removing config
+ * - `botToken` / `token` / `apiKey` — authentication credential
+ * - `dmPolicy` — DM access control ("open" | "pairing" | "closed")
+ * - `configWrites` — allow the connector to write config on events
+ */
+export type ConnectorConfig = { [key: string]: ConnectorFieldValue };
+
 export type MilaidyConfig = {
   meta?: {
     /** Last Milaidy version that wrote this config. */
@@ -574,7 +596,8 @@ export type MilaidyConfig = {
   approvals?: ApprovalsConfig;
   session?: SessionConfig;
   web?: WebConfig;
-  channels?: Record<string, unknown>;
+  /** @deprecated Use `connectors` instead. Kept for backward compatibility during migration. */
+  channels?: Record<string, ConnectorConfig>;
   cron?: CronConfig;
   hooks?: HooksConfig;
   discovery?: DiscoveryConfig;
@@ -586,6 +609,8 @@ export type MilaidyConfig = {
   /** ElizaCloud integration for remote agent provisioning and inference. */
   cloud?: CloudConfig;
   x402?: X402Config;
+  /** Messaging connector configuration (Telegram, Discord, Slack, etc.). */
+  connectors?: Record<string, ConnectorConfig>;
   /** MCP server configuration. */
   mcp?: {
     servers?: Record<

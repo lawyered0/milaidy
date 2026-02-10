@@ -1,5 +1,5 @@
 import { ascii } from "../ascii.js";
-import { isRich, theme, cyberGreen } from "../terminal/theme.js";
+import { cyberGreen, isRich, theme } from "../terminal/theme.js";
 import { resolveCommitHash } from "./git-commit.js";
 
 type BannerOptions = {

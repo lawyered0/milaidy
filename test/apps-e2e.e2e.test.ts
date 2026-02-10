@@ -14,7 +14,7 @@
  */
 import http from "node:http";
 import net from "node:net";
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { startApiServer } from "../src/api/server.js";
 
 // ---------------------------------------------------------------------------
@@ -238,7 +238,27 @@ describe("Apps E2E", () => {
     let gatewayRunning = false;
 
     beforeAll(async () => {
-      engineRunning = await isPortOpen(80);
+      // Port 80 may be claimed by IIS or another service on Windows, so
+      // verify the response actually contains HTML before treating the
+      // 2004scape engine as running.
+      if (await isPortOpen(80)) {
+        try {
+          const body = await new Promise<string>((resolve, reject) => {
+            http
+              .get("http://127.0.0.1:80", (res) => {
+                const chunks: Buffer[] = [];
+                res.on("data", (c: Buffer) => chunks.push(c));
+                res.on("end", () =>
+                  resolve(Buffer.concat(chunks).toString("utf-8")),
+                );
+              })
+              .on("error", reject);
+          });
+          engineRunning = body.includes("<");
+        } catch {
+          engineRunning = false;
+        }
+      }
       gatewayRunning = await isPortOpen(7780);
       if (!engineRunning) {
         console.log(

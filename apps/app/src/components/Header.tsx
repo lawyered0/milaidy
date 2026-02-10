@@ -28,6 +28,8 @@ export function Header() {
     <header className="flex items-center justify-between border-b border-border py-4 px-5">
       <div className="flex items-center gap-3">
         <span className="text-lg font-bold text-txt-strong" data-testid="agent-name">{name}</span>
+      </div>
+      <div className="flex items-center gap-3">
         {cloudConnected && cloudCredits !== null && (
           <a href={cloudTopUpUrl} target="_blank" rel="noopener noreferrer"
             className={`inline-flex items-center gap-1 px-2.5 py-0.5 border font-mono text-xs no-underline transition-colors hover:border-accent hover:text-accent ${creditColor}`}>
@@ -35,8 +37,6 @@ export function Header() {
             ${cloudCredits.toFixed(2)}
           </a>
         )}
-      </div>
-      <div className="flex items-center gap-3">
         <div className="flex items-center gap-1.5">
           <span className={`inline-flex items-center h-7 px-2.5 border font-mono text-xs leading-none ${stateColor}`} data-testid="status-pill">{state}</span>
           {state === "not_started" || state === "stopped" ? (

@@ -355,16 +355,21 @@ describe("Package.json version pinning (issue #10)", () => {
     const pkgPath = resolve(process.cwd(), "package.json");
     const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as {
       dependencies: Record<string, string>;
+      pnpm?: { overrides?: Record<string, string> };
     };
 
     const coreVersion = pkg.dependencies["@elizaos/core"];
     expect(coreVersion).toBeDefined();
-    // Core must be pinned (not "next") to prevent version skew
-    expect(coreVersion).not.toBe("next");
-    // Should be a specific version
-    expect(coreVersion).toMatch(/^\d+\.\d+\.\d+/);
-    // Must be >= alpha.3 (minimum version compatible with pinned plugins)
-    expect(versionSatisfies(coreVersion, "2.0.0-alpha.3")).toBe(true);
+    // Core can use "next" dist-tag if pnpm overrides pin the actual version
+    if (coreVersion === "next") {
+      const pnpmPin = pkg.pnpm?.overrides?.["@elizaos/core"];
+      expect(pnpmPin).toBeDefined();
+      expect(pnpmPin).toMatch(/^\d+\.\d+\.\d+/);
+      expect(versionSatisfies(pnpmPin ?? "", "2.0.0-alpha.3")).toBe(true);
+    } else {
+      expect(coreVersion).toMatch(/^\d+\.\d+\.\d+/);
+      expect(versionSatisfies(coreVersion, "2.0.0-alpha.3")).toBe(true);
+    }
   });
 
   it("affected plugins are present in dependencies (core pin makes next safe)", async () => {
@@ -374,9 +379,10 @@ describe("Package.json version pinning (issue #10)", () => {
     const pkgPath = resolve(process.cwd(), "package.json");
     const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as {
       dependencies: Record<string, string>;
+      pnpm?: { overrides?: Record<string, string> };
     };
 
-    // With core pinned to >= alpha.4, plugins at "next" are safe
+    // With core pinned via pnpm overrides, plugins at "next" are safe
     const affectedPlugins = [
       "@elizaos/plugin-openrouter",
       "@elizaos/plugin-openai",
@@ -385,16 +391,22 @@ describe("Package.json version pinning (issue #10)", () => {
       "@elizaos/plugin-knowledge",
     ];
 
+    // If core is "next", ensure pnpm overrides pin the actual version
+    const coreVersion = pkg.dependencies["@elizaos/core"];
+    if (coreVersion === "next") {
+      const pnpmPin = pkg.pnpm?.overrides?.["@elizaos/core"];
+      expect(pnpmPin).toBeDefined();
+      expect(pnpmPin).toMatch(/^\d+\.\d+\.\d+/);
+    }
+
     for (const plugin of affectedPlugins) {
       const version = pkg.dependencies[plugin];
       expect(version).toBeDefined();
-      // Must be pinned to a specific version (not "next")
-      // Reason: "next" tag resolves to alpha.4 for plugins but alpha.10 for core,
-      // causing version skew errors like "Export named 'MAX_EMBEDDING_TOKENS' not found"
-      // See docs/ELIZAOS_VERSIONING.md for full explanation
-      expect(version).not.toBe("next");
-      // Should be pinned to latest stable alpha version
-      expect(version).toMatch(/^\d+\.\d+\.\d+-alpha\.\d+$/);
+      // Plugins can use "next" when core is pinned via pnpm overrides.
+      // When not "next", they should be pinned to a specific version.
+      if (version !== "next") {
+        expect(version).toMatch(/^\d+\.\d+\.\d+/);
+      }
     }
   });
 
@@ -404,15 +416,20 @@ describe("Package.json version pinning (issue #10)", () => {
     const pkgPath = resolve(import.meta.dirname, "../../package.json");
     const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as {
       dependencies: Record<string, string>;
+      pnpm?: { overrides?: Record<string, string> };
     };
 
-    // Core should be pinned to a specific alpha version (not "next")
-    // Reason: Core releases (alpha.10) are ahead of plugin releases (alpha.4),
-    // so we pin both to ensure compatibility. See docs/ELIZAOS_VERSIONING.md
+    // Core can use "next" dist-tag if pnpm overrides pin the actual version.
+    // See docs/ELIZAOS_VERSIONING.md for explanation.
     const coreVersion = pkg.dependencies["@elizaos/core"];
     expect(coreVersion).toBeDefined();
-    expect(coreVersion).not.toBe("next");
-    expect(coreVersion).toMatch(/^\d+\.\d+\.\d+-alpha\.\d+$/);
+    if (coreVersion === "next") {
+      const pnpmPin = pkg.pnpm?.overrides?.["@elizaos/core"];
+      expect(pnpmPin).toBeDefined();
+      expect(pnpmPin).toMatch(/^\d+\.\d+\.\d+/);
+    } else {
+      expect(coreVersion).toMatch(/^\d+\.\d+\.\d+-alpha\.\d+$/);
+    }
   });
 
   it("pinned versions are compatible with each other", () => {

@@ -25,8 +25,10 @@ function resolveGitHead(startDir: string): string | null {
           return path.join(path.resolve(current, match[1].trim()), "HEAD");
         }
       }
-    } catch {
-      // ignore missing .git at this level
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+        throw err;
+      }
     }
     const parent = path.dirname(current);
     if (parent === current) break;
@@ -43,8 +45,11 @@ function readCommitFromPackageJson(): string | null {
       githead?: string;
     };
     return formatCommit(pkg.gitHead ?? pkg.githead);
-  } catch {
-    return null;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "MODULE_NOT_FOUND") {
+      return null;
+    }
+    throw err;
   }
 }
 
@@ -55,8 +60,10 @@ function readCommitFromBuildInfo(): string | null {
       const info = req(candidate) as { commit?: string | null };
       const formatted = formatCommit(info.commit);
       if (formatted) return formatted;
-    } catch {
-      // ignore missing candidate
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "MODULE_NOT_FOUND") {
+        throw err;
+      }
     }
   }
   return null;
@@ -92,8 +99,11 @@ export function resolveCommitHash(
     (() => {
       try {
         return readCommitFromGitHead(options.cwd ?? process.cwd());
-      } catch {
-        return null;
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+          return null;
+        }
+        throw err;
       }
     })();
 

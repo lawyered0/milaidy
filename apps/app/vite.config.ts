@@ -16,7 +16,7 @@ export default defineConfig({
   publicDir: path.resolve(here, "public"),
   plugins: [tailwindcss(), react()],
   resolve: {
-    dedupe: ["react", "react-dom", "marked", "dompurify", "@noble/ed25519"],
+    dedupe: ["react", "react-dom"],
     alias: [
       /**
        * Map @milaidy/capacitor-* packages directly to their TS source.
@@ -38,9 +38,6 @@ export default defineConfig({
     include: [
       "react",
       "react-dom",
-      "marked",
-      "dompurify",
-      "@noble/ed25519",
     ],
   },
   build: {

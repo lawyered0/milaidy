@@ -14,14 +14,9 @@ import {
   type TableRowsResponse,
   type QueryResult,
 } from "../api-client";
-import { useApp } from "../AppContext";
-
 type DbView = "tables" | "query";
 
 export function DatabaseView() {
-  const _app = useApp();
-  void _app; // context available for future use
-
   const [dbStatus, setDbStatus] = useState<DatabaseStatus | null>(null);
   const [tables, setTables] = useState<TableInfo[]>([]);
   const [selectedTable, setSelectedTable] = useState("");

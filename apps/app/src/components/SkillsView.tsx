@@ -438,7 +438,7 @@ export function SkillsView() {
   }, [loadSkills]);
 
   // Separate quarantined/blocked from normal
-  const { quarantinedOrBlocked, normal, quarantinedCount } = useMemo(() => {
+  const { quarantinedOrBlocked, normal } = useMemo(() => {
     const quarantinedOrBlocked: SkillInfo[] = [];
     const normal: SkillInfo[] = [];
 
@@ -454,11 +454,7 @@ export function SkillsView() {
       }
     }
 
-    const quarantinedCount = skills.filter(
-      (s) => s.scanStatus === "warning" || s.scanStatus === "critical",
-    ).length;
-
-    return { quarantinedOrBlocked, normal, quarantinedCount };
+    return { quarantinedOrBlocked, normal };
   }, [skills]);
 
   const handleDismissReview = () => {

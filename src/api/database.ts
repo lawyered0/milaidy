@@ -106,6 +106,36 @@ function readBody(req: http.IncomingMessage): Promise<string> {
 }
 
 /**
+ * Read and parse a JSON request body with size limits and error handling.
+ * Returns null (and sends a 4xx response) if reading or parsing fails.
+ */
+async function readJsonBody<T = Record<string, unknown>>(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+): Promise<T | null> {
+  let raw: string;
+  try {
+    raw = await readBody(req);
+  } catch (err) {
+    const msg =
+      err instanceof Error ? err.message : "Failed to read request body";
+    errorResponse(res, msg, 413);
+    return null;
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (parsed == null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      errorResponse(res, "Request body must be a JSON object", 400);
+      return null;
+    }
+    return parsed as T;
+  } catch {
+    errorResponse(res, "Invalid JSON in request body", 400);
+    return null;
+  }
+}
+
+/**
  * Safely quote a SQL identifier (table or column name).
  * Postgres uses double-quote escaping: embedded " becomes "".
  */
@@ -442,7 +472,8 @@ async function handlePutConfig(
   req: http.IncomingMessage,
   res: http.ServerResponse,
 ): Promise<void> {
-  const body = JSON.parse(await readBody(req)) as DatabaseConfig;
+  const body = await readJsonBody<DatabaseConfig>(req, res);
+  if (!body) return;
 
   // Validate
   if (
@@ -517,7 +548,8 @@ async function handleTestConnection(
   req: http.IncomingMessage,
   res: http.ServerResponse,
 ): Promise<void> {
-  const body = JSON.parse(await readBody(req)) as PostgresCredentials;
+  const body = await readJsonBody<PostgresCredentials>(req, res);
+  if (!body) return;
 
   const hostError = await validateDbHost(body);
   if (hostError) {
@@ -534,11 +566,13 @@ async function handleTestConnection(
     const pgModule = await import("pg");
     Pool = pgModule.default?.Pool ?? pgModule.Pool;
   } catch {
-    errorResponse(
-      res,
-      "PostgreSQL client library (pg) is not available. Ensure @elizaos/plugin-sql is installed.",
-      500,
-    );
+    jsonResponse(res, {
+      success: false,
+      serverVersion: null,
+      error:
+        "PostgreSQL client library (pg) is not available. Ensure @elizaos/plugin-sql is installed.",
+      durationMs: Date.now() - start,
+    } satisfies ConnectionTestResult);
     return;
   }
 
@@ -707,8 +741,11 @@ async function handleGetRows(
   // Build search clause: search across all text-castable columns
   let whereClause = "";
   if (search.trim()) {
+    // Escape ILIKE special characters: backslash first (since it becomes
+    // the escape character), then the ILIKE wildcards % and _.
     const escapedSearch = search
       .replace(/'/g, "''")
+      .replace(/\\/g, "\\\\")
       .replace(/%/g, "\\%")
       .replace(/_/g, "\\_");
     const textColumns = columnNames.filter((col) => {
@@ -729,7 +766,7 @@ async function handleGetRows(
     if (textColumns.length > 0) {
       const conditions = textColumns.map(
         (col) =>
-          `${quoteIdent(col)}::text ILIKE '%${escapedSearch}%' ESCAPE ''`,
+          `${quoteIdent(col)}::text ILIKE '%${escapedSearch}%' ESCAPE '\\'`,
       );
       whereClause = `WHERE (${conditions.join(" OR ")})`;
     }
@@ -772,9 +809,10 @@ async function handleInsertRow(
   runtime: AgentRuntime,
   tableName: string,
 ): Promise<void> {
-  const body = JSON.parse(await readBody(req)) as {
+  const body = await readJsonBody<{
     data: Record<string, unknown>;
-  };
+  }>(req, res);
+  if (!body) return;
 
   if (
     !body.data ||
@@ -813,10 +851,11 @@ async function handleUpdateRow(
   runtime: AgentRuntime,
   tableName: string,
 ): Promise<void> {
-  const body = JSON.parse(await readBody(req)) as {
+  const body = await readJsonBody<{
     where: Record<string, unknown>;
     data: Record<string, unknown>;
-  };
+  }>(req, res);
+  if (!body) return;
 
   if (!body.where || Object.keys(body.where).length === 0) {
     errorResponse(
@@ -866,9 +905,10 @@ async function handleDeleteRow(
   runtime: AgentRuntime,
   tableName: string,
 ): Promise<void> {
-  const body = JSON.parse(await readBody(req)) as {
+  const body = await readJsonBody<{
     where: Record<string, unknown>;
-  };
+  }>(req, res);
+  if (!body) return;
 
   if (!body.where || Object.keys(body.where).length === 0) {
     errorResponse(
@@ -906,10 +946,11 @@ async function handleQuery(
   res: http.ServerResponse,
   runtime: AgentRuntime,
 ): Promise<void> {
-  const body = JSON.parse(await readBody(req)) as {
+  const body = await readJsonBody<{
     sql: string;
     readOnly?: boolean;
-  };
+  }>(req, res);
+  if (!body) return;
 
   if (
     !body.sql ||

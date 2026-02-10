@@ -7,8 +7,8 @@
  */
 
 import {
-  loginAnthropic,
   refreshAnthropicToken as _refreshAnthropicToken,
+  loginAnthropic,
 } from "@mariozechner/pi-ai";
 import type { OAuthCredentials } from "./types.js";
 

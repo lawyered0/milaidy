@@ -41,7 +41,7 @@ describe("config schema", () => {
     ).toBe(true);
   });
 
-  it("merges plugin + channel schemas", () => {
+  it("merges plugin + connector schemas", () => {
     const res = buildConfigSchema({
       plugins: [
         {
@@ -55,7 +55,7 @@ describe("config schema", () => {
           },
         },
       ],
-      channels: [
+      connectors: [
         {
           id: "matrix",
           label: "Matrix",
@@ -98,24 +98,24 @@ describe("config schema", () => {
       | undefined;
     expect(pluginConfigProps?.provider).toBeTruthy();
 
-    const channelsNode = schema.properties?.channels as
+    const connectorsNode = schema.properties?.connectors as
       | Record<string, unknown>
       | undefined;
-    const channelsProps = channelsNode?.properties as
+    const connectorsProps = connectorsNode?.properties as
       | Record<string, unknown>
       | undefined;
-    const channelSchema = channelsProps?.matrix as
+    const connectorSchema = connectorsProps?.matrix as
       | Record<string, unknown>
       | undefined;
-    const channelProps = channelSchema?.properties as
+    const connectorProps = connectorSchema?.properties as
       | Record<string, unknown>
       | undefined;
-    expect(channelProps?.accessToken).toBeTruthy();
+    expect(connectorProps?.accessToken).toBeTruthy();
   });
 
-  it("adds heartbeat target hints with dynamic channels", () => {
+  it("adds heartbeat target hints with dynamic connectors", () => {
     const res = buildConfigSchema({
-      channels: [
+      connectors: [
         {
           id: "bluebubbles",
           label: "BlueBubbles",

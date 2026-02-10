@@ -44,6 +44,21 @@ import {
 import { tabFromPath, pathForTab, type Tab } from "./navigation";
 import { SkillScanReportSummary } from "./api-client";
 
+// ── VRM helpers ─────────────────────────────────────────────────────────
+
+/** Number of built-in milady VRM avatars shipped with the app. */
+export const VRM_COUNT = 8;
+
+/** Resolve a built-in VRM index (1–8) to its public asset URL. */
+export function getVrmUrl(index: number): string {
+  return `/vrms/${index}.vrm`;
+}
+
+/** Resolve a built-in VRM index (1–8) to its preview thumbnail URL. */
+export function getVrmPreviewUrl(index: number): string {
+  return `/vrms/previews/milady-${index}.png`;
+}
+
 // ── Theme ──────────────────────────────────────────────────────────────
 
 const THEME_STORAGE_KEY = "milaidy:theme";
@@ -95,6 +110,7 @@ function applyTheme(name: ThemeName) {
 export type OnboardingStep =
   | "welcome"
   | "name"
+  | "avatar"
   | "style"
   | "theme"
   | "runMode"
@@ -102,7 +118,8 @@ export type OnboardingStep =
   | "modelSelection"
   | "cloudLogin"
   | "llmProvider"
-  | "inventorySetup";
+  | "inventorySetup"
+  | "connectors";
 
 // ── Action notice ──────────────────────────────────────────────────────
 
@@ -195,6 +212,8 @@ export interface AppState {
   characterSaveSuccess: string | null;
   characterSaveError: string | null;
   characterDraft: CharacterData;
+  selectedVrmIndex: number;
+  customVrmUrl: string;
 
   // Cloud
   cloudEnabled: boolean;
@@ -271,9 +290,21 @@ export interface AppState {
   onboardingLargeModel: string;
   onboardingProvider: string;
   onboardingApiKey: string;
+  onboardingOpenRouterModel: string;
+  onboardingTelegramToken: string;
+  onboardingDiscordToken: string;
+  onboardingWhatsAppSessionPath: string;
+  onboardingTwilioAccountSid: string;
+  onboardingTwilioAuthToken: string;
+  onboardingTwilioPhoneNumber: string;
+  onboardingBlooioApiKey: string;
+  onboardingBlooioPhoneNumber: string;
+  onboardingSubscriptionTab: "token" | "oauth";
   onboardingSelectedChains: Set<string>;
   onboardingRpcSelections: Record<string, string>;
   onboardingRpcKeys: Record<string, string>;
+  onboardingAvatar: number;
+  onboardingRestarting: boolean;
 
   // Command palette
   commandPaletteOpen: boolean;
@@ -303,9 +334,6 @@ export interface AppState {
   activeGameSandbox: string;
   activeGamePostMessageAuth: boolean;
 
-  // Config text
-  configRaw: Record<string, unknown>;
-  configText: string;
 }
 
 export interface AppActions {
@@ -498,6 +526,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [characterSaveSuccess, setCharacterSaveSuccess] = useState<string | null>(null);
   const [characterSaveError, setCharacterSaveError] = useState<string | null>(null);
   const [characterDraft, setCharacterDraft] = useState<CharacterData>({});
+  const [selectedVrmIndex, setSelectedVrmIndex] = useState(1);
+  const [customVrmUrl, setCustomVrmUrl] = useState("");
 
   // --- Cloud ---
   const [cloudEnabled, setCloudEnabled] = useState(false);
@@ -567,16 +597,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [onboardingOptions, setOnboardingOptions] = useState<OnboardingOptions | null>(null);
   const [onboardingName, setOnboardingName] = useState("");
   const [onboardingStyle, setOnboardingStyle] = useState("");
-  const [onboardingTheme, setOnboardingTheme] = useState<ThemeName>("milady");
+  const [onboardingTheme, setOnboardingTheme] = useState<ThemeName>(loadTheme);
   const [onboardingRunMode, setOnboardingRunMode] = useState<"local" | "cloud" | "">("");
   const [onboardingCloudProvider, setOnboardingCloudProvider] = useState("");
-  const [onboardingSmallModel, setOnboardingSmallModel] = useState("claude-haiku");
-  const [onboardingLargeModel, setOnboardingLargeModel] = useState("claude-sonnet-4-5");
+  const [onboardingSmallModel, setOnboardingSmallModel] = useState("moonshotai/kimi-k2-turbo");
+  const [onboardingLargeModel, setOnboardingLargeModel] = useState("moonshotai/kimi-k2-0905");
   const [onboardingProvider, setOnboardingProvider] = useState("");
   const [onboardingApiKey, setOnboardingApiKey] = useState("");
+  const [onboardingOpenRouterModel, setOnboardingOpenRouterModel] = useState("");
+  const [onboardingTelegramToken, setOnboardingTelegramToken] = useState("");
+  const [onboardingDiscordToken, setOnboardingDiscordToken] = useState("");
+  const [onboardingWhatsAppSessionPath, setOnboardingWhatsAppSessionPath] = useState("");
+  const [onboardingTwilioAccountSid, setOnboardingTwilioAccountSid] = useState("");
+  const [onboardingTwilioAuthToken, setOnboardingTwilioAuthToken] = useState("");
+  const [onboardingTwilioPhoneNumber, setOnboardingTwilioPhoneNumber] = useState("");
+  const [onboardingBlooioApiKey, setOnboardingBlooioApiKey] = useState("");
+  const [onboardingBlooioPhoneNumber, setOnboardingBlooioPhoneNumber] = useState("");
+  const [onboardingSubscriptionTab, setOnboardingSubscriptionTab] = useState<"token" | "oauth">("token");
   const [onboardingSelectedChains, setOnboardingSelectedChains] = useState<Set<string>>(new Set(["evm", "solana"]));
   const [onboardingRpcSelections, setOnboardingRpcSelections] = useState<Record<string, string>>({});
   const [onboardingRpcKeys, setOnboardingRpcKeys] = useState<Record<string, string>>({});
+  const [onboardingAvatar, setOnboardingAvatar] = useState(1);
+  const [onboardingRestarting, setOnboardingRestarting] = useState(false);
 
   // --- Command palette ---
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
@@ -606,14 +648,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [activeGameSandbox, setActiveGameSandbox] = useState("allow-scripts allow-same-origin allow-popups");
   const [activeGamePostMessageAuth, setActiveGamePostMessageAuth] = useState(false);
 
-  // --- Config ---
-  const [configRaw, setConfigRaw] = useState<Record<string, unknown>>({});
-  const [configText, setConfigText] = useState("");
 
   // --- Refs for timers ---
   const actionNoticeTimer = useRef<number | null>(null);
   const cloudPollInterval = useRef<number | null>(null);
   const cloudLoginPollTimer = useRef<number | null>(null);
+  const prevAgentStateRef = useRef<string | null>(null);
+  /** Guards against double-greeting when both init and state-transition paths fire. */
+  const greetingFiredRef = useRef(false);
 
   // ── Action notice ──────────────────────────────────────────────────
 
@@ -730,7 +772,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const { messages } = await client.getConversationMessages(convId);
       setConversationMessages(messages);
-    } catch {
+    } catch (err) {
+      // If the conversation no longer exists (server restarted), clear it
+      const status = (err as { status?: number }).status;
+      if (status === 404) {
+        setActiveConversationId(null);
+        setConversations([]);
+      }
       setConversationMessages([]);
     }
   }, []);
@@ -843,9 +891,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const cloudStatus = await client.getCloudStatus().catch(() => null);
     if (!cloudStatus) return;
     setCloudEnabled(cloudStatus.enabled ?? false);
-    setCloudConnected(cloudStatus.connected);
+    // Treat as connected if EITHER the backend says connected OR the config
+    // has the API key saved (hasApiKey).  The CLOUD_AUTH service may not have
+    // refreshed yet, but the key is persisted and model calls will work.
+    const isConnected = cloudStatus.connected || (cloudStatus.enabled && cloudStatus.hasApiKey);
+    setCloudConnected(Boolean(isConnected));
     setCloudUserId(cloudStatus.userId ?? null);
     if (cloudStatus.topUpUrl) setCloudTopUpUrl(cloudStatus.topUpUrl);
+    // Only fetch credits when the backend confirms the auth service is
+    // actually connected.  When hasApiKey is true but connected is false,
+    // the CLOUD_AUTH service hasn't authenticated yet -- fetching credits
+    // would just fail and spam warnings in the backend logs.
     if (cloudStatus.connected) {
       const credits = await client.getCloudCredits().catch(() => null);
       if (credits) {
@@ -896,6 +952,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ...(agentStatus ?? { agentName: "Milaidy", model: undefined, uptime: undefined, startedAt: undefined }),
         state: "restarting",
       });
+      // Server restart clears in-memory conversations — reset client state
+      setActiveConversationId(null);
+      setConversationMessages([]);
+      setConversations([]);
       const s = await client.restartAgent();
       setAgentStatus(s);
     } catch {
@@ -940,16 +1000,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // ── Chat ───────────────────────────────────────────────────────────
 
+  /** Request an agent greeting for a conversation and add it to messages. */
+  const fetchGreeting = useCallback(async (convId: string) => {
+    setChatSending(true);
+    try {
+      const data = await client.requestGreeting(convId);
+      if (data.text) {
+        setConversationMessages((prev: ConversationMessage[]) => [
+          ...prev,
+          { id: `greeting-${Date.now()}`, role: "assistant", text: data.text, timestamp: Date.now() },
+        ]);
+      }
+    } catch {
+      /* greeting failed silently — user can still chat */
+    } finally {
+      setChatSending(false);
+    }
+  }, []);
+
   const handleNewConversation = useCallback(async () => {
     try {
       const { conversation } = await client.createConversation();
       setConversations((prev) => [conversation, ...prev]);
       setActiveConversationId(conversation.id);
       setConversationMessages([]);
+      // Agent sends the first message
+      greetingFiredRef.current = true;
+      void fetchGreeting(conversation.id);
     } catch {
       /* ignore */
     }
-  }, []);
+  }, [fetchGreeting]);
 
   const handleChatSend = useCallback(async () => {
     const text = chatInput.trim();
@@ -980,8 +1061,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ...prev,
         { id: `temp-resp-${Date.now()}`, role: "assistant", text: data.text, timestamp: Date.now() },
       ]);
-    } catch {
-      await loadConversationMessages(convId);
+    } catch (err) {
+      // If the conversation was lost (server restart), create a fresh one and retry
+      const status = (err as { status?: number }).status;
+      if (status === 404) {
+        try {
+          const { conversation } = await client.createConversation();
+          setConversations((prev) => [conversation, ...prev]);
+          setActiveConversationId(conversation.id);
+          convId = conversation.id;
+          const data = await client.sendConversationMessage(convId, text);
+          setConversationMessages([
+            { id: `temp-${Date.now()}`, role: "user", text, timestamp: Date.now() },
+            { id: `temp-resp-${Date.now()}`, role: "assistant", text: data.text, timestamp: Date.now() },
+          ]);
+        } catch {
+          // Give up — show whatever we have
+          setConversationMessages([
+            { id: `temp-${Date.now()}`, role: "user", text, timestamp: Date.now() },
+          ]);
+        }
+      } else {
+        await loadConversationMessages(convId);
+      }
     } finally {
       setChatSending(false);
     }
@@ -1441,6 +1543,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setOnboardingStep("name");
         break;
       case "name":
+        setOnboardingStep("avatar");
+        break;
+      case "avatar":
         setOnboardingStep("style");
         break;
       case "style":
@@ -1455,10 +1560,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (onboardingRunMode === "cloud") {
           if (opts && opts.cloudProviders.length === 1) {
             setOnboardingCloudProvider(opts.cloudProviders[0].id);
-            setOnboardingStep("modelSelection");
-          } else {
-            setOnboardingStep("cloudProvider");
           }
+          setOnboardingStep("cloudProvider");
         } else {
           setOnboardingStep("llmProvider");
         }
@@ -1467,28 +1570,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setOnboardingStep("modelSelection");
         break;
       case "modelSelection":
-        setOnboardingStep("cloudLogin");
+        if (cloudConnected) {
+          setOnboardingStep("connectors");
+        } else {
+          setOnboardingStep("cloudLogin");
+        }
         break;
       case "cloudLogin":
-        // Finish onboarding
-        await handleOnboardingFinish();
+        setOnboardingStep("connectors");
         break;
       case "llmProvider":
         setOnboardingStep("inventorySetup");
         break;
       case "inventorySetup":
+        setOnboardingStep("connectors");
+        break;
+      case "connectors":
         await handleOnboardingFinish();
         break;
     }
-  }, [onboardingStep, onboardingOptions, onboardingRunMode, onboardingTheme, setTheme]);
+  }, [onboardingStep, onboardingOptions, onboardingRunMode, onboardingTheme, setTheme, cloudConnected]);
 
   const handleOnboardingBack = useCallback(() => {
     switch (onboardingStep) {
       case "name":
         setOnboardingStep("welcome");
         break;
-      case "style":
+      case "avatar":
         setOnboardingStep("name");
+        break;
+      case "style":
+        setOnboardingStep("avatar");
         break;
       case "theme":
         setOnboardingStep("style");
@@ -1500,11 +1612,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setOnboardingStep("runMode");
         break;
       case "modelSelection":
-        if (onboardingOptions && onboardingOptions.cloudProviders.length > 1) {
-          setOnboardingStep("cloudProvider");
-        } else {
-          setOnboardingStep("runMode");
-        }
+        setOnboardingStep("cloudProvider");
         break;
       case "cloudLogin":
         setOnboardingStep("modelSelection");
@@ -1521,8 +1629,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       case "inventorySetup":
         setOnboardingStep("llmProvider");
         break;
+      case "connectors":
+        // Go back to whichever path we came from
+        if (onboardingRunMode === "cloud") {
+          setOnboardingStep("modelSelection");
+        } else {
+          setOnboardingStep("inventorySetup");
+        }
+        break;
     }
-  }, [onboardingStep, onboardingOptions]);
+  }, [onboardingStep, onboardingOptions, onboardingRunMode]);
 
   const handleOnboardingFinish = useCallback(async () => {
     if (!onboardingOptions) return;
@@ -1540,6 +1656,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    setOnboardingRestarting(true);
     try {
       await client.submitOnboarding({
         name: onboardingName,
@@ -1550,6 +1667,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         style: style?.style,
         adjectives: style?.adjectives,
         topics: style?.topics,
+        postExamples: style?.postExamples,
         messageExamples: style?.messageExamples,
         cloudProvider: onboardingRunMode === "cloud" ? onboardingCloudProvider : undefined,
         smallModel: onboardingRunMode === "cloud" ? onboardingSmallModel : undefined,
@@ -1557,23 +1675,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
         provider: onboardingRunMode === "local" ? onboardingProvider || undefined : undefined,
         providerApiKey: onboardingRunMode === "local" ? onboardingApiKey || undefined : undefined,
         inventoryProviders: inventoryProviders.length > 0 ? inventoryProviders : undefined,
+        // Connectors
+        telegramToken: onboardingTelegramToken.trim() || undefined,
+        discordToken: onboardingDiscordToken.trim() || undefined,
+        whatsappSessionPath: onboardingWhatsAppSessionPath.trim() || undefined,
+        twilioAccountSid: onboardingTwilioAccountSid.trim() || undefined,
+        twilioAuthToken: onboardingTwilioAuthToken.trim() || undefined,
+        twilioPhoneNumber: onboardingTwilioPhoneNumber.trim() || undefined,
+        blooioApiKey: onboardingBlooioApiKey.trim() || undefined,
+        blooioPhoneNumber: onboardingBlooioPhoneNumber.trim() || undefined,
       });
     } catch (err) {
+      setOnboardingRestarting(false);
       window.alert(`Setup failed: ${err instanceof Error ? err.message : "network error"}. Please try again.`);
       return;
     }
 
     setOnboardingComplete(true);
+    setTab("chat");
     try {
       setAgentStatus(await client.restartAgent());
     } catch {
       /* ignore */
     }
+    setOnboardingRestarting(false);
   }, [
     onboardingOptions, onboardingStyle, onboardingName, onboardingTheme,
     onboardingRunMode, onboardingCloudProvider, onboardingSmallModel,
     onboardingLargeModel, onboardingProvider, onboardingApiKey,
     onboardingSelectedChains, onboardingRpcSelections, onboardingRpcKeys,
+    onboardingTelegramToken, onboardingDiscordToken, onboardingWhatsAppSessionPath,
+    onboardingTwilioAccountSid, onboardingTwilioAuthToken, onboardingTwilioPhoneNumber,
+    onboardingBlooioApiKey, onboardingBlooioPhoneNumber,
+    setTab,
   ]);
 
   // ── Cloud ──────────────────────────────────────────────────────────
@@ -1600,8 +1734,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
           if (poll.status === "authenticated") {
             if (cloudLoginPollTimer.current) clearInterval(cloudLoginPollTimer.current);
             setCloudLoginBusy(false);
+            // Immediately reflect the login in the UI — don't wait for the
+            // background poll which may race with the config save.
+            setCloudConnected(true);
+            setCloudEnabled(true);
             setActionNotice("Logged in to Eliza Cloud successfully.", "success", 6000);
-            void pollCloudCredits();
+            // Delay the credit fetch slightly so the backend has time to
+            // persist the API key before we query cloud status / credits.
+            setTimeout(() => void pollCloudCredits(), 2000);
           } else if (poll.status === "expired" || poll.status === "error") {
             if (cloudLoginPollTimer.current) clearInterval(cloudLoginPollTimer.current);
             setCloudLoginError(poll.error ?? "Session expired. Please try again.");
@@ -1757,7 +1897,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
       onboardingApiKey: setOnboardingApiKey as (v: never) => void,
       onboardingSelectedChains: setOnboardingSelectedChains as (v: never) => void,
       onboardingRpcSelections: setOnboardingRpcSelections as (v: never) => void,
+      onboardingOpenRouterModel: setOnboardingOpenRouterModel as (v: never) => void,
+      onboardingTelegramToken: setOnboardingTelegramToken as (v: never) => void,
+      onboardingDiscordToken: setOnboardingDiscordToken as (v: never) => void,
+      onboardingWhatsAppSessionPath: setOnboardingWhatsAppSessionPath as (v: never) => void,
+      onboardingTwilioAccountSid: setOnboardingTwilioAccountSid as (v: never) => void,
+      onboardingTwilioAuthToken: setOnboardingTwilioAuthToken as (v: never) => void,
+      onboardingTwilioPhoneNumber: setOnboardingTwilioPhoneNumber as (v: never) => void,
+      onboardingBlooioApiKey: setOnboardingBlooioApiKey as (v: never) => void,
+      onboardingBlooioPhoneNumber: setOnboardingBlooioPhoneNumber as (v: never) => void,
+      onboardingSubscriptionTab: setOnboardingSubscriptionTab as (v: never) => void,
       onboardingRpcKeys: setOnboardingRpcKeys as (v: never) => void,
+      onboardingAvatar: setOnboardingAvatar as (v: never) => void,
+      onboardingRestarting: setOnboardingRestarting as (v: never) => void,
+      selectedVrmIndex: setSelectedVrmIndex as (v: never) => void,
+      customVrmUrl: setCustomVrmUrl as (v: never) => void,
       commandQuery: setCommandQuery as (v: never) => void,
       commandActiveIndex: setCommandActiveIndex as (v: never) => void,
       storeSearch: setStoreSearch as (v: never) => void,
@@ -1799,8 +1953,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       mcpHeaderInputs: setMcpHeaderInputs as (v: never) => void,
       droppedFiles: setDroppedFiles as (v: never) => void,
       shareIngestNotice: setShareIngestNotice as (v: never) => void,
-      configRaw: setConfigRaw as (v: never) => void,
-      configText: setConfigText as (v: never) => void,
     };
     const setter = setterMap[key as string];
     if (setter) setter(value as never);
@@ -1849,7 +2001,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       if (authRequired) return;
 
-      // Load conversations
+      // Load conversations — if none exist, create one and request a greeting
+      let greetConvId: string | null = null;
       try {
         const { conversations: c } = await client.listConversations();
         setConversations(c);
@@ -1859,12 +2012,50 @@ export function AppProvider({ children }: { children: ReactNode }) {
           try {
             const { messages } = await client.getConversationMessages(latest.id);
             setConversationMessages(messages);
+            // If the latest conversation has no messages, queue a greeting
+            if (messages.length === 0) {
+              greetConvId = latest.id;
+            }
+          } catch {
+            /* ignore */
+          }
+        } else {
+          // First launch — create a conversation and greet
+          try {
+            const { conversation } = await client.createConversation();
+            setConversations([conversation]);
+            setActiveConversationId(conversation.id);
+            setConversationMessages([]);
+            greetConvId = conversation.id;
           } catch {
             /* ignore */
           }
         }
       } catch {
         /* ignore */
+      }
+
+      // If the agent is already running and we have a conversation needing a
+      // greeting, fire it now. Otherwise the agent-state-transition effect
+      // below will trigger it once the agent starts.
+      if (greetConvId) {
+        try {
+          const s = await client.getStatus();
+          if (s.state === "running" && !greetingFiredRef.current) {
+            greetingFiredRef.current = true;
+            setChatSending(true);
+            try {
+              const data = await client.requestGreeting(greetConvId);
+              if (data.text) {
+                setConversationMessages((prev: ConversationMessage[]) => [
+                  ...prev,
+                  { id: `greeting-${Date.now()}`, role: "assistant", text: data.text, timestamp: Date.now() },
+                ]);
+              }
+            } catch { /* ignore */ }
+            setChatSending(false);
+          }
+        } catch { /* ignore */ }
       }
 
       void loadWorkbench();
@@ -1898,7 +2089,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const urlTab = tabFromPath(window.location.pathname);
       if (urlTab) {
         setTabRaw(urlTab);
-        if (urlTab === "plugins") void loadPlugins();
+        if (urlTab === "features") void loadPlugins();
         if (urlTab === "skills") void loadSkills();
         if (urlTab === "config") {
           void checkExtensionStatus();
@@ -1907,7 +2098,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
           void loadUpdateStatus();
           void loadPlugins();
         }
-        if (urlTab === "logs") void loadLogs();
         if (urlTab === "inventory") void loadInventory();
       }
     };
@@ -1930,6 +2120,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // When agent transitions to "running", send a greeting if conversation is empty
+  useEffect(() => {
+    const current = agentStatus?.state ?? null;
+    const prev = prevAgentStateRef.current;
+    prevAgentStateRef.current = current;
+
+    if (current === "running" && prev !== "running") {
+      void loadWorkbench();
+
+      // Agent just started — greet if conversation is empty.
+      // The greetingFiredRef guard prevents double-greeting when both the
+      // init mount effect and this state-transition effect race to fire.
+      if (activeConversationId && conversationMessages.length === 0 && !chatSending && !greetingFiredRef.current) {
+        greetingFiredRef.current = true;
+        void fetchGreeting(activeConversationId);
+      }
+    }
+  }, [agentStatus?.state, loadWorkbench, activeConversationId, conversationMessages.length, chatSending, fetchGreeting]);
+
   // ── Context value ──────────────────────────────────────────────────
 
   const value: AppContextValue = {
@@ -1949,7 +2158,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     walletNftsLoading, inventoryView, walletExportData, walletExportVisible,
     walletApiKeySaving, inventorySort, walletError,
     characterData, characterLoading, characterSaving, characterSaveSuccess,
-    characterSaveError, characterDraft,
+    characterSaveError, characterDraft, selectedVrmIndex, customVrmUrl,
     cloudEnabled, cloudConnected, cloudCredits, cloudCreditsLow, cloudCreditsCritical,
     cloudTopUpUrl, cloudUserId, cloudLoginBusy, cloudLoginError, cloudDisconnecting,
     updateStatus, updateLoading, updateChannelSaving,
@@ -1964,8 +2173,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     importBusy, importPassword, importFile, importError, importSuccess,
     onboardingStep, onboardingOptions, onboardingName, onboardingStyle, onboardingTheme,
     onboardingRunMode, onboardingCloudProvider, onboardingSmallModel, onboardingLargeModel,
-    onboardingProvider, onboardingApiKey, onboardingSelectedChains,
-    onboardingRpcSelections, onboardingRpcKeys,
+    onboardingProvider, onboardingApiKey, onboardingOpenRouterModel,
+    onboardingTelegramToken, onboardingDiscordToken, onboardingWhatsAppSessionPath,
+    onboardingTwilioAccountSid, onboardingTwilioAuthToken, onboardingTwilioPhoneNumber,
+    onboardingBlooioApiKey, onboardingBlooioPhoneNumber, onboardingSubscriptionTab,
+    onboardingSelectedChains, onboardingRpcSelections, onboardingRpcKeys,
+    onboardingAvatar, onboardingRestarting,
     commandPaletteOpen, commandQuery, commandActiveIndex,
     mcpConfiguredServers, mcpServerStatuses, mcpMarketplaceQuery, mcpMarketplaceResults,
     mcpMarketplaceLoading, mcpAction, mcpAddingServer, mcpAddingResult,
@@ -1973,7 +2186,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     droppedFiles, shareIngestNotice,
     activeGameApp, activeGameDisplayName, activeGameViewerUrl, activeGameSandbox,
     activeGamePostMessageAuth,
-    configRaw, configText,
 
     // Actions
     setTab, setTheme,

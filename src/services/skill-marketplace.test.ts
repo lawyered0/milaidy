@@ -7,17 +7,18 @@
  * - listInstalledMarketplaceSkills (record loading, sorting, corrupt-file resilience)
  * - uninstallMarketplaceSkill (record lookup, path-containment safety, cleanup)
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  type InstalledMarketplaceSkill,
   installMarketplaceSkill,
   listInstalledMarketplaceSkills,
   searchSkillsMarketplace,
   uninstallMarketplaceSkill,
-  type InstalledMarketplaceSkill,
 } from "./skill-marketplace.js";
 
 // ---------------------------------------------------------------------------
@@ -490,6 +491,35 @@ describe("installMarketplaceSkill", () => {
         name: "test-skill",
       }),
     ).rejects.toThrow("Invalid git ref");
+  });
+
+  it("rejects skill paths with traversal segments", async () => {
+    await expect(
+      installMarketplaceSkill(tmpDir, {
+        repository: "owner/repo",
+        path: "../secrets",
+        name: "evil-skill",
+      }),
+    ).rejects.toThrow("Invalid skill path");
+  });
+
+  it("rejects absolute skill paths", async () => {
+    await expect(
+      installMarketplaceSkill(tmpDir, {
+        repository: "owner/repo",
+        path: "/etc",
+        name: "evil-skill",
+      }),
+    ).rejects.toThrow("Invalid skill path");
+  });
+
+  it("rejects GitHub URLs with traversal paths", async () => {
+    await expect(
+      installMarketplaceSkill(tmpDir, {
+        githubUrl: "https://github.com/owner/repo/tree/main/../secrets",
+        name: "evil-skill",
+      }),
+    ).rejects.toThrow("Invalid skill path");
   });
 
   it("throws when skill is already installed at the target path", async () => {

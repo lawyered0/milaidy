@@ -9,8 +9,11 @@ function readVersionFromPackageJson(): string | null {
   try {
     const pkg = require("../../package.json") as { version?: string };
     return pkg.version ?? null;
-  } catch {
-    return null;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "MODULE_NOT_FOUND") {
+      return null;
+    }
+    throw err;
   }
 }
 
@@ -23,8 +26,10 @@ function readVersionFromBuildInfo(): string | null {
     try {
       const info = require(candidate) as { version?: string };
       if (info.version) return info.version;
-    } catch {
-      // ignore missing candidate
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "MODULE_NOT_FOUND") {
+        throw err;
+      }
     }
   }
   return null;

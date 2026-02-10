@@ -281,9 +281,7 @@ export function createPhettaCompanionPlugin(
 
   const sendEvent = (event: PhettaEvent): void => {
     // Fire-and-forget so we never block the agent turn on UI/IPC.
-    void client.postEvent(event).catch(() => {
-      /* handled in client */
-    });
+    void client.postEvent(event);
   };
 
   const notifyAction: Action = {
@@ -388,8 +386,10 @@ export function createPhettaCompanionPlugin(
           .then(() => {
             patchMessageService(runtime);
           })
-          .catch(() => {
-            /* ignore */
+          .catch((err: Error) => {
+            logger.debug(
+              `[phetta-companion] Runtime init failed: ${err.message}`,
+            );
           });
       }
     },

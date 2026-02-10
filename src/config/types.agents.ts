@@ -36,6 +36,22 @@ export type AgentConfig = {
   heartbeat?: AgentDefaultsConfig["heartbeat"];
   identity?: IdentityConfig;
   groupChat?: GroupChatConfig;
+
+  // ── Personality fields (set during onboarding from style presets) ──────
+  /** Agent bio lines. Set during onboarding from the chosen style preset. */
+  bio?: string[];
+  /** System prompt. Set during onboarding from the chosen style preset. */
+  system?: string;
+  /** Communication style rules. Set during onboarding from the chosen style preset. */
+  style?: { all?: string[]; chat?: string[]; post?: string[] };
+  /** Personality adjectives. Set during onboarding from the chosen style preset. */
+  adjectives?: string[];
+  /** Topics the agent engages with. Set during onboarding from the chosen style preset. */
+  topics?: string[];
+  /** Example social media posts demonstrating the agent's voice. */
+  postExamples?: string[];
+  /** Example message conversations demonstrating the agent's voice. */
+  messageExamples?: Array<Array<{ user: string; content: { text: string } }>>;
   subagents?: {
     /** Allow spawning sub-agents under other agent ids. Use "*" to allow any. */
     allowAgents?: string[];

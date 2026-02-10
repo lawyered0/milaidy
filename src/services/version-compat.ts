@@ -170,8 +170,12 @@ export async function coreExportExists(exportName: string): Promise<boolean> {
   try {
     const core = (await import("@elizaos/core")) as Record<string, unknown>;
     return exportName in core && core[exportName] !== undefined;
-  } catch {
-    return false;
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "MODULE_NOT_FOUND" || code === "ERR_MODULE_NOT_FOUND") {
+      return false;
+    }
+    throw err;
   }
 }
 
@@ -193,8 +197,16 @@ export async function getInstalledVersion(
       version: string;
     };
     return pkg.version ?? null;
-  } catch {
-    return null;
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (
+      code === "MODULE_NOT_FOUND" ||
+      code === "ERR_MODULE_NOT_FOUND" ||
+      code === "ENOENT"
+    ) {
+      return null;
+    }
+    throw err;
   }
 }
 

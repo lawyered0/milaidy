@@ -5,8 +5,13 @@ async function loadDotEnv(): Promise<void> {
   try {
     const { config } = await import("dotenv");
     config();
-  } catch {
-    // dotenv not installed or .env not found
+  } catch (err) {
+    if (
+      (err as NodeJS.ErrnoException).code !== "MODULE_NOT_FOUND" &&
+      (err as NodeJS.ErrnoException).code !== "ERR_MODULE_NOT_FOUND"
+    ) {
+      throw err;
+    }
   }
 }
 

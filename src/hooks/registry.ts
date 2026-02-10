@@ -40,13 +40,20 @@ export async function triggerHook(event: HookEvent): Promise<void> {
 
   if (handlers.length === 0) return;
 
+  const errors: Error[] = [];
   for (const { key, handler } of handlers) {
     try {
       await handler(event);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      logger.error(`[hooks] Handler error for "${key}": ${msg}`);
+      const error = err instanceof Error ? err : new Error(String(err));
+      logger.error(`[hooks] Handler error for "${key}": ${error.message}`);
+      errors.push(error);
     }
+  }
+  if (errors.length > 0) {
+    logger.warn(
+      `[hooks] ${errors.length} hook handler(s) failed — errors were logged above`,
+    );
   }
 }
 

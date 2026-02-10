@@ -7,8 +7,8 @@
  * the runtime and serves snapshot/restore for state management.
  */
 
-import * as http from "node:http";
 import * as crypto from "node:crypto";
+import * as http from "node:http";
 
 const PORT = Number(process.env.PORT ?? "2138");
 const BRIDGE_PORT = Number(process.env.BRIDGE_PORT ?? "18790");

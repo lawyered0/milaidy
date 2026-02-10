@@ -19,10 +19,12 @@ import type { MilaidyConfig } from "../config/types.milaidy.js";
 import { createSessionKeyProvider } from "../providers/session-bridge.js";
 import { createWorkspaceProvider } from "../providers/workspace-provider.js";
 import {
-  applyChannelSecretsToEnv,
   applyCloudConfigToEnv,
+  applyConnectorSecretsToEnv,
   buildCharacterFromConfig,
+  CORE_PLUGINS,
   collectPluginNames,
+  OPTIONAL_CORE_PLUGINS,
   resolvePrimaryModel,
 } from "../runtime/eliza.js";
 import { createMilaidyPlugin } from "../runtime/milaidy-plugin.js";
@@ -30,36 +32,10 @@ import { createMilaidyPlugin } from "../runtime/milaidy-plugin.js";
 // ---------------------------------------------------------------------------
 // Constants — Full plugin enumeration
 // ---------------------------------------------------------------------------
+// CORE_PLUGINS and OPTIONAL_CORE_PLUGINS are imported from eliza.ts
 
-/** Core plugins that are always loaded (must match CORE_PLUGINS in eliza.ts). */
-const CORE_PLUGINS: readonly string[] = [
-  "@elizaos/plugin-sql",
-  "@elizaos/plugin-local-embedding",
-  "@elizaos/plugin-agent-skills",
-  "@elizaos/plugin-agent-orchestrator",
-  "@elizaos/plugin-directives",
-  "@elizaos/plugin-commands",
-  "@elizaos/plugin-shell",
-  "@elizaos/plugin-personality",
-  "@elizaos/plugin-experience",
-  "@elizaos/plugin-plugin-manager",
-  "@elizaos/plugin-cli",
-  "@elizaos/plugin-code",
-  "@elizaos/plugin-edge-tts",
-  "@elizaos/plugin-knowledge",
-  "@elizaos/plugin-mcp",
-  "@elizaos/plugin-pdf",
-  "@elizaos/plugin-scratchpad",
-  "@elizaos/plugin-secrets-manager",
-  "@elizaos/plugin-todo",
-  "@elizaos/plugin-trust",
-  "@elizaos/plugin-form",
-  "@elizaos/plugin-goals",
-  "@elizaos/plugin-scheduling",
-];
-
-/** Channel plugins (loaded when channel config is present). */
-const CHANNEL_PLUGINS: Record<string, string> = {
+/** Connector plugins (loaded when connector config is present). */
+const CONNECTOR_PLUGINS: Record<string, string> = {
   discord: "@elizaos/plugin-discord",
   telegram: "@elizaos/plugin-telegram",
   slack: "@elizaos/plugin-slack",
@@ -92,7 +68,7 @@ const PROVIDER_PLUGINS: Record<string, string> = {
 const ALL_KNOWN_PLUGINS: readonly string[] = [
   ...new Set([
     ...CORE_PLUGINS,
-    ...Object.values(CHANNEL_PLUGINS),
+    ...Object.values(CONNECTOR_PLUGINS),
     ...Object.values(PROVIDER_PLUGINS),
   ]),
 ].sort();
@@ -127,16 +103,16 @@ const envKeysToClean = [
 
 describe("Plugin Enumeration", () => {
   it("lists all core plugins", () => {
-    expect(CORE_PLUGINS.length).toBe(23);
+    expect(CORE_PLUGINS.length).toBe(6);
     for (const name of CORE_PLUGINS) {
       expect(name).toMatch(/^@elizaos\/plugin-/);
     }
   });
 
-  it("lists all channel plugins", () => {
-    expect(Object.keys(CHANNEL_PLUGINS).length).toBe(10);
-    for (const [channel, pluginName] of Object.entries(CHANNEL_PLUGINS)) {
-      expect(typeof channel).toBe("string");
+  it("lists all connector plugins", () => {
+    expect(Object.keys(CONNECTOR_PLUGINS).length).toBe(10);
+    for (const [connector, pluginName] of Object.entries(CONNECTOR_PLUGINS)) {
+      expect(typeof connector).toBe("string");
       expect(pluginName).toMatch(/^@elizaos\/plugin-/);
     }
   });
@@ -263,15 +239,15 @@ describe("collectPluginNames", () => {
       },
     };
     const names = collectPluginNames(config);
-    // The unknown channel should NOT map to any plugin. Verify no
-    // channel-specific plugin was added (env-based provider plugins may
+    // The unknown connector should NOT map to any plugin. Verify no
+    // connector-specific plugin was added (env-based provider plugins may
     // appear depending on the runner's environment, so we only assert
-    // that the unknown channel mapping was a no-op).
-    const channelPluginValues = new Set(Object.values(CHANNEL_PLUGINS));
-    const addedChannelPlugins = [...names].filter((n) =>
-      channelPluginValues.has(n),
+    // that the unknown connector mapping was a no-op).
+    const connectorPluginValues = new Set(Object.values(CONNECTOR_PLUGINS));
+    const addedConnectorPlugins = [...names].filter((n) =>
+      connectorPluginValues.has(n),
     );
-    expect(addedChannelPlugins.length).toBe(0);
+    expect(addedConnectorPlugins.length).toBe(0);
   });
 });
 
@@ -682,24 +658,24 @@ describe("Environment Propagation", () => {
     }
   });
 
-  it("applyChannelSecretsToEnv sets DISCORD_BOT_TOKEN from config", () => {
+  it("applyConnectorSecretsToEnv sets DISCORD_BOT_TOKEN from config", () => {
     const config: MilaidyConfig = {
-      channels: {
+      connectors: {
         discord: { token: "test-discord-token-123" },
       },
     };
-    applyChannelSecretsToEnv(config);
+    applyConnectorSecretsToEnv(config);
     expect(process.env.DISCORD_BOT_TOKEN).toBe("test-discord-token-123");
   });
 
-  it("applyChannelSecretsToEnv does not overwrite existing env vars", () => {
+  it("applyConnectorSecretsToEnv does not overwrite existing env vars", () => {
     process.env.DISCORD_BOT_TOKEN = "existing-token";
     const config: MilaidyConfig = {
-      channels: {
+      connectors: {
         discord: { token: "new-token" },
       },
     };
-    applyChannelSecretsToEnv(config);
+    applyConnectorSecretsToEnv(config);
     expect(process.env.DISCORD_BOT_TOKEN).toBe("existing-token");
   });
 
@@ -892,9 +868,16 @@ describe("Version Skew Detection (issue #10)", () => {
 
     const coreVersion = pkg.dependencies["@elizaos/core"];
     expect(coreVersion).toBeDefined();
-    // Core must be pinned to a specific version (not a dist-tag like "next")
-    expect(coreVersion).not.toBe("next");
-    expect(coreVersion).toMatch(/^\d+\.\d+\.\d+/);
+    // Core can use "next" dist-tag if pnpm overrides pin the actual version
+    const pnpmOverride = (
+      pkg as Record<string, Record<string, Record<string, string>>>
+    ).pnpm?.overrides?.["@elizaos/core"];
+    if (coreVersion === "next") {
+      expect(pnpmOverride).toBeDefined();
+      expect(pnpmOverride).toMatch(/^\d+\.\d+\.\d+/);
+    } else {
+      expect(coreVersion).toMatch(/^\d+\.\d+\.\d+/);
+    }
 
     // The affected plugins should still be present in dependencies
     const affectedPlugins = [
@@ -908,12 +891,12 @@ describe("Version Skew Detection (issue #10)", () => {
     for (const name of affectedPlugins) {
       const ver = pkg.dependencies[name];
       expect(ver).toBeDefined();
-      // Must be pinned to specific alpha version (not "next")
-      // The "next" tag causes version skew: plugins@alpha.4 vs core@alpha.10
-      // Results in "MAX_EMBEDDING_TOKENS not found" errors at runtime
+      // Plugins can use "next" dist-tag when core is pinned via pnpm overrides,
+      // or they can be pinned to a specific alpha version.
       // See docs/ELIZAOS_VERSIONING.md for details and update procedures
-      expect(ver).not.toBe("next");
-      expect(ver).toMatch(/^\d+\.\d+\.\d+-alpha\.\d+$/);
+      if (ver !== "next") {
+        expect(ver).toMatch(/^\d+\.\d+\.\d+/);
+      }
     }
   });
 
@@ -931,8 +914,8 @@ describe("Version Skew Detection (issue #10)", () => {
     }
   });
 
-  it("plugin-knowledge is in CORE_PLUGINS", () => {
-    expect(CORE_PLUGINS).toContain("@elizaos/plugin-knowledge");
+  it("plugin-knowledge is in OPTIONAL_CORE_PLUGINS", () => {
+    expect(OPTIONAL_CORE_PLUGINS).toContain("@elizaos/plugin-knowledge");
   });
 });
 

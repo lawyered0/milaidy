@@ -26,14 +26,10 @@ export function registerSetupCommand(program: Command) {
           config = loadMilaidyConfig() as Record<string, unknown>;
           console.log(`${theme.success("✓")} Config loaded`);
         } catch (err) {
-          const code = (err as NodeJS.ErrnoException).code;
-          if (code === "ENOENT") {
+          if ((err as NodeJS.ErrnoException).code === "ENOENT") {
             console.log(`${theme.muted("→")} No config found, using defaults`);
           } else {
-            console.error(
-              `${theme.error("✗")} Config load failed: ${err instanceof Error ? err.message : String(err)}`,
-            );
-            console.log(`${theme.muted("→")} Continuing with defaults`);
+            throw err;
           }
         }
 

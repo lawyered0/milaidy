@@ -1,12 +1,12 @@
 /**
- * Config view component — settings page with multiple sections.
+ * Config view component — admin settings.
  *
  * Section order:
- *   1. Character
- *   2. Theme
- *   3. Model Provider  (onboarding-style provider selector)
- *   4. Model Provider Settings  (detailed plugin config)
- *   5. Wallet Providers & API Keys
+ *   1. Theme
+ *   2. Model Provider  (onboarding-style provider selector)
+ *   3. Model Provider Settings  (detailed plugin config)
+ *   4. Wallet Providers & API Keys
+ *   5. Connectors
  *   6. Software Updates
  *   7. Chrome Extension
  *   8. Agent Export / Import
@@ -295,6 +295,7 @@ function PluginField({
 export function ConfigView() {
   const {
     // Cloud
+    cloudEnabled,
     cloudConnected,
     cloudCredits,
     cloudCreditsLow,
@@ -308,13 +309,6 @@ export function ConfigView() {
     plugins,
     pluginSaving,
     pluginSaveSuccess,
-    // Character
-    characterData,
-    characterDraft,
-    characterLoading,
-    characterSaving,
-    characterSaveSuccess,
-    characterSaveError,
     // Theme
     currentTheme,
     // Updates
@@ -341,11 +335,6 @@ export function ConfigView() {
     importError,
     importSuccess,
     // Actions
-    handleCharacterFieldInput,
-    handleCharacterArrayInput,
-    handleCharacterStyleInput,
-    handleSaveCharacter,
-    loadCharacter,
     loadPlugins,
     handlePluginToggle,
     setTheme,
@@ -373,7 +362,6 @@ export function ConfigView() {
   const [modelSaveSuccess, setModelSaveSuccess] = useState(false);
 
   useEffect(() => {
-    void loadCharacter();
     void loadPlugins();
     void loadUpdateStatus();
     void checkExtensionStatus();
@@ -387,11 +375,15 @@ export function ConfigView() {
       try {
         const cfg = await client.getConfig();
         const models = cfg.models as Record<string, string> | undefined;
-        if (models?.small) setCurrentSmallModel(models.small);
-        if (models?.large) setCurrentLargeModel(models.large);
+        const cloud = cfg.cloud as Record<string, unknown> | undefined;
+        const cloudEnabled = cloud?.enabled === true;
+        const defaultSmall = "moonshotai/kimi-k2-turbo";
+        const defaultLarge = "moonshotai/kimi-k2-0905";
+        setCurrentSmallModel(models?.small || (cloudEnabled ? defaultSmall : ""));
+        setCurrentLargeModel(models?.large || (cloudEnabled ? defaultLarge : ""));
       } catch { /* ignore */ }
     })();
-  }, [loadCharacter, loadPlugins, loadUpdateStatus, checkExtensionStatus]);
+  }, [loadPlugins, loadUpdateStatus, checkExtensionStatus]);
 
   const handleModelSave = useCallback(async () => {
     setModelSaving(true);
@@ -411,8 +403,23 @@ export function ConfigView() {
   const allAiProviders = plugins.filter((p) => p.category === "ai-provider");
   const enabledAiProviders = allAiProviders.filter((p) => p.enabled);
 
-  /* Track which provider is selected for showing settings inline */
-  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
+  /* Track which provider is selected for showing settings inline.
+   * Initialise to __cloud__ when cloud is the active model provider so the
+   * selection survives component remounts (e.g. tab switches). */
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(
+    () => (cloudEnabled ? "__cloud__" : null),
+  );
+
+  /* Keep in sync: when cloudEnabled changes (e.g. after onboarding or
+   * disconnect), update the local selection if the user hasn't already
+   * picked something manually. */
+  const hasManualSelection = useRef(false);
+  useEffect(() => {
+    if (hasManualSelection.current) return;
+    if (cloudEnabled && selectedProviderId !== "__cloud__") {
+      setSelectedProviderId("__cloud__");
+    }
+  }, [cloudEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Resolve the actually-selected provider: accept __cloud__ or fall back to first enabled */
   const resolvedSelectedId =
@@ -426,12 +433,19 @@ export function ConfigView() {
     ? allAiProviders.find((p) => p.id === resolvedSelectedId) ?? null
     : null;
 
-  /* Switch provider: enable the new one, disable all others */
+  /* Switch to a local provider: enable the new one, disable all others,
+   * and turn off cloud mode so the runtime picks up the correct plugin. */
   const handleSwitchProvider = useCallback(
     async (newId: string) => {
+      hasManualSelection.current = true;
       setSelectedProviderId(newId);
       const target = allAiProviders.find((p) => p.id === newId);
       if (!target) return;
+
+      /* Turn off cloud mode when switching to a local provider */
+      try {
+        await client.updateConfig({ cloud: { enabled: false } });
+      } catch { /* non-fatal */ }
 
       /* Enable the new provider if not already */
       if (!target.enabled) {
@@ -448,11 +462,23 @@ export function ConfigView() {
     [allAiProviders, enabledAiProviders, handlePluginToggle],
   );
 
-  const d = characterDraft;
-  const bioText = typeof d.bio === "string" ? d.bio : Array.isArray(d.bio) ? d.bio.join("\n") : "";
-  const styleAllText = (d.style?.all ?? []).join("\n");
-  const styleChatText = (d.style?.chat ?? []).join("\n");
-  const stylePostText = (d.style?.post ?? []).join("\n");
+  /* Switch to Eliza Cloud: persist the selection to config and restart
+   * the runtime so the cloud plugin loads with the saved API key.
+   * Also ensures sensible model defaults are present in config. */
+  const handleSelectCloud = useCallback(async () => {
+    hasManualSelection.current = true;
+    setSelectedProviderId("__cloud__");
+    try {
+      await client.updateConfig({
+        cloud: { enabled: true },
+        models: {
+          small: currentSmallModel || "moonshotai/kimi-k2-turbo",
+          large: currentLargeModel || "moonshotai/kimi-k2-0905",
+        },
+      });
+      await client.restartAgent();
+    } catch { /* non-fatal */ }
+  }, [currentSmallModel, currentLargeModel]);
 
   const ext = extensionStatus;
   const relayOk = ext?.relayReachable === true;
@@ -470,74 +496,10 @@ export function ConfigView() {
     void handleWalletApiKeySave(config);
   }, [handleWalletApiKeySave]);
 
-  /* ── Character generation state ─────────────────────────────────── */
-  const [generating, setGenerating] = useState<string | null>(null); // field name being generated
-
-  const getCharContext = useCallback(() => ({
-    name: d.name ?? "",
-    system: d.system ?? "",
-    bio: bioText,
-    style: d.style ?? { all: [], chat: [], post: [] },
-    postExamples: d.postExamples ?? [],
-  }), [d, bioText]);
-
-  const handleGenerate = useCallback(async (field: string, mode: "append" | "replace" = "replace") => {
-    setGenerating(field);
-    try {
-      const { generated } = await client.generateCharacterField(field, getCharContext(), mode);
-      if (field === "bio") {
-        handleCharacterFieldInput("bio", generated.trim());
-      } else if (field === "style") {
-        try {
-          const parsed = JSON.parse(generated);
-          if (mode === "append") {
-            handleCharacterStyleInput("all", [...(d.style?.all ?? []), ...(parsed.all ?? [])].join("\n"));
-            handleCharacterStyleInput("chat", [...(d.style?.chat ?? []), ...(parsed.chat ?? [])].join("\n"));
-            handleCharacterStyleInput("post", [...(d.style?.post ?? []), ...(parsed.post ?? [])].join("\n"));
-          } else {
-            if (parsed.all) handleCharacterStyleInput("all", parsed.all.join("\n"));
-            if (parsed.chat) handleCharacterStyleInput("chat", parsed.chat.join("\n"));
-            if (parsed.post) handleCharacterStyleInput("post", parsed.post.join("\n"));
-          }
-        } catch { /* raw text fallback */ }
-      } else if (field === "chatExamples") {
-        try {
-          const parsed = JSON.parse(generated);
-          if (Array.isArray(parsed)) {
-            const formatted = parsed.map((convo: Array<{ user: string; content: { text: string } }>) => ({
-              examples: convo.map((msg) => ({ name: msg.user, content: { text: msg.content.text } })),
-            }));
-            handleCharacterFieldInput("messageExamples" as keyof typeof d, formatted as never);
-          }
-        } catch { /* raw text fallback */ }
-      } else if (field === "postExamples") {
-        try {
-          const parsed = JSON.parse(generated);
-          if (Array.isArray(parsed)) {
-            if (mode === "append") {
-              handleCharacterArrayInput("postExamples", [...(d.postExamples ?? []), ...parsed].join("\n"));
-            } else {
-              handleCharacterArrayInput("postExamples", parsed.join("\n"));
-            }
-          }
-        } catch { /* raw text fallback */ }
-      }
-    } catch {
-      /* generation failed — silently ignore */
-    }
-    setGenerating(null);
-  }, [getCharContext, d, handleCharacterFieldInput, handleCharacterArrayInput, handleCharacterStyleInput]);
-
-  const handleRandomName = useCallback(async () => {
-    try {
-      const { name } = await client.getRandomName();
-      handleCharacterFieldInput("name", name);
-    } catch { /* ignore */ }
-  }, [handleCharacterFieldInput]);
 
   /* ── RPC provider selection state ────────────────────────────────── */
-  const [selectedEvmRpc, setSelectedEvmRpc] = useState<"alchemy" | "infura" | "ankr">("alchemy");
-  const [selectedSolanaRpc, setSelectedSolanaRpc] = useState<"helius" | "birdeye">("helius");
+  const [selectedEvmRpc, setSelectedEvmRpc] = useState<"eliza-cloud" | "alchemy" | "infura" | "ankr">("eliza-cloud");
+  const [selectedSolanaRpc, setSelectedSolanaRpc] = useState<"eliza-cloud" | "helius-birdeye">("eliza-cloud");
 
   /* ── Export / Import modal state ─────────────────────────────────── */
   const [exportModalOpen, setExportModalOpen] = useState(false);
@@ -583,329 +545,13 @@ export function ConfigView() {
 
   return (
     <div>
-      <h2 className="text-lg font-bold">Settings</h2>
-      <p className="text-[13px] text-[var(--muted)] mb-5">Agent settings and configuration.</p>
+      <h2 className="text-lg font-bold mb-5">Config</h2>
 
       {/* ═══════════════════════════════════════════════════════════════
-          1. CHARACTER
+          1. THEME
           ═══════════════════════════════════════════════════════════════ */}
       <div className="mt-6 p-4 border border-[var(--border)] bg-[var(--card)]">
-        <div className="flex justify-between items-center mb-4">
-          <div>
-            <div className="font-bold text-sm">Character</div>
-            <div className="text-xs text-[var(--muted)] mt-0.5">
-              Define your agent&apos;s name, personality, knowledge, and communication style.
-            </div>
-          </div>
-          <button
-            className="btn whitespace-nowrap !mt-0 text-xs py-1.5 px-3.5"
-            onClick={() => void loadCharacter()}
-            disabled={characterLoading}
-          >
-            {characterLoading ? "Loading..." : "Reload"}
-          </button>
-        </div>
-
-        {characterLoading && !characterData ? (
-          <div className="text-center py-6 text-[var(--muted)] text-[13px]">
-            Loading character data...
-          </div>
-        ) : (
-          <div className="flex flex-col gap-4">
-            {/* Name — short field with random name button */}
-            <div className="flex flex-col gap-1">
-              <label className="font-semibold text-xs">Name</label>
-              <div className="text-[11px] text-[var(--muted)]">Agent display name (max 50 characters)</div>
-              <div className="flex items-center gap-2 max-w-[280px]">
-                <input
-                  type="text"
-                  value={d.name ?? ""}
-                  maxLength={50}
-                  placeholder="Agent name"
-                  onChange={(e) => handleCharacterFieldInput("name", e.target.value)}
-                  className="flex-1 px-2.5 py-1.5 border border-[var(--border)] bg-[var(--card)] text-[13px] focus:border-[var(--accent)] focus:outline-none"
-                />
-                <button
-                  className="px-2 py-1.5 border border-[var(--border)] bg-[var(--card)] text-[13px] cursor-pointer hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors"
-                  onClick={() => void handleRandomName()}
-                  title="Random name"
-                  type="button"
-                >
-                  &#x21bb;
-                </button>
-              </div>
-            </div>
-
-            {/* Bio — with generate button */}
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <label className="font-semibold text-xs">Bio</label>
-                <button
-                  className="text-[10px] px-1.5 py-0.5 border border-[var(--border)] bg-[var(--card)] cursor-pointer hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors disabled:opacity-40"
-                  onClick={() => void handleGenerate("bio")}
-                  disabled={generating === "bio"}
-                  title="Generate bio using AI"
-                  type="button"
-                >
-                  {generating === "bio" ? "generating..." : "generate"}
-                </button>
-              </div>
-              <div className="text-[11px] text-[var(--muted)]">Biography — one paragraph per line</div>
-              <textarea
-                value={bioText}
-                rows={4}
-                placeholder="Write your agent's bio here. One paragraph per line."
-                onChange={(e) => handleCharacterFieldInput("bio", e.target.value)}
-                className="px-2.5 py-1.5 border border-[var(--border)] bg-[var(--card)] text-xs font-inherit resize-y leading-relaxed focus:border-[var(--accent)] focus:outline-none"
-              />
-            </div>
-
-            {/* System Prompt */}
-            <div className="flex flex-col gap-1">
-              <label className="font-semibold text-xs">System Prompt</label>
-              <div className="text-[11px] text-[var(--muted)]">Core behavior instructions for the agent (max 10,000 characters)</div>
-              <textarea
-                value={d.system ?? ""}
-                rows={6}
-                maxLength={10000}
-                placeholder="You are..."
-                onChange={(e) => handleCharacterFieldInput("system", e.target.value)}
-                className="px-2.5 py-1.5 border border-[var(--border)] bg-[var(--card)] text-xs font-[var(--mono)] resize-y leading-relaxed focus:border-[var(--accent)] focus:outline-none"
-              />
-            </div>
-
-            {/* Advanced */}
-            <details className="group">
-              <summary className="flex items-center gap-1.5 cursor-pointer select-none text-xs font-semibold list-none [&::-webkit-details-marker]:hidden">
-                <span className="inline-block transition-transform group-open:rotate-90">&#9654;</span>
-                Advanced
-                <span className="font-normal text-[var(--muted)]">— style, chat examples, post examples</span>
-              </summary>
-
-              <div className="flex flex-col gap-4 mt-3 pl-0.5">
-                {/* Style — with generate (append) and recycle (replace) buttons */}
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-2">
-                    <label className="font-semibold text-xs">Style</label>
-                    <button
-                      className="text-[10px] px-1.5 py-0.5 border border-[var(--border)] bg-[var(--card)] cursor-pointer hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors disabled:opacity-40"
-                      onClick={() => void handleGenerate("style", "append")}
-                      disabled={generating === "style"}
-                      title="Add more style rules"
-                      type="button"
-                    >
-                      {generating === "style" ? "generating..." : "+ generate"}
-                    </button>
-                    <button
-                      className="text-[10px] px-1.5 py-0.5 border border-[var(--border)] bg-[var(--card)] cursor-pointer hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors disabled:opacity-40"
-                      onClick={() => void handleGenerate("style", "replace")}
-                      disabled={generating === "style"}
-                      title="Regenerate all style rules"
-                      type="button"
-                    >
-                      &#x21bb; recycle
-                    </button>
-                  </div>
-                  <div className="text-[11px] text-[var(--muted)]">Communication style guidelines — one rule per line</div>
-
-                  <div className="grid grid-cols-3 gap-3 mt-1 p-3 border border-[var(--border)] bg-[var(--bg-muted)]">
-                    <div className="flex flex-col gap-1">
-                      <label className="font-semibold text-[11px] text-[var(--muted)]">All</label>
-                      <textarea
-                        value={styleAllText}
-                        rows={3}
-                        placeholder={"Keep responses concise\nUse casual tone"}
-                        onChange={(e) => handleCharacterStyleInput("all", e.target.value)}
-                        className="px-2.5 py-1.5 border border-[var(--border)] bg-[var(--card)] text-xs font-inherit resize-y leading-relaxed focus:border-[var(--accent)] focus:outline-none"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="font-semibold text-[11px] text-[var(--muted)]">Chat</label>
-                      <textarea
-                        value={styleChatText}
-                        rows={3}
-                        placeholder={"Be conversational\nAsk follow-up questions"}
-                        onChange={(e) => handleCharacterStyleInput("chat", e.target.value)}
-                        className="px-2.5 py-1.5 border border-[var(--border)] bg-[var(--card)] text-xs font-inherit resize-y leading-relaxed focus:border-[var(--accent)] focus:outline-none"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="font-semibold text-[11px] text-[var(--muted)]">Post</label>
-                      <textarea
-                        value={stylePostText}
-                        rows={3}
-                        placeholder={"Use hashtags sparingly\nKeep under 280 characters"}
-                        onChange={(e) => handleCharacterStyleInput("post", e.target.value)}
-                        className="px-2.5 py-1.5 border border-[var(--border)] bg-[var(--card)] text-xs font-inherit resize-y leading-relaxed focus:border-[var(--accent)] focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Chat Examples — individual conversation cards */}
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-2">
-                    <label className="font-semibold text-xs">Chat Examples</label>
-                    <button
-                      className="text-[10px] px-1.5 py-0.5 border border-[var(--border)] bg-[var(--card)] cursor-pointer hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors disabled:opacity-40"
-                      onClick={() => void handleGenerate("chatExamples", "replace")}
-                      disabled={generating === "chatExamples"}
-                      title="Generate new chat examples"
-                      type="button"
-                    >
-                      {generating === "chatExamples" ? "generating..." : "generate"}
-                    </button>
-                    <button
-                      className="text-[10px] px-1.5 py-0.5 border border-[var(--border)] bg-[var(--card)] cursor-pointer hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors disabled:opacity-40"
-                      onClick={() => void handleGenerate("chatExamples", "replace")}
-                      disabled={generating === "chatExamples"}
-                      title="Regenerate all chat examples"
-                      type="button"
-                    >
-                      &#x21bb; recycle
-                    </button>
-                  </div>
-                  <div className="text-[11px] text-[var(--muted)]">Example conversations showing how the agent responds</div>
-
-                  <div className="flex flex-col gap-2 mt-1">
-                    {(d.messageExamples ?? []).map((convo, ci) => (
-                      <div key={ci} className="p-2.5 border border-[var(--border)] bg-[var(--bg-muted)]">
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-[10px] text-[var(--muted)] font-semibold">Conversation {ci + 1}</span>
-                          <button
-                            className="text-[10px] text-[var(--muted)] hover:text-[var(--danger,#e74c3c)] cursor-pointer"
-                            onClick={() => {
-                              const updated = [...(d.messageExamples ?? [])];
-                              updated.splice(ci, 1);
-                              handleCharacterFieldInput("messageExamples" as keyof typeof d, updated as never);
-                            }}
-                            type="button"
-                          >
-                            remove
-                          </button>
-                        </div>
-                        {convo.examples.map((msg, mi) => (
-                          <div key={mi} className="flex gap-2 mb-1 last:mb-0">
-                            <span className={`text-[10px] font-semibold shrink-0 w-16 pt-0.5 ${msg.name === "{{user1}}" ? "text-[var(--muted)]" : "text-[var(--accent)]"}`}>
-                              {msg.name === "{{user1}}" ? "User" : "Agent"}
-                            </span>
-                            <input
-                              type="text"
-                              value={msg.content.text}
-                              onChange={(e) => {
-                                const updated = [...(d.messageExamples ?? [])];
-                                const convoClone = { examples: [...updated[ci].examples] };
-                                convoClone.examples[mi] = { ...convoClone.examples[mi], content: { text: e.target.value } };
-                                updated[ci] = convoClone;
-                                handleCharacterFieldInput("messageExamples" as keyof typeof d, updated as never);
-                              }}
-                              className="flex-1 px-2 py-1 border border-[var(--border)] bg-[var(--card)] text-xs focus:border-[var(--accent)] focus:outline-none"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    ))}
-                    {(d.messageExamples ?? []).length === 0 && (
-                      <div className="text-[11px] text-[var(--muted)] py-2">No chat examples yet. Click generate to create some.</div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Post Examples — individual post cards */}
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-2">
-                    <label className="font-semibold text-xs">Post Examples</label>
-                    <button
-                      className="text-[10px] px-1.5 py-0.5 border border-[var(--border)] bg-[var(--card)] cursor-pointer hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors disabled:opacity-40"
-                      onClick={() => void handleGenerate("postExamples", "append")}
-                      disabled={generating === "postExamples"}
-                      title="Generate more posts"
-                      type="button"
-                    >
-                      {generating === "postExamples" ? "generating..." : "+ generate"}
-                    </button>
-                    <button
-                      className="text-[10px] px-1.5 py-0.5 border border-[var(--border)] bg-[var(--card)] cursor-pointer hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors disabled:opacity-40"
-                      onClick={() => void handleGenerate("postExamples", "replace")}
-                      disabled={generating === "postExamples"}
-                      title="Regenerate all posts"
-                      type="button"
-                    >
-                      &#x21bb; recycle
-                    </button>
-                  </div>
-                  <div className="text-[11px] text-[var(--muted)]">Example social media posts this agent would write</div>
-
-                  <div className="flex flex-col gap-1.5 mt-1">
-                    {(d.postExamples ?? []).map((post, pi) => (
-                      <div key={pi} className="flex gap-2 items-start">
-                        <input
-                          type="text"
-                          value={post}
-                          onChange={(e) => {
-                            const updated = [...(d.postExamples ?? [])];
-                            updated[pi] = e.target.value;
-                            handleCharacterFieldInput("postExamples" as keyof typeof d, updated as never);
-                          }}
-                          className="flex-1 px-2 py-1.5 border border-[var(--border)] bg-[var(--card)] text-xs focus:border-[var(--accent)] focus:outline-none"
-                        />
-                        <button
-                          className="text-[10px] text-[var(--muted)] hover:text-[var(--danger,#e74c3c)] cursor-pointer shrink-0 py-1.5"
-                          onClick={() => {
-                            const updated = [...(d.postExamples ?? [])];
-                            updated.splice(pi, 1);
-                            handleCharacterFieldInput("postExamples" as keyof typeof d, updated as never);
-                          }}
-                          type="button"
-                        >
-                          &times;
-                        </button>
-                      </div>
-                    ))}
-                    {(d.postExamples ?? []).length === 0 && (
-                      <div className="text-[11px] text-[var(--muted)] py-2">No post examples yet. Click generate to create some.</div>
-                    )}
-                    <button
-                      className="text-[11px] text-[var(--muted)] hover:text-[var(--accent)] cursor-pointer self-start mt-0.5"
-                      onClick={() => {
-                        const updated = [...(d.postExamples ?? []), ""];
-                        handleCharacterFieldInput("postExamples" as keyof typeof d, updated as never);
-                      }}
-                      type="button"
-                    >
-                      + add post
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </details>
-
-            {/* Save Button */}
-            <div className="flex items-center gap-3 mt-1">
-              <button
-                className="btn text-[13px] py-2 px-6 !mt-0"
-                disabled={characterSaving}
-                onClick={() => void handleSaveCharacter()}
-              >
-                {characterSaving ? "Saving..." : "Save Character"}
-              </button>
-              {characterSaveSuccess && (
-                <span className="text-xs text-[var(--ok,#16a34a)]">{characterSaveSuccess}</span>
-              )}
-              {characterSaveError && (
-                <span className="text-xs text-[var(--danger,#e74c3c)]">{characterSaveError}</span>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ═══════════════════════════════════════════════════════════════
-          2. THEME
-          ═══════════════════════════════════════════════════════════════ */}
-      <div className="mt-6 p-4 border border-[var(--border)] bg-[var(--card)]">
-        <div className="font-bold text-sm mb-1">Theme</div>
-        <div className="text-xs text-[var(--muted)] mb-2">Choose your visual style.</div>
+        <div className="font-bold text-sm mb-2">Theme</div>
         <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
           {THEMES.map((t) => (
             <button
@@ -928,10 +574,7 @@ export function ConfigView() {
           3. MODEL PROVIDER  (onboarding-style selector)
           ═══════════════════════════════════════════════════════════════ */}
       <div className="mt-6 p-4 border border-[var(--border)] bg-[var(--card)]">
-        <div className="font-bold text-sm mb-1">Model Provider</div>
-        <div className="text-xs text-[var(--muted)] mb-4">
-          Choose which AI provider powers your agent. Enable one or more below.
-        </div>
+        <div className="font-bold text-sm mb-4">Model Provider</div>
 
         {/* Provider cards (cloud + local in one row) */}
         {(() => {
@@ -948,10 +591,10 @@ export function ConfigView() {
                     className="text-[var(--accent)] underline"
                     onClick={(e: React.MouseEvent) => {
                       e.preventDefault();
-                      setTab("plugins");
+                      setTab("features");
                     }}
                   >
-                    Plugins
+                    Features
                   </a>{" "}
                   page.
                 </div>
@@ -972,7 +615,7 @@ export function ConfigView() {
                       ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]"
                       : "border-[var(--border)] bg-[var(--card)] hover:border-[var(--accent)]"
                   }`}
-                  onClick={() => setSelectedProviderId("__cloud__")}
+                  onClick={() => void handleSelectCloud()}
                 >
                   <div className={`text-xs font-bold whitespace-nowrap ${isCloudSelected ? "" : "text-[var(--text)]"}`}>
                     Eliza Cloud
@@ -1050,38 +693,61 @@ export function ConfigView() {
                       </div>
 
                       {/* Cloud model selection */}
-                      {modelOptions && (
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="flex flex-col gap-1">
-                            <label className="text-xs font-semibold">Small Model</label>
-                            <div className="text-[10px] text-[var(--muted)]">Fast model for simple tasks</div>
-                            <select
-                              value={currentSmallModel}
-                              onChange={(e) => setCurrentSmallModel(e.target.value)}
-                              className="px-2.5 py-[7px] border border-[var(--border)] bg-[var(--card)] text-[13px] focus:border-[var(--accent)] focus:outline-none"
-                            >
-                              <option value="">Select model...</option>
-                              {modelOptions.small.map((m) => (
-                                <option key={m.id} value={m.id}>{m.name}</option>
-                              ))}
-                            </select>
+                      {modelOptions && (() => {
+                        // Group models by provider for cleaner optgroup display
+                        const groupByProvider = (models: typeof modelOptions.small) => {
+                          const groups: Record<string, typeof models> = {};
+                          for (const m of models) {
+                            const key = m.provider || "Other";
+                            if (!groups[key]) groups[key] = [];
+                            groups[key].push(m);
+                          }
+                          return groups;
+                        };
+                        const smallGroups = groupByProvider(modelOptions.small);
+                        const largeGroups = groupByProvider(modelOptions.large);
+
+                        return (
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="flex flex-col gap-1">
+                              <label className="text-xs font-semibold">Small Model</label>
+                              <div className="text-[10px] text-[var(--muted)]">Fast model for simple tasks</div>
+                              <select
+                                value={currentSmallModel}
+                                onChange={(e) => setCurrentSmallModel(e.target.value)}
+                                className="px-2.5 py-[7px] border border-[var(--border)] bg-[var(--card)] text-[13px] focus:border-[var(--accent)] focus:outline-none"
+                              >
+                                <option value="">Select model...</option>
+                                {Object.entries(smallGroups).map(([provider, models]) => (
+                                  <optgroup key={provider} label={provider}>
+                                    {models.map((m) => (
+                                      <option key={m.id} value={m.id}>{m.name}</option>
+                                    ))}
+                                  </optgroup>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                              <label className="text-xs font-semibold">Large Model</label>
+                              <div className="text-[10px] text-[var(--muted)]">Powerful model for complex reasoning</div>
+                              <select
+                                value={currentLargeModel}
+                                onChange={(e) => setCurrentLargeModel(e.target.value)}
+                                className="px-2.5 py-[7px] border border-[var(--border)] bg-[var(--card)] text-[13px] focus:border-[var(--accent)] focus:outline-none"
+                              >
+                                <option value="">Select model...</option>
+                                {Object.entries(largeGroups).map(([provider, models]) => (
+                                  <optgroup key={provider} label={provider}>
+                                    {models.map((m) => (
+                                      <option key={m.id} value={m.id}>{m.name}</option>
+                                    ))}
+                                  </optgroup>
+                                ))}
+                              </select>
+                            </div>
                           </div>
-                          <div className="flex flex-col gap-1">
-                            <label className="text-xs font-semibold">Large Model</label>
-                            <div className="text-[10px] text-[var(--muted)]">Powerful model for complex reasoning</div>
-                            <select
-                              value={currentLargeModel}
-                              onChange={(e) => setCurrentLargeModel(e.target.value)}
-                              className="px-2.5 py-[7px] border border-[var(--border)] bg-[var(--card)] text-[13px] focus:border-[var(--accent)] focus:outline-none"
-                            >
-                              <option value="">Select model...</option>
-                              {modelOptions.large.map((m) => (
-                                <option key={m.id} value={m.id}>{m.name}</option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-                      )}
+                        );
+                      })()}
 
                       <div className="flex justify-end mt-3">
                         <button
@@ -1106,9 +772,6 @@ export function ConfigView() {
                               {cloudLoginError}
                             </div>
                           )}
-                          <div className="text-xs text-[var(--muted)] mb-3">
-                            Connect to Eliza Cloud for managed AI models, wallets, and RPCs.
-                          </div>
                           <button
                             className="btn text-xs py-[5px] px-3.5 font-bold !mt-0"
                             onClick={() => void handleCloudLogin()}
@@ -1187,12 +850,7 @@ export function ConfigView() {
           5. RPC & DATA PROVIDERS
           ═══════════════════════════════════════════════════════════════ */}
       <div className="mt-6 p-4 border border-[var(--border)] bg-[var(--card)]">
-        <div className="mb-4">
-          <div className="font-bold text-sm">RPC &amp; Data Providers</div>
-          <div className="text-xs text-[var(--muted)] mt-0.5">
-            Choose your blockchain RPC provider for each chain.
-          </div>
-        </div>
+        <div className="font-bold text-sm mb-4">RPC &amp; Data Providers</div>
 
         <div className="grid grid-cols-2 gap-6">
           {/* ── EVM ─────────────────────────────────────── */}
@@ -1200,8 +858,9 @@ export function ConfigView() {
             <div className="text-xs font-bold mb-1">EVM</div>
             <div className="text-[11px] text-[var(--muted)] mb-2">Ethereum, Base, Arbitrum, Optimism, Polygon</div>
 
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-4 gap-1.5">
               {([
+                { id: "eliza-cloud" as const, label: "Eliza Cloud" },
                 { id: "alchemy" as const, label: "Alchemy" },
                 { id: "infura" as const, label: "Infura" },
                 { id: "ankr" as const, label: "Ankr" },
@@ -1226,6 +885,36 @@ export function ConfigView() {
             </div>
 
             {/* Inline settings for selected EVM provider */}
+            {selectedEvmRpc === "eliza-cloud" && (
+              <div className="mt-3">
+                {cloudConnected ? (
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="inline-block w-2 h-2 rounded-full bg-[var(--ok,#16a34a)]" />
+                    <span className="font-semibold">Connected to Eliza Cloud</span>
+                    {cloudCredits !== null && (
+                      <span className="text-[var(--muted)] ml-auto">
+                        Credits: <span className={cloudCreditsCritical ? "text-[var(--danger,#e74c3c)] font-bold" : cloudCreditsLow ? "text-[#b8860b] font-bold" : ""}>${cloudCredits.toFixed(2)}</span>
+                        {cloudTopUpUrl && <a href={cloudTopUpUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] ml-1.5 text-[var(--accent)]">Top up</a>}
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="inline-block w-2 h-2 rounded-full bg-[var(--muted)]" />
+                      <span className="text-[var(--muted)]">Requires Eliza Cloud connection</span>
+                    </div>
+                    <button
+                      className="btn text-xs py-[3px] px-3 !mt-0 font-bold"
+                      onClick={() => void handleCloudLogin()}
+                      disabled={cloudLoginBusy}
+                    >
+                      {cloudLoginBusy ? "Connecting..." : "Log in"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
             {selectedEvmRpc === "alchemy" && (
               <div className="mt-3 flex flex-col gap-1">
                 <div className="flex items-center gap-1.5 text-xs">
@@ -1265,8 +954,8 @@ export function ConfigView() {
 
             <div className="grid grid-cols-2 gap-1.5">
               {([
-                { id: "helius" as const, label: "Helius" },
-                { id: "birdeye" as const, label: "Birdeye" },
+                { id: "eliza-cloud" as const, label: "Eliza Cloud" },
+                { id: "helius-birdeye" as const, label: "Helius + Birdeye" },
               ]).map((p) => {
                 const active = selectedSolanaRpc === p.id;
                 return (
@@ -1288,24 +977,54 @@ export function ConfigView() {
             </div>
 
             {/* Inline settings for selected Solana provider */}
-            {selectedSolanaRpc === "helius" && (
-              <div className="mt-3 flex flex-col gap-1">
-                <div className="flex items-center gap-1.5 text-xs">
-                  <span className="font-semibold">Helius API Key</span>
-                  {walletConfig?.heliusKeySet && <span className="text-[10px] text-[var(--ok,#16a34a)]">configured</span>}
-                  <a href="https://dev.helius.xyz/" target="_blank" rel="noopener" className="text-[10px] text-[var(--accent)] ml-auto">Get key</a>
-                </div>
-                <input type="password" data-wallet-config="HELIUS_API_KEY" placeholder={walletConfig?.heliusKeySet ? "Already set — leave blank to keep" : "Enter API key"} className="w-full py-1.5 px-2 border border-[var(--border)] bg-[var(--card)] text-xs font-[var(--mono)] box-border focus:border-[var(--accent)] focus:outline-none" />
+            {selectedSolanaRpc === "eliza-cloud" && (
+              <div className="mt-3">
+                {cloudConnected ? (
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="inline-block w-2 h-2 rounded-full bg-[var(--ok,#16a34a)]" />
+                    <span className="font-semibold">Connected to Eliza Cloud</span>
+                    {cloudCredits !== null && (
+                      <span className="text-[var(--muted)] ml-auto">
+                        Credits: <span className={cloudCreditsCritical ? "text-[var(--danger,#e74c3c)] font-bold" : cloudCreditsLow ? "text-[#b8860b] font-bold" : ""}>${cloudCredits.toFixed(2)}</span>
+                        {cloudTopUpUrl && <a href={cloudTopUpUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] ml-1.5 text-[var(--accent)]">Top up</a>}
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="inline-block w-2 h-2 rounded-full bg-[var(--muted)]" />
+                      <span className="text-[var(--muted)]">Requires Eliza Cloud connection</span>
+                    </div>
+                    <button
+                      className="btn text-xs py-[3px] px-3 !mt-0 font-bold"
+                      onClick={() => void handleCloudLogin()}
+                      disabled={cloudLoginBusy}
+                    >
+                      {cloudLoginBusy ? "Connecting..." : "Log in"}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
-            {selectedSolanaRpc === "birdeye" && (
-              <div className="mt-3 flex flex-col gap-1">
-                <div className="flex items-center gap-1.5 text-xs">
-                  <span className="font-semibold">Birdeye API Key</span>
-                  {walletConfig?.birdeyeKeySet && <span className="text-[10px] text-[var(--ok,#16a34a)]">configured</span>}
-                  <a href="https://birdeye.so/" target="_blank" rel="noopener" className="text-[10px] text-[var(--accent)] ml-auto">Get key</a>
+            {selectedSolanaRpc === "helius-birdeye" && (
+              <div className="mt-3 flex flex-col gap-3">
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <span className="font-semibold">Helius API Key</span>
+                    {walletConfig?.heliusKeySet && <span className="text-[10px] text-[var(--ok,#16a34a)]">configured</span>}
+                    <a href="https://dev.helius.xyz/" target="_blank" rel="noopener" className="text-[10px] text-[var(--accent)] ml-auto">Get key</a>
+                  </div>
+                  <input type="password" data-wallet-config="HELIUS_API_KEY" placeholder={walletConfig?.heliusKeySet ? "Already set — leave blank to keep" : "Enter API key"} className="w-full py-1.5 px-2 border border-[var(--border)] bg-[var(--card)] text-xs font-[var(--mono)] box-border focus:border-[var(--accent)] focus:outline-none" />
                 </div>
-                <input type="password" data-wallet-config="BIRDEYE_API_KEY" placeholder={walletConfig?.birdeyeKeySet ? "Already set — leave blank to keep" : "Enter API key"} className="w-full py-1.5 px-2 border border-[var(--border)] bg-[var(--card)] text-xs font-[var(--mono)] box-border focus:border-[var(--accent)] focus:outline-none" />
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <span className="font-semibold">Birdeye API Key</span>
+                    {walletConfig?.birdeyeKeySet && <span className="text-[10px] text-[var(--ok,#16a34a)]">configured</span>}
+                    <a href="https://birdeye.so/" target="_blank" rel="noopener" className="text-[10px] text-[var(--accent)] ml-auto">Get key</a>
+                  </div>
+                  <input type="password" data-wallet-config="BIRDEYE_API_KEY" placeholder={walletConfig?.birdeyeKeySet ? "Already set — leave blank to keep" : "Enter API key"} className="w-full py-1.5 px-2 border border-[var(--border)] bg-[var(--card)] text-xs font-[var(--mono)] box-border focus:border-[var(--accent)] focus:outline-none" />
+                </div>
               </div>
             )}
           </div>
@@ -1322,8 +1041,9 @@ export function ConfigView() {
         </div>
       </div>
 
+
       {/* ═══════════════════════════════════════════════════════════════
-          6. SOFTWARE UPDATES
+          7. SOFTWARE UPDATES
           ═══════════════════════════════════════════════════════════════ */}
       <div className="mt-6 p-4 border border-[var(--border)] bg-[var(--card)]">
         <div className="flex justify-between items-center mb-3">
@@ -1405,16 +1125,11 @@ export function ConfigView() {
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════
-          7. CHROME EXTENSION
+          8. CHROME EXTENSION
           ═══════════════════════════════════════════════════════════════ */}
       <div className="mt-6 p-4 border border-[var(--border)] bg-[var(--card)]">
         <div className="flex justify-between items-center mb-3">
-          <div>
-            <div className="font-bold text-sm">Chrome Extension</div>
-            <div className="text-xs text-[var(--muted)] mt-0.5">
-              Connect the Milaidy Browser Relay extension so the agent can automate Chrome tabs.
-            </div>
-          </div>
+          <div className="font-bold text-sm">Chrome Extension</div>
           <button
             className="btn whitespace-nowrap !mt-0 text-xs py-1.5 px-3.5"
             onClick={() => void checkExtensionStatus()}
@@ -1497,16 +1212,11 @@ export function ConfigView() {
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════
-          8. AGENT EXPORT / IMPORT
+          9. AGENT EXPORT / IMPORT
           ═══════════════════════════════════════════════════════════════ */}
       <div className="mt-6 p-4 border border-[var(--border)] bg-[var(--card)]">
         <div className="flex justify-between items-center">
-          <div>
-            <div className="font-bold text-sm">Agent Export / Import</div>
-            <div className="text-xs text-[var(--muted)] mt-0.5">
-              Migrate your agent to another machine. Optionally encrypt with a password.
-            </div>
-          </div>
+          <div className="font-bold text-sm">Agent Export / Import</div>
           <div className="flex items-center gap-2">
             <button
               className="btn whitespace-nowrap !mt-0 text-xs py-1.5 px-3.5"
@@ -1523,6 +1233,7 @@ export function ConfigView() {
           </div>
         </div>
       </div>
+
 
       {/* ─── Export Modal ─────────────────────────────────────────────── */}
       <Modal open={exportModalOpen} onClose={() => setExportModalOpen(false)} title="Export Agent">
@@ -1633,7 +1344,7 @@ export function ConfigView() {
       </Modal>
 
       {/* ═══════════════════════════════════════════════════════════════
-          9. DANGER ZONE
+          10. DANGER ZONE
           ═══════════════════════════════════════════════════════════════ */}
       <div className="mt-12 pt-6 border-t border-[var(--border)]">
         <h2 className="text-lg font-bold text-[var(--danger,#e74c3c)]">Danger Zone</h2>

@@ -17,7 +17,7 @@
  * These tests exercise REAL production code, not mocks.
  */
 import http from "node:http";
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { startApiServer } from "../src/api/server.js";
 import { AGENT_NAME_POOL } from "../src/runtime/onboarding-names.js";
 
@@ -703,7 +703,11 @@ describe("API Server E2E (no runtime)", () => {
       // First add
       await req(port, "POST", "/api/mcp/config/server", {
         name: "to-delete",
-        config: { type: "stdio", command: "echo" },
+        config: {
+          type: "stdio",
+          command: "npx",
+          args: ["-y", "@test/mcp-server"],
+        },
       });
 
       // Then remove

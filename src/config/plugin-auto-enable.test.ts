@@ -2,16 +2,16 @@
  * Plugin Auto-Enable — Unit Tests
  *
  * Tests for:
- * - applyPluginAutoEnable (channel, auth profile, env var, feature flag, hooks rules)
- * - CHANNEL_PLUGINS / AUTH_PROVIDER_PLUGINS mappings
+ * - applyPluginAutoEnable (connector, auth profile, env var, feature flag, hooks rules)
+ * - CONNECTOR_PLUGINS / AUTH_PROVIDER_PLUGINS mappings
  */
 import { describe, expect, it } from "vitest";
 
 import {
-  AUTH_PROVIDER_PLUGINS,
-  CHANNEL_PLUGINS,
-  applyPluginAutoEnable,
   type ApplyPluginAutoEnableParams,
+  AUTH_PROVIDER_PLUGINS,
+  applyPluginAutoEnable,
+  CONNECTOR_PLUGINS,
 } from "./plugin-auto-enable.js";
 
 // ---------------------------------------------------------------------------
@@ -62,11 +62,11 @@ describe("applyPluginAutoEnable", () => {
 //  2. Channel auto-enable
 // ============================================================================
 
-describe("applyPluginAutoEnable — channels", () => {
-  it("enables plugin for a channel with a botToken", () => {
+describe("applyPluginAutoEnable — connectors", () => {
+  it("enables plugin for a connector with a botToken", () => {
     const params = makeParams({
       config: {
-        channels: {
+        connectors: {
           telegram: { botToken: "123:ABC" },
         },
       },
@@ -77,10 +77,10 @@ describe("applyPluginAutoEnable — channels", () => {
     expect(changes.some((c) => c.includes("telegram"))).toBe(true);
   });
 
-  it("skips channel when explicitly disabled", () => {
+  it("skips connector when explicitly disabled", () => {
     const params = makeParams({
       config: {
-        channels: {
+        connectors: {
           discord: { enabled: false, botToken: "abc" },
         },
       },
@@ -90,10 +90,10 @@ describe("applyPluginAutoEnable — channels", () => {
     expect(config.plugins?.allow ?? []).not.toContain("discord");
   });
 
-  it("skips channel without authentication credentials", () => {
+  it("skips connector without authentication credentials", () => {
     const params = makeParams({
       config: {
-        channels: {
+        connectors: {
           slack: { someOtherField: "value" },
         },
       },
@@ -106,7 +106,7 @@ describe("applyPluginAutoEnable — channels", () => {
   it("enables bluebubbles when serverUrl and password are set", () => {
     const params = makeParams({
       config: {
-        channels: {
+        connectors: {
           bluebubbles: { serverUrl: "http://localhost:1234", password: "pass" },
         },
       },
@@ -119,7 +119,7 @@ describe("applyPluginAutoEnable — channels", () => {
   it("enables imessage when cliPath is set", () => {
     const params = makeParams({
       config: {
-        channels: {
+        connectors: {
           imessage: { cliPath: "/usr/local/bin/imessage" },
         },
       },
@@ -127,6 +127,19 @@ describe("applyPluginAutoEnable — channels", () => {
     const { config } = applyPluginAutoEnable(params);
 
     expect(config.plugins?.allow).toContain("imessage");
+  });
+
+  it("supports legacy channels key for backward compat", () => {
+    const params = makeParams({
+      config: {
+        channels: {
+          telegram: { botToken: "legacy-tok" },
+        },
+      },
+    });
+    const { config } = applyPluginAutoEnable(params);
+
+    expect(config.plugins?.allow).toContain("telegram");
   });
 });
 
@@ -329,17 +342,17 @@ describe("applyPluginAutoEnable — hooks", () => {
 //  7. Mapping constants
 // ============================================================================
 
-describe("CHANNEL_PLUGINS", () => {
+describe("CONNECTOR_PLUGINS", () => {
   it("maps telegram to @elizaos/plugin-telegram", () => {
-    expect(CHANNEL_PLUGINS.telegram).toBe("@elizaos/plugin-telegram");
+    expect(CONNECTOR_PLUGINS.telegram).toBe("@elizaos/plugin-telegram");
   });
 
   it("maps discord to @elizaos/plugin-discord", () => {
-    expect(CHANNEL_PLUGINS.discord).toBe("@elizaos/plugin-discord");
+    expect(CONNECTOR_PLUGINS.discord).toBe("@elizaos/plugin-discord");
   });
 
-  it("contains 16 channel mappings", () => {
-    expect(Object.keys(CHANNEL_PLUGINS)).toHaveLength(16);
+  it("contains 16 connector mappings", () => {
+    expect(Object.keys(CONNECTOR_PLUGINS)).toHaveLength(16);
   });
 });
 

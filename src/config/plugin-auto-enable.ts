@@ -10,7 +10,7 @@ export interface ApplyPluginAutoEnableParams {
   env: NodeJS.ProcessEnv;
 }
 
-export const CHANNEL_PLUGINS: Record<string, string> = {
+export const CONNECTOR_PLUGINS: Record<string, string> = {
   telegram: "@elizaos/plugin-telegram",
   discord: "@elizaos/plugin-discord",
   slack: "@elizaos/plugin-slack",
@@ -92,21 +92,21 @@ const FEATURE_PLUGINS: Record<string, string> = {
   x402: "@elizaos/plugin-x402",
 };
 
-function isChannelConfigured(
-  channelName: string,
-  channelConfig: unknown,
+function isConnectorConfigured(
+  connectorName: string,
+  connectorConfig: unknown,
 ): boolean {
-  if (!channelConfig || typeof channelConfig !== "object") {
+  if (!connectorConfig || typeof connectorConfig !== "object") {
     return false;
   }
-  const config = channelConfig as Record<string, unknown>;
+  const config = connectorConfig as Record<string, unknown>;
   if (config.enabled === false) {
     return false;
   }
   if (config.botToken || config.token || config.apiKey) {
     return true;
   }
-  switch (channelName) {
+  switch (connectorName) {
     case "bluebubbles":
       return Boolean(config.serverUrl && config.password);
     case "imessage":
@@ -147,21 +147,20 @@ export function applyPluginAutoEnable(
   pluginsConfig.allow = pluginsConfig.allow ?? [];
   pluginsConfig.entries = pluginsConfig.entries ?? {};
 
-  // Channels
-  if (updatedConfig.channels) {
-    for (const [channelName, channelConfig] of Object.entries(
-      updatedConfig.channels,
-    )) {
-      const pluginName = CHANNEL_PLUGINS[channelName];
+  // Connectors (also check legacy `channels` key for backward compat)
+  const connectors = updatedConfig.connectors ?? updatedConfig.channels;
+  if (connectors) {
+    for (const [connectorName, connectorConfig] of Object.entries(connectors)) {
+      const pluginName = CONNECTOR_PLUGINS[connectorName];
       if (!pluginName) continue;
-      if (!isChannelConfigured(channelName, channelConfig)) continue;
-      if (pluginsConfig.entries[channelName]?.enabled === false) continue;
+      if (!isConnectorConfigured(connectorName, connectorConfig)) continue;
+      if (pluginsConfig.entries[connectorName]?.enabled === false) continue;
       addToAllowlist(
         pluginsConfig.allow,
         pluginName,
-        channelName,
+        connectorName,
         changes,
-        `channel: ${channelName}`,
+        `connector: ${connectorName}`,
       );
     }
   }

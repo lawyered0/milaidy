@@ -4,8 +4,6 @@
  * Fetches MCP servers from the official registry and manages local config.
  */
 
-import { logger } from "@elizaos/core";
-
 const MCP_REGISTRY_BASE_URL = "https://registry.modelcontextprotocol.io";
 
 export interface McpRegistryServer {
@@ -96,104 +94,96 @@ export async function searchMcpMarketplace(
   query?: string,
   limit = 30,
 ): Promise<{ results: McpMarketplaceSearchItem[] }> {
-  try {
-    const url = `${MCP_REGISTRY_BASE_URL}/v0/servers`;
+  const url = `${MCP_REGISTRY_BASE_URL}/v0/servers`;
 
-    // The registry API doesn't have a search query param, so we fetch all and filter
-    // If they add search later, we can update this
-    const resp = await fetch(url, {
-      headers: {
-        Accept: "application/json",
-      },
+  // The registry API doesn't have a search query param, so we fetch all and filter
+  // If they add search later, we can update this
+  const resp = await fetch(url, {
+    headers: {
+      Accept: "application/json",
+    },
+  });
+
+  if (!resp.ok) {
+    throw new Error(`Registry API error: ${resp.status} ${resp.statusText}`);
+  }
+
+  const data = (await resp.json()) as {
+    servers: Array<{
+      server: McpRegistryServer;
+      _meta?: {
+        "io.modelcontextprotocol.registry/official"?: {
+          isLatest?: boolean;
+          publishedAt?: string;
+        };
+      };
+    }>;
+    metadata?: { nextCursor?: string; count?: number };
+  };
+
+  const results: McpMarketplaceSearchItem[] = [];
+  const seenNames = new Set<string>();
+
+  for (const entry of data.servers) {
+    const server = entry.server;
+    const meta = entry._meta?.["io.modelcontextprotocol.registry/official"];
+
+    // Only show latest versions
+    if (!meta?.isLatest) continue;
+
+    // Deduplicate by name
+    if (seenNames.has(server.name)) continue;
+    seenNames.add(server.name);
+
+    // Apply search filter if query provided
+    if (query) {
+      const q = query.toLowerCase();
+      const matchName = server.name.toLowerCase().includes(q);
+      const matchTitle = server.title?.toLowerCase().includes(q);
+      const matchDesc = server.description?.toLowerCase().includes(q);
+      if (!matchName && !matchTitle && !matchDesc) continue;
+    }
+
+    // Determine connection type
+    let connectionType: "remote" | "stdio" = "remote";
+    let connectionUrl: string | undefined;
+    let npmPackage: string | undefined;
+    let dockerImage: string | undefined;
+
+    if (server.remotes && server.remotes.length > 0) {
+      connectionType = "remote";
+      connectionUrl = server.remotes[0].url;
+    } else if (server.packages && server.packages.length > 0) {
+      const pkg = server.packages[0];
+      connectionType = "stdio";
+      if (pkg.registryType === "npm") {
+        npmPackage = pkg.identifier;
+      } else if (pkg.registryType === "oci") {
+        dockerImage = pkg.identifier;
+      }
+    }
+
+    results.push({
+      id: `${server.name}@${server.version}`,
+      name: server.name,
+      title: server.title || server.name.split("/").pop() || server.name,
+      description: server.description || "No description",
+      version: server.version,
+      connectionType,
+      connectionUrl,
+      npmPackage,
+      dockerImage,
+      repositoryUrl: server.repository?.url,
+      websiteUrl: server.websiteUrl,
+      iconUrl: server.icons?.[0]?.src,
+      publishedAt: meta?.publishedAt,
+      isLatest: true,
     });
 
-    if (!resp.ok) {
-      throw new Error(`Registry API error: ${resp.status} ${resp.statusText}`);
-    }
-
-    const data = (await resp.json()) as {
-      servers: Array<{
-        server: McpRegistryServer;
-        _meta?: {
-          "io.modelcontextprotocol.registry/official"?: {
-            isLatest?: boolean;
-            publishedAt?: string;
-          };
-        };
-      }>;
-      metadata?: { nextCursor?: string; count?: number };
-    };
-
-    const results: McpMarketplaceSearchItem[] = [];
-    const seenNames = new Set<string>();
-
-    for (const entry of data.servers) {
-      const server = entry.server;
-      const meta = entry._meta?.["io.modelcontextprotocol.registry/official"];
-
-      // Only show latest versions
-      if (!meta?.isLatest) continue;
-
-      // Deduplicate by name
-      if (seenNames.has(server.name)) continue;
-      seenNames.add(server.name);
-
-      // Apply search filter if query provided
-      if (query) {
-        const q = query.toLowerCase();
-        const matchName = server.name.toLowerCase().includes(q);
-        const matchTitle = server.title?.toLowerCase().includes(q);
-        const matchDesc = server.description?.toLowerCase().includes(q);
-        if (!matchName && !matchTitle && !matchDesc) continue;
-      }
-
-      // Determine connection type
-      let connectionType: "remote" | "stdio" = "remote";
-      let connectionUrl: string | undefined;
-      let npmPackage: string | undefined;
-      let dockerImage: string | undefined;
-
-      if (server.remotes && server.remotes.length > 0) {
-        connectionType = "remote";
-        connectionUrl = server.remotes[0].url;
-      } else if (server.packages && server.packages.length > 0) {
-        const pkg = server.packages[0];
-        connectionType = "stdio";
-        if (pkg.registryType === "npm") {
-          npmPackage = pkg.identifier;
-        } else if (pkg.registryType === "oci") {
-          dockerImage = pkg.identifier;
-        }
-      }
-
-      results.push({
-        id: `${server.name}@${server.version}`,
-        name: server.name,
-        title: server.title || server.name.split("/").pop() || server.name,
-        description: server.description || "No description",
-        version: server.version,
-        connectionType,
-        connectionUrl,
-        npmPackage,
-        dockerImage,
-        repositoryUrl: server.repository?.url,
-        websiteUrl: server.websiteUrl,
-        iconUrl: server.icons?.[0]?.src,
-        publishedAt: meta?.publishedAt,
-        isLatest: true,
-      });
-
-      if (results.length >= limit) break;
-    }
-
-    return { results };
-  } catch (err) {
-    logger.error(
-      "[mcp-marketplace] search error:",
-      err instanceof Error ? err.message : String(err),
-    );
-    return { results: [] };
+    if (results.length >= limit) break;
   }
+
+  return { results };
 }
 
 /**
@@ -202,26 +192,18 @@ export async function searchMcpMarketplace(
 export async function getMcpServerDetails(
   name: string,
 ): Promise<McpRegistryServer | null> {
-  try {
-    const url = `${MCP_REGISTRY_BASE_URL}/v0/servers/${encodeURIComponent(name)}`;
-    const resp = await fetch(url, {
-      headers: { Accept: "application/json" },
-    });
+  const url = `${MCP_REGISTRY_BASE_URL}/v0/servers/${encodeURIComponent(name)}`;
+  const resp = await fetch(url, {
+    headers: { Accept: "application/json" },
+  });
 
-    if (!resp.ok) {
-      if (resp.status === 404) return null;
-      throw new Error(`Registry API error: ${resp.status}`);
-    }
-
-    const data = (await resp.json()) as { server: McpRegistryServer };
-    return data.server;
-  } catch (err) {
-    logger.error(
-      "[mcp-marketplace] get server details error:",
-      err instanceof Error ? err.message : String(err),
-    );
-    return null;
+  if (!resp.ok) {
+    if (resp.status === 404) return null;
+    throw new Error(`Registry API error: ${resp.status}`);
   }
+
+  const data = (await resp.json()) as { server: McpRegistryServer };
+  return data.server;
 }
 
 /**

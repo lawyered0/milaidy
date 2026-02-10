@@ -20,9 +20,9 @@ import {
   AgentRuntime,
   ChannelType,
   type Character,
-  mergeCharacterDefaults,
   createMessageMemory,
   logger,
+  mergeCharacterDefaults,
   type Plugin,
   stringToUuid,
   type UUID,
@@ -312,9 +312,13 @@ async function main(): Promise<void> {
   let config: MilaidyConfig;
   try {
     config = loadMilaidyConfig();
-  } catch {
-    logger.warn("[bench] No config found, using defaults");
-    config = {} as MilaidyConfig;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      logger.warn("[bench] No config found, using defaults");
+      config = {} as MilaidyConfig;
+    } else {
+      throw err;
+    }
   }
 
   // Create runtime
@@ -328,21 +332,15 @@ async function main(): Promise<void> {
   let currentRoomId = stringToUuid(`bench-${crypto.randomUUID()}`);
 
   async function ensureRoom(roomId: UUID): Promise<void> {
-    try {
-      await runtime.ensureConnection({
-        entityId: userId,
-        roomId,
-        worldId: stringToUuid("benchmark-world"),
-        userName: "BenchmarkRunner",
-        source: "benchmark",
-        channelId: "benchmark",
-        type: ChannelType.API,
-      });
-    } catch (err) {
-      // Room may already exist — log at debug level for visibility
-      const msg = err instanceof Error ? err.message : String(err);
-      logger.debug(`[bench] ensureRoom: ${msg}`);
-    }
+    await runtime.ensureConnection({
+      entityId: userId,
+      roomId,
+      worldId: stringToUuid("benchmark-world"),
+      userName: "BenchmarkRunner",
+      source: "benchmark",
+      channelId: "benchmark",
+      type: ChannelType.API,
+    });
   }
 
   await ensureRoom(currentRoomId);
@@ -548,7 +546,9 @@ async function main(): Promise<void> {
     server.close();
     runtime
       .stop()
-      .catch(() => {})
+      .catch((err: Error) => {
+        logger.error(`[bench] Error during shutdown: ${err.message}`);
+      })
       .finally(() => process.exit(0));
   };
 

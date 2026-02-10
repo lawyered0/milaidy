@@ -9,17 +9,20 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  addIteration,
   CapturedErrorSchema,
+  type CodingAgentContext,
+  type CodingIteration,
   CodingIterationSchema,
   CommandResultSchema,
   ConnectorConfigSchema,
-  FileOperationSchema,
-  HumanFeedbackSchema,
-  InteractionModeSchema,
-  addIteration,
   createCodingAgentContext,
+  FileOperationSchema,
   getUnresolvedErrors,
+  type HumanFeedback,
+  HumanFeedbackSchema,
   hasReachedMaxIterations,
+  InteractionModeSchema,
   injectFeedback,
   isLastIterationClean,
   shouldContinueLoop,
@@ -27,9 +30,6 @@ import {
   validateCodingIteration,
   validateConnectorConfig,
   validateHumanFeedback,
-  type CodingAgentContext,
-  type CodingIteration,
-  type HumanFeedback,
 } from "./coding-agent-context.js";
 
 // ---------------------------------------------------------------------------

@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { isSubagentSessionKey } from "@elizaos/core";
+import { isSubagentSessionKey, logger } from "@elizaos/core";
 import { resolveUserPath } from "../config/paths.js";
 
 export interface RunCommandResult {
@@ -224,8 +224,11 @@ async function hasGitRepo(dir: string): Promise<boolean> {
   try {
     await fs.stat(path.join(dir, ".git"));
     return true;
-  } catch {
-    return false;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      return false;
+    }
+    throw err;
   }
 }
 
@@ -255,8 +258,10 @@ async function ensureGitRepo(dir: string, isBrandNewWorkspace: boolean) {
       cwd: dir,
       timeoutMs: 10_000,
     });
-  } catch {
-    // Ignore git init failures; workspace creation should still succeed.
+  } catch (err) {
+    logger.warn(
+      `[workspace] git init failed: ${err instanceof Error ? err.message : err}`,
+    );
   }
 }
 
@@ -302,8 +307,11 @@ export async function ensureAgentWorkspace(params?: {
         try {
           await fs.access(p);
           return true;
-        } catch {
-          return false;
+        } catch (err) {
+          if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+            return false;
+          }
+          throw err;
         }
       }),
     );
@@ -355,8 +363,10 @@ async function resolveMemoryBootstrapEntries(
     try {
       await fs.access(filePath);
       entries.push({ name, filePath });
-    } catch {
-      // optional
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+        throw err;
+      }
     }
   }
   if (entries.length <= 1) {
@@ -370,7 +380,11 @@ async function resolveMemoryBootstrapEntries(
     let key = entry.filePath;
     try {
       key = await fs.realpath(entry.filePath);
-    } catch {}
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+        throw err;
+      }
+    }
     if (seen.has(key)) {
       continue;
     }
@@ -427,8 +441,11 @@ export async function loadWorkspaceBootstrapFiles(
           content,
           missing: false,
         };
-      } catch {
-        return { name: entry.name, path: entry.filePath, missing: true };
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+          return { name: entry.name, path: entry.filePath, missing: true };
+        }
+        throw err;
       }
     }),
   );

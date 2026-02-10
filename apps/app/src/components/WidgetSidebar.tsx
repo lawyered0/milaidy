@@ -17,7 +17,6 @@ export function WidgetSidebar() {
     workbenchLoading,
     workbenchGoalsAvailable,
     workbenchTodosAvailable,
-    loadWorkbench,
   } = useApp();
 
   const [goalsCollapsed, setGoalsCollapsed] = useState(false);
@@ -29,27 +28,23 @@ export function WidgetSidebar() {
 
   return (
     <aside className="w-[260px] min-w-[260px] border-l border-border flex flex-col h-full font-body text-[13px]" data-testid="widget-sidebar">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-        <h3 className="text-txt-strong font-semibold">Workbench</h3>
-        <button
-          className="text-muted hover:text-txt-strong transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          onClick={loadWorkbench}
-          disabled={workbenchLoading}
-          title="Refresh workbench"
-        >
-          ↻
-        </button>
-      </div>
-
       {isAgentStopped ? (
         <div className="flex items-center justify-center flex-1">
           <p className="text-muted">Agent not running</p>
+        </div>
+      ) : agentStatus?.state === "restarting" ? (
+        <div className="flex items-center justify-center flex-1">
+          <p className="text-muted">Agent restarting&hellip;</p>
+        </div>
+      ) : workbenchLoading ? (
+        <div className="flex items-center justify-center flex-1">
+          <p className="text-muted">Loading&hellip;</p>
         </div>
       ) : (
         <>
           {!workbenchGoalsAvailable && !workbenchTodosAvailable ? (
             <div className="flex items-center justify-center flex-1">
-              <p className="text-muted">Plugin not loaded</p>
+              <p className="text-muted">No workbench plugins active</p>
             </div>
           ) : (
             <>

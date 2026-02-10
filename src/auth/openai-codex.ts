@@ -6,8 +6,8 @@
  */
 
 import {
-  loginOpenAICodex,
   refreshOpenAICodexToken as _refreshOpenAICodexToken,
+  loginOpenAICodex,
 } from "@mariozechner/pi-ai";
 import type { OAuthCredentials } from "./types.js";
 

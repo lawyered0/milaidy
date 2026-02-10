@@ -1,7 +1,7 @@
 import { VERSION } from "../runtime/version.js";
 
-/** Known channel IDs for config schema generation */
-const CHANNEL_IDS = [
+/** Known connector IDs for config schema generation */
+const CONNECTOR_IDS = [
   "discord",
   "telegram",
   "slack",
@@ -53,7 +53,7 @@ export type PluginUiMetadata = {
   configSchema?: JsonSchemaNode;
 };
 
-export type ChannelUiMetadata = {
+export type ConnectorUiMetadata = {
   id: string;
   label?: string;
   description?: string;
@@ -81,7 +81,7 @@ const GROUP_LABELS: Record<string, string> = {
   ui: "UI",
   browser: "Browser",
   talk: "Talk",
-  channels: "Messaging Channels",
+  connectors: "Connectors",
   skills: "Skills",
   plugins: "Plugins",
   discovery: "Discovery",
@@ -108,7 +108,7 @@ const GROUP_ORDER: Record<string, number> = {
   ui: 120,
   browser: 130,
   talk: 140,
-  channels: 150,
+  connectors: 150,
   skills: 200,
   plugins: 205,
   discovery: 210,
@@ -346,62 +346,62 @@ const FIELD_LABELS: Record<string, string> = {
   "messages.ackReactionScope": "Ack Reaction Scope",
   "messages.inbound.debounceMs": "Inbound Message Debounce (ms)",
   "talk.apiKey": "Talk API Key",
-  "channels.whatsapp": "WhatsApp",
-  "channels.telegram": "Telegram",
-  "channels.telegram.customCommands": "Telegram Custom Commands",
-  "channels.discord": "Discord",
-  "channels.slack": "Slack",
-  "channels.mattermost": "Mattermost",
-  "channels.signal": "Signal",
-  "channels.imessage": "iMessage",
-  "channels.bluebubbles": "BlueBubbles",
-  "channels.msteams": "MS Teams",
-  "channels.telegram.botToken": "Telegram Bot Token",
-  "channels.telegram.dmPolicy": "Telegram DM Policy",
-  "channels.telegram.streamMode": "Telegram Draft Stream Mode",
-  "channels.telegram.draftChunk.minChars": "Telegram Draft Chunk Min Chars",
-  "channels.telegram.draftChunk.maxChars": "Telegram Draft Chunk Max Chars",
-  "channels.telegram.draftChunk.breakPreference":
+  "connectors.whatsapp": "WhatsApp",
+  "connectors.telegram": "Telegram",
+  "connectors.telegram.customCommands": "Telegram Custom Commands",
+  "connectors.discord": "Discord",
+  "connectors.slack": "Slack",
+  "connectors.mattermost": "Mattermost",
+  "connectors.signal": "Signal",
+  "connectors.imessage": "iMessage",
+  "connectors.bluebubbles": "BlueBubbles",
+  "connectors.msteams": "MS Teams",
+  "connectors.telegram.botToken": "Telegram Bot Token",
+  "connectors.telegram.dmPolicy": "Telegram DM Policy",
+  "connectors.telegram.streamMode": "Telegram Draft Stream Mode",
+  "connectors.telegram.draftChunk.minChars": "Telegram Draft Chunk Min Chars",
+  "connectors.telegram.draftChunk.maxChars": "Telegram Draft Chunk Max Chars",
+  "connectors.telegram.draftChunk.breakPreference":
     "Telegram Draft Chunk Break Preference",
-  "channels.telegram.retry.attempts": "Telegram Retry Attempts",
-  "channels.telegram.retry.minDelayMs": "Telegram Retry Min Delay (ms)",
-  "channels.telegram.retry.maxDelayMs": "Telegram Retry Max Delay (ms)",
-  "channels.telegram.retry.jitter": "Telegram Retry Jitter",
-  "channels.telegram.network.autoSelectFamily": "Telegram autoSelectFamily",
-  "channels.telegram.timeoutSeconds": "Telegram API Timeout (seconds)",
-  "channels.telegram.capabilities.inlineButtons": "Telegram Inline Buttons",
-  "channels.whatsapp.dmPolicy": "WhatsApp DM Policy",
-  "channels.whatsapp.selfChatMode": "WhatsApp Self-Phone Mode",
-  "channels.whatsapp.debounceMs": "WhatsApp Message Debounce (ms)",
-  "channels.signal.dmPolicy": "Signal DM Policy",
-  "channels.imessage.dmPolicy": "iMessage DM Policy",
-  "channels.bluebubbles.dmPolicy": "BlueBubbles DM Policy",
-  "channels.discord.dm.policy": "Discord DM Policy",
-  "channels.discord.retry.attempts": "Discord Retry Attempts",
-  "channels.discord.retry.minDelayMs": "Discord Retry Min Delay (ms)",
-  "channels.discord.retry.maxDelayMs": "Discord Retry Max Delay (ms)",
-  "channels.discord.retry.jitter": "Discord Retry Jitter",
-  "channels.discord.maxLinesPerMessage": "Discord Max Lines Per Message",
-  "channels.discord.intents.presence": "Discord Presence Intent",
-  "channels.discord.intents.guildMembers": "Discord Guild Members Intent",
-  "channels.discord.pluralkit.enabled": "Discord PluralKit Enabled",
-  "channels.discord.pluralkit.token": "Discord PluralKit Token",
-  "channels.slack.dm.policy": "Slack DM Policy",
-  "channels.slack.allowBots": "Slack Allow Bot Messages",
-  "channels.discord.token": "Discord Bot Token",
-  "channels.slack.botToken": "Slack Bot Token",
-  "channels.slack.appToken": "Slack App Token",
-  "channels.slack.userToken": "Slack User Token",
-  "channels.slack.userTokenReadOnly": "Slack User Token Read Only",
-  "channels.slack.thread.historyScope": "Slack Thread History Scope",
-  "channels.slack.thread.inheritParent": "Slack Thread Parent Inheritance",
-  "channels.mattermost.botToken": "Mattermost Bot Token",
-  "channels.mattermost.baseUrl": "Mattermost Base URL",
-  "channels.mattermost.chatmode": "Mattermost Chat Mode",
-  "channels.mattermost.oncharPrefixes": "Mattermost Onchar Prefixes",
-  "channels.mattermost.requireMention": "Mattermost Require Mention",
-  "channels.signal.account": "Signal Account",
-  "channels.imessage.cliPath": "iMessage CLI Path",
+  "connectors.telegram.retry.attempts": "Telegram Retry Attempts",
+  "connectors.telegram.retry.minDelayMs": "Telegram Retry Min Delay (ms)",
+  "connectors.telegram.retry.maxDelayMs": "Telegram Retry Max Delay (ms)",
+  "connectors.telegram.retry.jitter": "Telegram Retry Jitter",
+  "connectors.telegram.network.autoSelectFamily": "Telegram autoSelectFamily",
+  "connectors.telegram.timeoutSeconds": "Telegram API Timeout (seconds)",
+  "connectors.telegram.capabilities.inlineButtons": "Telegram Inline Buttons",
+  "connectors.whatsapp.dmPolicy": "WhatsApp DM Policy",
+  "connectors.whatsapp.selfChatMode": "WhatsApp Self-Phone Mode",
+  "connectors.whatsapp.debounceMs": "WhatsApp Message Debounce (ms)",
+  "connectors.signal.dmPolicy": "Signal DM Policy",
+  "connectors.imessage.dmPolicy": "iMessage DM Policy",
+  "connectors.bluebubbles.dmPolicy": "BlueBubbles DM Policy",
+  "connectors.discord.dm.policy": "Discord DM Policy",
+  "connectors.discord.retry.attempts": "Discord Retry Attempts",
+  "connectors.discord.retry.minDelayMs": "Discord Retry Min Delay (ms)",
+  "connectors.discord.retry.maxDelayMs": "Discord Retry Max Delay (ms)",
+  "connectors.discord.retry.jitter": "Discord Retry Jitter",
+  "connectors.discord.maxLinesPerMessage": "Discord Max Lines Per Message",
+  "connectors.discord.intents.presence": "Discord Presence Intent",
+  "connectors.discord.intents.guildMembers": "Discord Guild Members Intent",
+  "connectors.discord.pluralkit.enabled": "Discord PluralKit Enabled",
+  "connectors.discord.pluralkit.token": "Discord PluralKit Token",
+  "connectors.slack.dm.policy": "Slack DM Policy",
+  "connectors.slack.allowBots": "Slack Allow Bot Messages",
+  "connectors.discord.token": "Discord Bot Token",
+  "connectors.slack.botToken": "Slack Bot Token",
+  "connectors.slack.appToken": "Slack App Token",
+  "connectors.slack.userToken": "Slack User Token",
+  "connectors.slack.userTokenReadOnly": "Slack User Token Read Only",
+  "connectors.slack.thread.historyScope": "Slack Thread History Scope",
+  "connectors.slack.thread.inheritParent": "Slack Thread Parent Inheritance",
+  "connectors.mattermost.botToken": "Mattermost Bot Token",
+  "connectors.mattermost.baseUrl": "Mattermost Base URL",
+  "connectors.mattermost.chatmode": "Mattermost Chat Mode",
+  "connectors.mattermost.oncharPrefixes": "Mattermost Onchar Prefixes",
+  "connectors.mattermost.requireMention": "Mattermost Require Mention",
+  "connectors.signal.account": "Signal Account",
+  "connectors.imessage.cliPath": "iMessage CLI Path",
   "agents.list[].skills": "Agent Skill Filter",
   "agents.list[].identity.avatar": "Agent Avatar",
   "discovery.mdns.mode": "mDNS Discovery Mode",
@@ -555,21 +555,21 @@ const FIELD_HELP: Record<string, string> = {
     "Firecrawl maxAge (ms) for cached results when supported by the API.",
   "tools.web.fetch.firecrawl.timeoutSeconds":
     "Timeout in seconds for Firecrawl requests.",
-  "channels.slack.allowBots":
+  "connectors.slack.allowBots":
     "Allow bot-authored messages to trigger Slack replies (default: false).",
-  "channels.slack.thread.historyScope":
+  "connectors.slack.thread.historyScope":
     'Scope for Slack thread history context ("thread" isolates per thread; "channel" reuses channel history).',
-  "channels.slack.thread.inheritParent":
+  "connectors.slack.thread.inheritParent":
     "If true, Slack thread sessions inherit the parent channel transcript (default: false).",
-  "channels.mattermost.botToken":
+  "connectors.mattermost.botToken":
     "Bot token from Mattermost System Console -> Integrations -> Bot Accounts.",
-  "channels.mattermost.baseUrl":
+  "connectors.mattermost.baseUrl":
     "Base URL for your Mattermost server (e.g., https://chat.example.com).",
-  "channels.mattermost.chatmode":
+  "connectors.mattermost.chatmode":
     'Reply to channel messages on mention ("oncall"), on trigger chars (">" or "!") ("onchar"), or on every message ("onmessage").',
-  "channels.mattermost.oncharPrefixes":
+  "connectors.mattermost.oncharPrefixes":
     'Trigger prefixes for onchar mode (default: [">", "!"]).',
-  "channels.mattermost.requireMention":
+  "connectors.mattermost.requireMention":
     "Require @mention in channels before responding (default: true).",
   "auth.profiles": "Named auth profiles (provider + mode + optional email).",
   "auth.order":
@@ -754,37 +754,37 @@ const FIELD_HELP: Record<string, string> = {
     'DM session scoping: "main" keeps continuity; "per-peer", "per-channel-peer", or "per-account-channel-peer" isolates DM history (recommended for shared inboxes/multi-account).',
   "session.identityLinks":
     "Map canonical identities to provider-prefixed peer IDs for DM session linking (example: telegram:123456).",
-  "channels.telegram.configWrites":
+  "connectors.telegram.configWrites":
     "Allow Telegram to write config in response to channel events/commands (default: true).",
-  "channels.slack.configWrites":
+  "connectors.slack.configWrites":
     "Allow Slack to write config in response to channel events/commands (default: true).",
-  "channels.mattermost.configWrites":
+  "connectors.mattermost.configWrites":
     "Allow Mattermost to write config in response to channel events/commands (default: true).",
-  "channels.discord.configWrites":
+  "connectors.discord.configWrites":
     "Allow Discord to write config in response to channel events/commands (default: true).",
-  "channels.whatsapp.configWrites":
+  "connectors.whatsapp.configWrites":
     "Allow WhatsApp to write config in response to channel events/commands (default: true).",
-  "channels.signal.configWrites":
+  "connectors.signal.configWrites":
     "Allow Signal to write config in response to channel events/commands (default: true).",
-  "channels.imessage.configWrites":
+  "connectors.imessage.configWrites":
     "Allow iMessage to write config in response to channel events/commands (default: true).",
-  "channels.msteams.configWrites":
+  "connectors.msteams.configWrites":
     "Allow Microsoft Teams to write config in response to channel events/commands (default: true).",
-  "channels.discord.commands.native":
+  "connectors.discord.commands.native":
     'Override native commands for Discord (bool or "auto").',
-  "channels.discord.commands.nativeSkills":
+  "connectors.discord.commands.nativeSkills":
     'Override native skill commands for Discord (bool or "auto").',
-  "channels.telegram.commands.native":
+  "connectors.telegram.commands.native":
     'Override native commands for Telegram (bool or "auto").',
-  "channels.telegram.commands.nativeSkills":
+  "connectors.telegram.commands.nativeSkills":
     'Override native skill commands for Telegram (bool or "auto").',
-  "channels.slack.commands.native":
+  "connectors.slack.commands.native":
     'Override native commands for Slack (bool or "auto").',
-  "channels.slack.commands.nativeSkills":
+  "connectors.slack.commands.nativeSkills":
     'Override native skill commands for Slack (bool or "auto").',
   "session.agentToAgent.maxPingPongTurns":
     "Max reply-back turns between requester and target (0–5).",
-  "channels.telegram.customCommands":
+  "connectors.telegram.customCommands":
     "Additional Telegram bot menu commands (merged with native; conflicts ignored).",
   "messages.ackReaction":
     "Emoji reaction used to acknowledge inbound messages (empty disables).",
@@ -792,62 +792,62 @@ const FIELD_HELP: Record<string, string> = {
     'When to send ack reactions ("group-mentions", "group-all", "direct", "all").',
   "messages.inbound.debounceMs":
     "Debounce window (ms) for batching rapid inbound messages from the same sender (0 to disable).",
-  "channels.telegram.dmPolicy":
-    'Direct message access control ("pairing" recommended). "open" requires channels.telegram.allowFrom=["*"].',
-  "channels.telegram.streamMode":
+  "connectors.telegram.dmPolicy":
+    'Direct message access control ("pairing" recommended). "open" requires connectors.telegram.allowFrom=["*"].',
+  "connectors.telegram.streamMode":
     "Draft streaming mode for Telegram replies (off | partial | block). Separate from block streaming; requires private topics + sendMessageDraft.",
-  "channels.telegram.draftChunk.minChars":
-    'Minimum chars before emitting a Telegram draft update when channels.telegram.streamMode="block" (default: 200).',
-  "channels.telegram.draftChunk.maxChars":
-    'Target max size for a Telegram draft update chunk when channels.telegram.streamMode="block" (default: 800; clamped to channels.telegram.textChunkLimit).',
-  "channels.telegram.draftChunk.breakPreference":
+  "connectors.telegram.draftChunk.minChars":
+    'Minimum chars before emitting a Telegram draft update when connectors.telegram.streamMode="block" (default: 200).',
+  "connectors.telegram.draftChunk.maxChars":
+    'Target max size for a Telegram draft update chunk when connectors.telegram.streamMode="block" (default: 800; clamped to connectors.telegram.textChunkLimit).',
+  "connectors.telegram.draftChunk.breakPreference":
     "Preferred breakpoints for Telegram draft chunks (paragraph | newline | sentence). Default: paragraph.",
-  "channels.telegram.retry.attempts":
+  "connectors.telegram.retry.attempts":
     "Max retry attempts for outbound Telegram API calls (default: 3).",
-  "channels.telegram.retry.minDelayMs":
+  "connectors.telegram.retry.minDelayMs":
     "Minimum retry delay in ms for Telegram outbound calls.",
-  "channels.telegram.retry.maxDelayMs":
+  "connectors.telegram.retry.maxDelayMs":
     "Maximum retry delay cap in ms for Telegram outbound calls.",
-  "channels.telegram.retry.jitter":
+  "connectors.telegram.retry.jitter":
     "Jitter factor (0-1) applied to Telegram retry delays.",
-  "channels.telegram.network.autoSelectFamily":
+  "connectors.telegram.network.autoSelectFamily":
     "Override Node autoSelectFamily for Telegram (true=enable, false=disable).",
-  "channels.telegram.timeoutSeconds":
+  "connectors.telegram.timeoutSeconds":
     "Max seconds before Telegram API requests are aborted (default: 500 per grammY).",
-  "channels.whatsapp.dmPolicy":
-    'Direct message access control ("pairing" recommended). "open" requires channels.whatsapp.allowFrom=["*"].',
-  "channels.whatsapp.selfChatMode":
+  "connectors.whatsapp.dmPolicy":
+    'Direct message access control ("pairing" recommended). "open" requires connectors.whatsapp.allowFrom=["*"].',
+  "connectors.whatsapp.selfChatMode":
     "Same-phone setup (bot uses your personal WhatsApp number).",
-  "channels.whatsapp.debounceMs":
+  "connectors.whatsapp.debounceMs":
     "Debounce window (ms) for batching rapid consecutive messages from the same sender (0 to disable).",
-  "channels.signal.dmPolicy":
-    'Direct message access control ("pairing" recommended). "open" requires channels.signal.allowFrom=["*"].',
-  "channels.imessage.dmPolicy":
-    'Direct message access control ("pairing" recommended). "open" requires channels.imessage.allowFrom=["*"].',
-  "channels.bluebubbles.dmPolicy":
-    'Direct message access control ("pairing" recommended). "open" requires channels.bluebubbles.allowFrom=["*"].',
-  "channels.discord.dm.policy":
-    'Direct message access control ("pairing" recommended). "open" requires channels.discord.dm.allowFrom=["*"].',
-  "channels.discord.retry.attempts":
+  "connectors.signal.dmPolicy":
+    'Direct message access control ("pairing" recommended). "open" requires connectors.signal.allowFrom=["*"].',
+  "connectors.imessage.dmPolicy":
+    'Direct message access control ("pairing" recommended). "open" requires connectors.imessage.allowFrom=["*"].',
+  "connectors.bluebubbles.dmPolicy":
+    'Direct message access control ("pairing" recommended). "open" requires connectors.bluebubbles.allowFrom=["*"].',
+  "connectors.discord.dm.policy":
+    'Direct message access control ("pairing" recommended). "open" requires connectors.discord.dm.allowFrom=["*"].',
+  "connectors.discord.retry.attempts":
     "Max retry attempts for outbound Discord API calls (default: 3).",
-  "channels.discord.retry.minDelayMs":
+  "connectors.discord.retry.minDelayMs":
     "Minimum retry delay in ms for Discord outbound calls.",
-  "channels.discord.retry.maxDelayMs":
+  "connectors.discord.retry.maxDelayMs":
     "Maximum retry delay cap in ms for Discord outbound calls.",
-  "channels.discord.retry.jitter":
+  "connectors.discord.retry.jitter":
     "Jitter factor (0-1) applied to Discord retry delays.",
-  "channels.discord.maxLinesPerMessage":
+  "connectors.discord.maxLinesPerMessage":
     "Soft max line count per Discord message (default: 17).",
-  "channels.discord.intents.presence":
+  "connectors.discord.intents.presence":
     "Enable the Guild Presences privileged intent. Must also be enabled in the Discord Developer Portal. Allows tracking user activities (e.g. Spotify). Default: false.",
-  "channels.discord.intents.guildMembers":
+  "connectors.discord.intents.guildMembers":
     "Enable the Guild Members privileged intent. Must also be enabled in the Discord Developer Portal. Default: false.",
-  "channels.discord.pluralkit.enabled":
+  "connectors.discord.pluralkit.enabled":
     "Resolve PluralKit proxied messages and treat system members as distinct senders.",
-  "channels.discord.pluralkit.token":
+  "connectors.discord.pluralkit.token":
     "Optional PluralKit token for resolving private systems or members.",
-  "channels.slack.dm.policy":
-    'Direct message access control ("pairing" recommended). "open" requires channels.slack.dm.allowFrom=["*"].',
+  "connectors.slack.dm.policy":
+    'Direct message access control ("pairing" recommended). "open" requires connectors.slack.dm.allowFrom=["*"].',
 };
 
 const FIELD_PLACEHOLDERS: Record<string, string> = {
@@ -857,7 +857,7 @@ const FIELD_PLACEHOLDERS: Record<string, string> = {
   "gateway.controlUi.basePath": "/milaidy",
   "gateway.controlUi.root": "dist/control-ui",
   "gateway.controlUi.allowedOrigins": "https://control.example.com",
-  "channels.mattermost.baseUrl": "https://chat.example.com",
+  "connectors.mattermost.baseUrl": "https://chat.example.com",
   "agents.list[].identity.avatar": "avatars/milaidy.png",
 };
 
@@ -1003,27 +1003,27 @@ function applyPluginHints(
   return next;
 }
 
-function applyChannelHints(
+function applyConnectorHints(
   hints: ConfigUiHints,
-  channels: ChannelUiMetadata[],
+  connectors: ConnectorUiMetadata[],
 ): ConfigUiHints {
   const next: ConfigUiHints = { ...hints };
-  for (const channel of channels) {
-    const id = channel.id.trim();
+  for (const connector of connectors) {
+    const id = connector.id.trim();
     if (!id) {
       continue;
     }
-    const basePath = `channels.${id}`;
+    const basePath = `connectors.${id}`;
     const current = next[basePath] ?? {};
-    const label = channel.label?.trim();
-    const help = channel.description?.trim();
+    const label = connector.label?.trim();
+    const help = connector.description?.trim();
     next[basePath] = {
       ...current,
       ...(label ? { label } : {}),
       ...(help ? { help } : {}),
     };
 
-    const uiHints = channel.configUiHints ?? {};
+    const uiHints = connector.configUiHints ?? {};
     for (const [relPathRaw, hint] of Object.entries(uiHints)) {
       const relPath = relPathRaw.trim().replace(/^\./, "");
       if (!relPath) {
@@ -1039,10 +1039,12 @@ function applyChannelHints(
   return next;
 }
 
-function listHeartbeatTargetChannels(channels: ChannelUiMetadata[]): string[] {
+function listHeartbeatTargetConnectors(
+  connectors: ConnectorUiMetadata[],
+): string[] {
   const seen = new Set<string>();
   const ordered: string[] = [];
-  for (const id of CHANNEL_IDS) {
+  for (const id of CONNECTOR_IDS) {
     const normalized = id.trim().toLowerCase();
     if (!normalized || seen.has(normalized)) {
       continue;
@@ -1050,8 +1052,8 @@ function listHeartbeatTargetChannels(channels: ChannelUiMetadata[]): string[] {
     seen.add(normalized);
     ordered.push(normalized);
   }
-  for (const channel of channels) {
-    const normalized = channel.id.trim().toLowerCase();
+  for (const connector of connectors) {
+    const normalized = connector.id.trim().toLowerCase();
     if (!normalized || seen.has(normalized)) {
       continue;
     }
@@ -1063,14 +1065,14 @@ function listHeartbeatTargetChannels(channels: ChannelUiMetadata[]): string[] {
 
 function applyHeartbeatTargetHints(
   hints: ConfigUiHints,
-  channels: ChannelUiMetadata[],
+  connectors: ConnectorUiMetadata[],
 ): ConfigUiHints {
   const next: ConfigUiHints = { ...hints };
-  const channelList = listHeartbeatTargetChannels(channels);
-  const channelHelp = channelList.length
-    ? ` Known channels: ${channelList.join(", ")}.`
+  const connectorList = listHeartbeatTargetConnectors(connectors);
+  const connectorHelp = connectorList.length
+    ? ` Known connectors: ${connectorList.join(", ")}.`
     : "";
-  const help = `Delivery target ("last", "none", or a channel id).${channelHelp}`;
+  const help = `Delivery target ("last", "none", or a connector id).${connectorHelp}`;
   const paths = [
     "agents.defaults.heartbeat.target",
     "agents.list.*.heartbeat.target",
@@ -1131,34 +1133,34 @@ function applyPluginSchemas(
   return next;
 }
 
-function applyChannelSchemas(
+function applyConnectorSchemas(
   schema: ConfigSchema,
-  channels: ChannelUiMetadata[],
+  connectors: ConnectorUiMetadata[],
 ): ConfigSchema {
   const next = cloneSchema(schema);
   const root = asSchemaObject(next);
-  const channelsNode = asSchemaObject(root?.properties?.channels);
-  if (!channelsNode) {
+  const connectorsNode = asSchemaObject(root?.properties?.connectors);
+  if (!connectorsNode) {
     return next;
   }
-  const channelProps = channelsNode.properties ?? {};
-  channelsNode.properties = channelProps;
+  const connectorProps = connectorsNode.properties ?? {};
+  connectorsNode.properties = connectorProps;
 
-  for (const channel of channels) {
-    if (!channel.configSchema) {
+  for (const connector of connectors) {
+    if (!connector.configSchema) {
       continue;
     }
-    const existing = asSchemaObject(channelProps[channel.id]);
-    const incoming = asSchemaObject(channel.configSchema);
+    const existing = asSchemaObject(connectorProps[connector.id]);
+    const incoming = asSchemaObject(connector.configSchema);
     if (
       existing &&
       incoming &&
       isObjectSchema(existing) &&
       isObjectSchema(incoming)
     ) {
-      channelProps[channel.id] = mergeObjectSchema(existing, incoming);
+      connectorProps[connector.id] = mergeObjectSchema(existing, incoming);
     } else {
-      channelProps[channel.id] = cloneSchema(channel.configSchema);
+      connectorProps[connector.id] = cloneSchema(connector.configSchema);
     }
   }
 
@@ -1167,17 +1169,17 @@ function applyChannelSchemas(
 
 let cachedBase: ConfigSchemaResponse | null = null;
 
-function stripChannelSchema(schema: ConfigSchema): ConfigSchema {
+function stripConnectorSchema(schema: ConfigSchema): ConfigSchema {
   const next = cloneSchema(schema);
   const root = asSchemaObject(next);
   if (!root || !root.properties) {
     return next;
   }
-  const channelsNode = asSchemaObject(root.properties.channels);
-  if (channelsNode) {
-    channelsNode.properties = {};
-    channelsNode.required = [];
-    channelsNode.additionalProperties = true;
+  const connectorsNode = asSchemaObject(root.properties.connectors);
+  if (connectorsNode) {
+    connectorsNode.properties = {};
+    connectorsNode.required = [];
+    connectorsNode.additionalProperties = true;
   }
   return next;
 }
@@ -1193,7 +1195,7 @@ function buildBaseConfigSchema(): ConfigSchemaResponse {
   schema.title = "MilaidyConfig";
   const hints = applySensitiveHints(buildBaseHints());
   const next = {
-    schema: stripChannelSchema(schema),
+    schema: stripConnectorSchema(schema),
     uiHints: hints,
     version: VERSION,
     generatedAt: new Date().toISOString(),
@@ -1204,23 +1206,23 @@ function buildBaseConfigSchema(): ConfigSchemaResponse {
 
 export function buildConfigSchema(params?: {
   plugins?: PluginUiMetadata[];
-  channels?: ChannelUiMetadata[];
+  connectors?: ConnectorUiMetadata[];
 }): ConfigSchemaResponse {
   const base = buildBaseConfigSchema();
   const plugins = params?.plugins ?? [];
-  const channels = params?.channels ?? [];
-  if (plugins.length === 0 && channels.length === 0) {
+  const connectors = params?.connectors ?? [];
+  if (plugins.length === 0 && connectors.length === 0) {
     return base;
   }
   const mergedHints = applySensitiveHints(
     applyHeartbeatTargetHints(
-      applyChannelHints(applyPluginHints(base.uiHints, plugins), channels),
-      channels,
+      applyConnectorHints(applyPluginHints(base.uiHints, plugins), connectors),
+      connectors,
     ),
   );
-  const mergedSchema = applyChannelSchemas(
+  const mergedSchema = applyConnectorSchemas(
     applyPluginSchemas(base.schema, plugins),
-    channels,
+    connectors,
   );
   return {
     ...base,

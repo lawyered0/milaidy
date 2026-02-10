@@ -14,8 +14,11 @@ export function loadMilaidyConfig(): MilaidyConfig {
   let raw: string;
   try {
     raw = fs.readFileSync(configPath, "utf-8");
-  } catch {
-    return {} as MilaidyConfig;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      return {} as MilaidyConfig;
+    }
+    throw err;
   }
 
   const parsed = JSON5.parse(raw) as Record<string, unknown>;

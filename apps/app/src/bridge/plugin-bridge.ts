@@ -19,8 +19,6 @@ import { Location as LocationPlugin } from "@milaidy/capacitor-location";
 import { ScreenCapture as ScreenCapturePlugin } from "@milaidy/capacitor-screencapture";
 import { Canvas as CanvasPlugin } from "@milaidy/capacitor-canvas";
 import { Desktop as DesktopPlugin } from "@milaidy/capacitor-desktop";
-import { Agent as AgentPlugin } from "@milaidy/capacitor-agent";
-
 // Import types
 import type { GatewayPlugin as IGatewayPlugin } from "@milaidy/capacitor-gateway";
 import type { SwabblePlugin as ISwabblePlugin } from "@milaidy/capacitor-swabble";

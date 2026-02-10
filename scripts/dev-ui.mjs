@@ -12,11 +12,11 @@
  *   node scripts/dev-ui.mjs            # starts both API + UI
  *   node scripts/dev-ui.mjs --ui-only  # starts only the Vite UI (API assumed running)
  */
-import { spawn, execSync } from "node:child_process";
+import { execSync, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { createConnection } from "node:net";
-import process from "node:process";
 import path from "node:path";
+import process from "node:process";
 
 const API_PORT = 31337;
 const UI_PORT = 2138;
@@ -277,7 +277,17 @@ if (uiOnly) {
 
   const apiCmd = hasBun
     ? ["bun", "--watch", "src/runtime/dev-server.ts"]
-    : ["node", "--import", "tsx", "--watch", "src/runtime/dev-server.ts"];
+    : [
+        "node",
+        "--import",
+        "./openai-codex-stealth.mjs",
+        "--import",
+        "./claude-code-stealth.mjs",
+        "--import",
+        "tsx",
+        "--watch",
+        "src/runtime/dev-server.ts",
+      ];
   apiProcess = spawn(apiCmd[0], apiCmd.slice(1), {
     cwd,
     env: {

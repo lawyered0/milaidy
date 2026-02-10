@@ -7,12 +7,13 @@
  * feedback) so the LLM has full awareness during the autonomous coding loop.
  */
 
-import type {
-  IAgentRuntime,
-  Memory,
-  Provider,
-  ProviderResult,
-  State,
+import {
+  type IAgentRuntime,
+  logger,
+  type Memory,
+  type Provider,
+  type ProviderResult,
+  type State,
 } from "@elizaos/core";
 import type { CodingAgentContext } from "../services/coding-agent-context.js";
 import {
@@ -222,6 +223,9 @@ export function createWorkspaceProvider(options?: {
           },
         };
       } catch (err) {
+        logger.warn(
+          `[workspace-provider] Failed to load workspace context: ${err instanceof Error ? err.message : err}`,
+        );
         return {
           text: `[Workspace context unavailable: ${err instanceof Error ? err.message : err}]`,
           data: {},

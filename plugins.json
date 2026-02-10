@@ -1,7 +1,7 @@
 {
   "$schema": "plugin-index-v1",
-  "generatedAt": "2026-02-09T02:48:57.322Z",
-  "count": 97,
+  "generatedAt": "2026-02-09T20:23:38.561Z",
+  "count": 96,
   "plugins": [
     {
       "id": "acp",
@@ -9,11 +9,126 @@
       "name": "Acp",
       "npmName": "@elizaos/plugin-acp",
       "description": "",
-      "category": "feature",
-      "envKey": null,
-      "configKeys": [],
+      "category": "connector",
+      "envKey": "ACP_GATEWAY_TOKEN",
+      "configKeys": [
+        "ACP_GATEWAY_URL",
+        "ACP_GATEWAY_TOKEN",
+        "ACP_GATEWAY_PASSWORD",
+        "ACP_DEFAULT_SESSION_KEY",
+        "ACP_DEFAULT_SESSION_LABEL",
+        "ACP_REQUIRE_EXISTING",
+        "ACP_RESET_SESSION",
+        "ACP_PREFIX_CWD",
+        "ACP_VERBOSE",
+        "ACP_CLIENT_NAME",
+        "ACP_CLIENT_DISPLAY_NAME",
+        "ACP_CLIENT_VERSION",
+        "ACP_CLIENT_MODE",
+        "ACP_PERSIST_SESSIONS",
+        "ACP_SESSION_STORE_PATH",
+        "ACP_AGENT_ID"
+      ],
       "version": "2.0.0-alpha.4",
-      "pluginDeps": ["cli"]
+      "pluginDeps": ["cli"],
+      "pluginParameters": {
+        "ACP_GATEWAY_URL": {
+          "type": "string",
+          "description": "URL for Acp Gateway",
+          "required": false,
+          "sensitive": false
+        },
+        "ACP_GATEWAY_TOKEN": {
+          "type": "string",
+          "description": "Authentication token for Acp Gateway",
+          "required": false,
+          "sensitive": true
+        },
+        "ACP_GATEWAY_PASSWORD": {
+          "type": "string",
+          "description": "Password for Acp Gateway",
+          "required": true,
+          "sensitive": true
+        },
+        "ACP_DEFAULT_SESSION_KEY": {
+          "type": "string",
+          "description": "Session identifier",
+          "required": false,
+          "sensitive": false
+        },
+        "ACP_DEFAULT_SESSION_LABEL": {
+          "type": "string",
+          "description": "Session identifier",
+          "required": false,
+          "sensitive": false
+        },
+        "ACP_REQUIRE_EXISTING": {
+          "type": "boolean",
+          "description": "Require existing session",
+          "required": false,
+          "sensitive": false
+        },
+        "ACP_RESET_SESSION": {
+          "type": "boolean",
+          "description": "Reset session on start",
+          "required": false,
+          "sensitive": false
+        },
+        "ACP_PREFIX_CWD": {
+          "type": "string",
+          "description": "Prefix current working directory",
+          "required": false,
+          "sensitive": false
+        },
+        "ACP_VERBOSE": {
+          "type": "boolean",
+          "description": "Enable verbose logging",
+          "required": false,
+          "sensitive": false
+        },
+        "ACP_CLIENT_NAME": {
+          "type": "string",
+          "description": "Display name",
+          "required": false,
+          "sensitive": false
+        },
+        "ACP_CLIENT_DISPLAY_NAME": {
+          "type": "string",
+          "description": "Display name",
+          "required": false,
+          "sensitive": false
+        },
+        "ACP_CLIENT_VERSION": {
+          "type": "string",
+          "description": "Version identifier",
+          "required": false,
+          "sensitive": false
+        },
+        "ACP_CLIENT_MODE": {
+          "type": "string",
+          "description": "Operating mode",
+          "required": false,
+          "sensitive": false
+        },
+        "ACP_PERSIST_SESSIONS": {
+          "type": "boolean",
+          "description": "Persist sessions to disk",
+          "required": false,
+          "sensitive": false
+        },
+        "ACP_SESSION_STORE_PATH": {
+          "type": "string",
+          "description": "Directory or file path",
+          "required": false,
+          "sensitive": false
+        },
+        "ACP_AGENT_ID": {
+          "type": "string",
+          "description": "Agent identifier",
+          "required": false,
+          "sensitive": false
+        }
+      }
     },
     {
       "id": "agent-orchestrator",
@@ -23,8 +138,16 @@
       "description": "Agent orchestration plugin for ElizaOS (task lifecycle + agent providers)",
       "category": "feature",
       "envKey": null,
-      "configKeys": [],
-      "version": "2.0.0-alpha.4"
+      "configKeys": ["ORCHESTRATOR_ACTIVE_PROVIDER"],
+      "version": "2.0.0-alpha.4",
+      "pluginParameters": {
+        "ORCHESTRATOR_ACTIVE_PROVIDER": {
+          "type": "string",
+          "description": "Provider selection",
+          "required": false,
+          "sensitive": false
+        }
+      }
     },
     {
       "id": "agent-skills",
@@ -134,10 +257,153 @@
       "npmName": "@elizaos/plugin-auto-trader",
       "description": "Autonomous trading plugin with LLM-powered strategies for Solana",
       "category": "feature",
-      "envKey": null,
-      "configKeys": [],
+      "envKey": "BIRDEYE_API_KEY",
+      "configKeys": [
+        "BIRDEYE_API_KEY",
+        "SOLANA_RPC_URL",
+        "SOLANA_PRIVATE_KEY",
+        "SOLANA_ADDRESS",
+        "SOLANA_ENABLED",
+        "TRADING_MODE",
+        "MAX_PORTFOLIO_ALLOCATION",
+        "MIN_LIQUIDITY_USD",
+        "MIN_VOLUME_24H_USD",
+        "MIN_SELL_COUNT_24H",
+        "MAX_BUY_SELL_RATIO",
+        "RUGCHECK_ENABLED",
+        "STOP_LOSS_PERCENT",
+        "TAKE_PROFIT_PERCENT",
+        "TRADING_INTERVAL_MS",
+        "MAX_DAILY_LOSS_USD",
+        "MAX_POSITION_SIZE_USD",
+        "SLIPPAGE_BPS",
+        "EVM_PROVIDER_URL",
+        "ZEROEX_API_KEY"
+      ],
       "version": "2.0.0-alpha.4",
-      "pluginDeps": ["solana"]
+      "pluginDeps": ["solana"],
+      "pluginParameters": {
+        "BIRDEYE_API_KEY": {
+          "type": "string",
+          "description": "API key for Birdeye",
+          "required": true,
+          "sensitive": true
+        },
+        "SOLANA_RPC_URL": {
+          "type": "string",
+          "description": "RPC endpoint URL",
+          "required": false,
+          "sensitive": false
+        },
+        "SOLANA_PRIVATE_KEY": {
+          "type": "string",
+          "description": "Private key for Solana",
+          "required": true,
+          "sensitive": true
+        },
+        "SOLANA_ADDRESS": {
+          "type": "string",
+          "description": "Wallet address",
+          "required": false,
+          "sensitive": false
+        },
+        "SOLANA_ENABLED": {
+          "type": "boolean",
+          "description": "Enable or disable this feature",
+          "required": false,
+          "sensitive": false
+        },
+        "TRADING_MODE": {
+          "type": "string",
+          "description": "Operating mode",
+          "required": false,
+          "sensitive": false
+        },
+        "MAX_PORTFOLIO_ALLOCATION": {
+          "type": "number",
+          "description": "Maximum allocation percentage",
+          "required": false,
+          "sensitive": false
+        },
+        "MIN_LIQUIDITY_USD": {
+          "type": "string",
+          "description": "Min liquidity usd",
+          "required": false,
+          "sensitive": false
+        },
+        "MIN_VOLUME_24H_USD": {
+          "type": "string",
+          "description": "Min volume 24h usd",
+          "required": false,
+          "sensitive": false
+        },
+        "MIN_SELL_COUNT_24H": {
+          "type": "string",
+          "description": "Min sell count 24h",
+          "required": false,
+          "sensitive": false
+        },
+        "MAX_BUY_SELL_RATIO": {
+          "type": "number",
+          "description": "Ratio limit",
+          "required": false,
+          "sensitive": false
+        },
+        "RUGCHECK_ENABLED": {
+          "type": "boolean",
+          "description": "Enable or disable this feature",
+          "required": false,
+          "sensitive": false
+        },
+        "STOP_LOSS_PERCENT": {
+          "type": "number",
+          "description": "Percentage value",
+          "required": false,
+          "sensitive": false
+        },
+        "TAKE_PROFIT_PERCENT": {
+          "type": "number",
+          "description": "Percentage value",
+          "required": false,
+          "sensitive": false
+        },
+        "TRADING_INTERVAL_MS": {
+          "type": "number",
+          "description": "Polling interval in milliseconds",
+          "required": false,
+          "sensitive": false
+        },
+        "MAX_DAILY_LOSS_USD": {
+          "type": "string",
+          "description": "Max daily loss usd",
+          "required": false,
+          "sensitive": false
+        },
+        "MAX_POSITION_SIZE_USD": {
+          "type": "string",
+          "description": "Max position size usd",
+          "required": false,
+          "sensitive": false
+        },
+        "SLIPPAGE_BPS": {
+          "type": "number",
+          "description": "Basis points (e.g. slippage)",
+          "required": false,
+          "sensitive": false
+        },
+        "EVM_PROVIDER_URL": {
+          "type": "string",
+          "description": "Provider endpoint URL",
+          "required": false,
+          "sensitive": false
+        },
+        "ZEROEX_API_KEY": {
+          "type": "string",
+          "description": "API key for Zeroex",
+          "required": true,
+          "sensitive": true
+        }
+      }
     },
     {
       "id": "babylon",
@@ -145,7 +411,7 @@
       "name": "Babylon",
       "npmName": "@elizaos/plugin-babylon",
       "description": "Babylon prediction market platform integration for ElizaOS with autonomous trading, social features, and A2A protocol support",
-      "category": "feature",
+      "category": "app",
       "envKey": null,
       "configKeys": [
         "BABYLON_API_URL",
@@ -267,10 +533,69 @@
       "name": "Blooio",
       "npmName": "@elizaos/plugin-blooio",
       "description": "Blooio plugin for iMessage/SMS messaging integration",
-      "category": "feature",
-      "envKey": null,
-      "configKeys": [],
-      "version": "2.0.0-alpha.4"
+      "category": "connector",
+      "envKey": "BLOOIO_API_KEY",
+      "configKeys": [
+        "BLOOIO_API_KEY",
+        "BLOOIO_WEBHOOK_URL",
+        "BLOOIO_WEBHOOK_SECRET",
+        "BLOOIO_BASE_URL",
+        "BLOOIO_WEBHOOK_PORT",
+        "BLOOIO_FROM_NUMBER",
+        "BLOOIO_SIGNATURE_TOLERANCE_SEC",
+        "BLOOIO_WEBHOOK_PATH"
+      ],
+      "version": "2.0.0-alpha.4",
+      "pluginParameters": {
+        "BLOOIO_API_KEY": {
+          "type": "string",
+          "description": "API key for Blooio",
+          "required": true,
+          "sensitive": true
+        },
+        "BLOOIO_WEBHOOK_URL": {
+          "type": "string",
+          "description": "Webhook callback URL",
+          "required": false,
+          "sensitive": false
+        },
+        "BLOOIO_WEBHOOK_SECRET": {
+          "type": "string",
+          "description": "Secret key for webhook/client verification",
+          "required": false,
+          "sensitive": true
+        },
+        "BLOOIO_BASE_URL": {
+          "type": "string",
+          "description": "Base URL for API requests",
+          "required": false,
+          "sensitive": false
+        },
+        "BLOOIO_WEBHOOK_PORT": {
+          "type": "number",
+          "description": "Port number",
+          "required": false,
+          "sensitive": false
+        },
+        "BLOOIO_FROM_NUMBER": {
+          "type": "string",
+          "description": "Sender phone number",
+          "required": false,
+          "sensitive": false
+        },
+        "BLOOIO_SIGNATURE_TOLERANCE_SEC": {
+          "type": "number",
+          "description": "Tolerance window in seconds",
+          "required": false,
+          "sensitive": false
+        },
+        "BLOOIO_WEBHOOK_PATH": {
+          "type": "string",
+          "description": "Webhook path",
+          "required": false,
+          "sensitive": false
+        }
+      }
     },
     {
       "id": "bluebubbles",
@@ -280,8 +605,74 @@
       "description": "",
       "category": "connector",
       "envKey": null,
-      "configKeys": [],
-      "version": "2.0.0-alpha.4"
+      "configKeys": [
+        "BLUEBUBBLES_SERVER_URL",
+        "BLUEBUBBLES_PASSWORD",
+        "BLUEBUBBLES_WEBHOOK_PATH",
+        "BLUEBUBBLES_DM_POLICY",
+        "BLUEBUBBLES_GROUP_POLICY",
+        "BLUEBUBBLES_ALLOW_FROM",
+        "BLUEBUBBLES_GROUP_ALLOW_FROM",
+        "BLUEBUBBLES_SEND_READ_RECEIPTS",
+        "BLUEBUBBLES_ENABLED"
+      ],
+      "version": "2.0.0-alpha.4",
+      "pluginParameters": {
+        "BLUEBUBBLES_SERVER_URL": {
+          "type": "string",
+          "description": "Server URL",
+          "required": false,
+          "sensitive": false
+        },
+        "BLUEBUBBLES_PASSWORD": {
+          "type": "string",
+          "description": "Password for Bluebubbles",
+          "required": true,
+          "sensitive": true
+        },
+        "BLUEBUBBLES_WEBHOOK_PATH": {
+          "type": "string",
+          "description": "Webhook path",
+          "required": false,
+          "sensitive": false
+        },
+        "BLUEBUBBLES_DM_POLICY": {
+          "type": "string",
+          "description": "DM policy (e.g. allow, deny, allowlist)",
+          "required": false,
+          "sensitive": false
+        },
+        "BLUEBUBBLES_GROUP_POLICY": {
+          "type": "string",
+          "description": "Group message policy (e.g. allow, deny)",
+          "required": false,
+          "sensitive": false
+        },
+        "BLUEBUBBLES_ALLOW_FROM": {
+          "type": "string",
+          "description": "Comma-separated allowed user list",
+          "required": false,
+          "sensitive": false
+        },
+        "BLUEBUBBLES_GROUP_ALLOW_FROM": {
+          "type": "string",
+          "description": "Comma-separated allowed user list",
+          "required": false,
+          "sensitive": false
+        },
+        "BLUEBUBBLES_SEND_READ_RECEIPTS": {
+          "type": "boolean",
+          "description": "Send read receipts",
+          "required": false,
+          "sensitive": false
+        },
+        "BLUEBUBBLES_ENABLED": {
+          "type": "boolean",
+          "description": "Enable or disable this feature",
+          "required": false,
+          "sensitive": false
+        }
+      }
     },
     {
       "id": "bluesky",
@@ -499,9 +890,40 @@
       "description": "Coder tools plugin for ElizaOS (filesystem + shell + git)",
       "category": "feature",
       "envKey": null,
-      "configKeys": [],
+      "configKeys": [
+        "CODER_ENABLED",
+        "CODER_ALLOWED_DIRECTORY",
+        "CODER_TIMEOUT",
+        "CODER_FORBIDDEN_COMMANDS"
+      ],
       "version": "2.0.0-alpha.5",
-      "pluginDeps": ["shell"]
+      "pluginDeps": ["shell"],
+      "pluginParameters": {
+        "CODER_ENABLED": {
+          "type": "boolean",
+          "description": "Enable or disable this feature",
+          "required": false,
+          "sensitive": false
+        },
+        "CODER_ALLOWED_DIRECTORY": {
+          "type": "string",
+          "description": "Allowed directory for file operations",
+          "required": false,
+          "sensitive": false
+        },
+        "CODER_TIMEOUT": {
+          "type": "number",
+          "description": "Coder timeout",
+          "required": false,
+          "sensitive": false
+        },
+        "CODER_FORBIDDEN_COMMANDS": {
+          "type": "string",
+          "description": "Comma-separated list of forbidden commands",
+          "required": false,
+          "sensitive": false
+        }
+      }
     },
     {
       "id": "commands",
@@ -597,8 +1019,67 @@
       "description": "ElizaOS Copilot Proxy Model Provider - TypeScript implementation",
       "category": "feature",
       "envKey": null,
-      "configKeys": [],
-      "version": "2.0.0-alpha.4"
+      "configKeys": [
+        "COPILOT_PROXY_BASE_URL",
+        "COPILOT_PROXY_MODEL",
+        "COPILOT_PROXY_ENABLED",
+        "COPILOT_PROXY_SMALL_MODEL",
+        "COPILOT_PROXY_LARGE_MODEL",
+        "COPILOT_PROXY_TIMEOUT_SECONDS",
+        "COPILOT_PROXY_MAX_TOKENS",
+        "COPILOT_PROXY_CONTEXT_WINDOW"
+      ],
+      "version": "2.0.0-alpha.4",
+      "pluginParameters": {
+        "COPILOT_PROXY_BASE_URL": {
+          "type": "string",
+          "description": "Base URL for API requests",
+          "required": false,
+          "sensitive": false
+        },
+        "COPILOT_PROXY_MODEL": {
+          "type": "string",
+          "description": "Model identifier",
+          "required": false,
+          "sensitive": false
+        },
+        "COPILOT_PROXY_ENABLED": {
+          "type": "boolean",
+          "description": "Enable or disable this feature",
+          "required": false,
+          "sensitive": false
+        },
+        "COPILOT_PROXY_SMALL_MODEL": {
+          "type": "string",
+          "description": "Model identifier",
+          "required": false,
+          "sensitive": false
+        },
+        "COPILOT_PROXY_LARGE_MODEL": {
+          "type": "string",
+          "description": "Model identifier",
+          "required": false,
+          "sensitive": false
+        },
+        "COPILOT_PROXY_TIMEOUT_SECONDS": {
+          "type": "number",
+          "description": "Timeout in seconds",
+          "required": false,
+          "sensitive": false
+        },
+        "COPILOT_PROXY_MAX_TOKENS": {
+          "type": "number",
+          "description": "Maximum tokens per request",
+          "required": false,
+          "sensitive": true
+        },
+        "COPILOT_PROXY_CONTEXT_WINDOW": {
+          "type": "number",
+          "description": "Context window size",
+          "required": false,
+          "sensitive": false
+        }
+      }
     },
     {
       "id": "cron",
@@ -1240,8 +1721,16 @@
       "description": "Experience learning plugin for ElizaOS - records and recalls transferable agent learnings",
       "category": "feature",
       "envKey": null,
-      "configKeys": [],
-      "version": "2.0.0-alpha.4"
+      "configKeys": ["AUTO_RECORD_THRESHOLD"],
+      "version": "2.0.0-alpha.4",
+      "pluginParameters": {
+        "AUTO_RECORD_THRESHOLD": {
+          "type": "number",
+          "description": "Threshold value",
+          "required": false,
+          "sensitive": false
+        }
+      }
     },
     {
       "id": "farcaster",
@@ -1440,7 +1929,7 @@
       "name": "Github",
       "npmName": "@elizaos/plugin-github",
       "description": "",
-      "category": "feature",
+      "category": "connector",
       "envKey": "GITHUB_API_TOKEN",
       "configKeys": [
         "GITHUB_API_TOKEN",
@@ -1511,7 +2000,7 @@
       "name": "Gmail Watch",
       "npmName": "@elizaos/plugin-gmail-watch",
       "description": "Gmail Pub/Sub watcher – spawns gog gmail watch serve and auto-renews",
-      "category": "feature",
+      "category": "connector",
       "envKey": null,
       "configKeys": [],
       "version": "2.0.0-alpha.4"
@@ -1524,8 +2013,53 @@
       "description": "Goals management plugin for ElizaOS - tracking and achieving objectives",
       "category": "feature",
       "envKey": null,
-      "configKeys": [],
-      "version": "2.0.0-alpha.6"
+      "configKeys": [
+        "GOAL_CHECK_INTERVAL",
+        "GOAL_BATCH_SIZE",
+        "GOAL_MAX_CONCURRENT",
+        "GOAL_REMINDER_COOLDOWN",
+        "GOAL_ENABLE_SMART_REMINDERS",
+        "GOAL_ENABLE_MONITORING"
+      ],
+      "version": "2.0.0-alpha.6",
+      "pluginParameters": {
+        "GOAL_CHECK_INTERVAL": {
+          "type": "number",
+          "description": "Check interval",
+          "required": false,
+          "sensitive": false
+        },
+        "GOAL_BATCH_SIZE": {
+          "type": "number",
+          "description": "Batch processing size",
+          "required": false,
+          "sensitive": false
+        },
+        "GOAL_MAX_CONCURRENT": {
+          "type": "number",
+          "description": "Maximum concurrent operations",
+          "required": false,
+          "sensitive": false
+        },
+        "GOAL_REMINDER_COOLDOWN": {
+          "type": "number",
+          "description": "Cooldown period",
+          "required": false,
+          "sensitive": false
+        },
+        "GOAL_ENABLE_SMART_REMINDERS": {
+          "type": "boolean",
+          "description": "Enable smart reminder features",
+          "required": false,
+          "sensitive": false
+        },
+        "GOAL_ENABLE_MONITORING": {
+          "type": "boolean",
+          "description": "Enable monitoring",
+          "required": false,
+          "sensitive": false
+        }
+      }
     },
     {
       "id": "google-chat",
@@ -1535,8 +2069,81 @@
       "description": "",
       "category": "connector",
       "envKey": null,
-      "configKeys": [],
-      "version": "2.0.0-alpha.4"
+      "configKeys": [
+        "GOOGLE_CHAT_SERVICE_ACCOUNT",
+        "GOOGLE_CHAT_SERVICE_ACCOUNT_FILE",
+        "GOOGLE_APPLICATION_CREDENTIALS",
+        "GOOGLE_CHAT_AUDIENCE_TYPE",
+        "GOOGLE_CHAT_AUDIENCE",
+        "GOOGLE_CHAT_WEBHOOK_PATH",
+        "GOOGLE_CHAT_SPACES",
+        "GOOGLE_CHAT_REQUIRE_MENTION",
+        "GOOGLE_CHAT_ENABLED",
+        "GOOGLE_CHAT_BOT_USER"
+      ],
+      "version": "2.0.0-alpha.4",
+      "pluginParameters": {
+        "GOOGLE_CHAT_SERVICE_ACCOUNT": {
+          "type": "string",
+          "description": "Service account credentials",
+          "required": false,
+          "sensitive": false
+        },
+        "GOOGLE_CHAT_SERVICE_ACCOUNT_FILE": {
+          "type": "string",
+          "description": "Service account credentials",
+          "required": false,
+          "sensitive": false
+        },
+        "GOOGLE_APPLICATION_CREDENTIALS": {
+          "type": "string",
+          "description": "Credentials file path or JSON",
+          "required": false,
+          "sensitive": true
+        },
+        "GOOGLE_CHAT_AUDIENCE_TYPE": {
+          "type": "string",
+          "description": "Audience/auth scope",
+          "required": false,
+          "sensitive": false
+        },
+        "GOOGLE_CHAT_AUDIENCE": {
+          "type": "string",
+          "description": "Audience/auth scope",
+          "required": false,
+          "sensitive": false
+        },
+        "GOOGLE_CHAT_WEBHOOK_PATH": {
+          "type": "string",
+          "description": "Webhook path",
+          "required": false,
+          "sensitive": false
+        },
+        "GOOGLE_CHAT_SPACES": {
+          "type": "string",
+          "description": "Comma-separated space/room list",
+          "required": false,
+          "sensitive": false
+        },
+        "GOOGLE_CHAT_REQUIRE_MENTION": {
+          "type": "boolean",
+          "description": "Only respond when mentioned",
+          "required": false,
+          "sensitive": false
+        },
+        "GOOGLE_CHAT_ENABLED": {
+          "type": "boolean",
+          "description": "Enable or disable this feature",
+          "required": false,
+          "sensitive": false
+        },
+        "GOOGLE_CHAT_BOT_USER": {
+          "type": "string",
+          "description": "Bot user identifier",
+          "required": false,
+          "sensitive": false
+        }
+      }
     },
     {
       "id": "google-genai",
@@ -1679,8 +2286,60 @@
       "description": "",
       "category": "connector",
       "envKey": null,
-      "configKeys": [],
-      "version": "2.0.0-alpha.4"
+      "configKeys": [
+        "IMESSAGE_CLI_PATH",
+        "IMESSAGE_DB_PATH",
+        "IMESSAGE_POLL_INTERVAL_MS",
+        "IMESSAGE_DM_POLICY",
+        "IMESSAGE_GROUP_POLICY",
+        "IMESSAGE_ALLOW_FROM",
+        "IMESSAGE_ENABLED"
+      ],
+      "version": "2.0.0-alpha.4",
+      "pluginParameters": {
+        "IMESSAGE_CLI_PATH": {
+          "type": "string",
+          "description": "Path to CLI binary",
+          "required": false,
+          "sensitive": false
+        },
+        "IMESSAGE_DB_PATH": {
+          "type": "string",
+          "description": "Path to database file",
+          "required": false,
+          "sensitive": false
+        },
+        "IMESSAGE_POLL_INTERVAL_MS": {
+          "type": "number",
+          "description": "Polling interval in milliseconds",
+          "required": false,
+          "sensitive": false
+        },
+        "IMESSAGE_DM_POLICY": {
+          "type": "string",
+          "description": "DM policy (e.g. allow, deny, allowlist)",
+          "required": false,
+          "sensitive": false
+        },
+        "IMESSAGE_GROUP_POLICY": {
+          "type": "string",
+          "description": "Group message policy",
+          "required": false,
+          "sensitive": false
+        },
+        "IMESSAGE_ALLOW_FROM": {
+          "type": "string",
+          "description": "Comma-separated allowed sender list",
+          "required": false,
+          "sensitive": false
+        },
+        "IMESSAGE_ENABLED": {
+          "type": "boolean",
+          "description": "Enable or disable this feature",
+          "required": false,
+          "sensitive": false
+        }
+      }
     },
     {
       "id": "inmemorydb",
@@ -1741,10 +2400,69 @@
       "name": "Iq",
       "npmName": "@elizaos/plugin-iq",
       "description": "IQ on-chain chat plugin for Eliza agents on Solana",
-      "category": "feature",
+      "category": "connector",
       "envKey": null,
-      "configKeys": [],
-      "version": "1.0.0"
+      "configKeys": [
+        "IQ_AGENT_NAME",
+        "IQ_DEFAULT_CHATROOM",
+        "IQ_CHATROOMS",
+        "IQ_GATEWAY_URL",
+        "SOLANA_PRIVATE_KEY",
+        "SOLANA_KEYPAIR_PATH",
+        "SOLANA_RPC_URL",
+        "PNL_API_URL"
+      ],
+      "version": "1.0.0",
+      "pluginParameters": {
+        "IQ_AGENT_NAME": {
+          "type": "string",
+          "description": "Agent display name",
+          "required": false,
+          "sensitive": false
+        },
+        "IQ_DEFAULT_CHATROOM": {
+          "type": "string",
+          "description": "Chat room identifier(s)",
+          "required": false,
+          "sensitive": false
+        },
+        "IQ_CHATROOMS": {
+          "type": "string",
+          "description": "Chat room identifier(s)",
+          "required": false,
+          "sensitive": false
+        },
+        "IQ_GATEWAY_URL": {
+          "type": "string",
+          "description": "Gateway URL",
+          "required": false,
+          "sensitive": false
+        },
+        "SOLANA_PRIVATE_KEY": {
+          "type": "string",
+          "description": "Private key for Solana",
+          "required": true,
+          "sensitive": true
+        },
+        "SOLANA_KEYPAIR_PATH": {
+          "type": "string",
+          "description": "Path to keypair file",
+          "required": false,
+          "sensitive": true
+        },
+        "SOLANA_RPC_URL": {
+          "type": "string",
+          "description": "RPC endpoint URL",
+          "required": false,
+          "sensitive": false
+        },
+        "PNL_API_URL": {
+          "type": "string",
+          "description": "URL for Pnl Api",
+          "required": false,
+          "sensitive": false
+        }
+      }
     },
     {
       "id": "knowledge",
@@ -1940,9 +2658,61 @@
       "npmName": "@elizaos/plugin-line",
       "description": "",
       "category": "connector",
-      "envKey": null,
-      "configKeys": [],
-      "version": "2.0.0-alpha.4"
+      "envKey": "LINE_CHANNEL_ACCESS_TOKEN",
+      "configKeys": [
+        "LINE_CHANNEL_ACCESS_TOKEN",
+        "LINE_CHANNEL_SECRET",
+        "LINE_WEBHOOK_PATH",
+        "LINE_DM_POLICY",
+        "LINE_GROUP_POLICY",
+        "LINE_ALLOW_FROM",
+        "LINE_ENABLED"
+      ],
+      "version": "2.0.0-alpha.4",
+      "pluginParameters": {
+        "LINE_CHANNEL_ACCESS_TOKEN": {
+          "type": "string",
+          "description": "Access token for Line Channel",
+          "required": true,
+          "sensitive": true
+        },
+        "LINE_CHANNEL_SECRET": {
+          "type": "string",
+          "description": "Secret for Line Channel",
+          "required": false,
+          "sensitive": true
+        },
+        "LINE_WEBHOOK_PATH": {
+          "type": "string",
+          "description": "Webhook path",
+          "required": false,
+          "sensitive": false
+        },
+        "LINE_DM_POLICY": {
+          "type": "string",
+          "description": "DM policy (e.g. allow, deny, allowlist)",
+          "required": false,
+          "sensitive": false
+        },
+        "LINE_GROUP_POLICY": {
+          "type": "string",
+          "description": "Group message policy (e.g. allow, deny)",
+          "required": false,
+          "sensitive": false
+        },
+        "LINE_ALLOW_FROM": {
+          "type": "string",
+          "description": "Comma-separated allowed user list",
+          "required": false,
+          "sensitive": false
+        },
+        "LINE_ENABLED": {
+          "type": "boolean",
+          "description": "Enable or disable this feature",
+          "required": false,
+          "sensitive": false
+        }
+      }
     },
     {
       "id": "linear",
@@ -2132,9 +2902,117 @@
       "description": "A unified plugin for managing liquidity positions on Solana DEXs (Raydium, Orca, Meteora) and EVM DEXs (Uniswap, PancakeSwap, Aerodrome).",
       "category": "feature",
       "envKey": null,
-      "configKeys": [],
+      "configKeys": [
+        "SOLANA_RPC_URL",
+        "SOLANA_COMMITMENT",
+        "SOLANA_PUBLIC_KEY",
+        "SOLANA_PRIVATE_KEY",
+        "EVM_PRIVATE_KEY",
+        "ETHEREUM_RPC_URL",
+        "EVM_PROVIDER_MAINNET",
+        "BASE_RPC_URL",
+        "EVM_PROVIDER_BASE",
+        "BSC_RPC_URL",
+        "EVM_PROVIDER_BSC",
+        "ARBITRUM_RPC_URL",
+        "EVM_PROVIDER_ARBITRUM",
+        "LP_SOLANA_DEXES",
+        "LP_EVM_DEXES"
+      ],
       "version": "2.0.0-alpha.4",
-      "pluginDeps": ["anthropic", "discord", "telegram", "evm"]
+      "pluginDeps": ["anthropic", "discord", "telegram", "evm"],
+      "pluginParameters": {
+        "SOLANA_RPC_URL": {
+          "type": "string",
+          "description": "RPC endpoint URL",
+          "required": false,
+          "sensitive": false
+        },
+        "SOLANA_COMMITMENT": {
+          "type": "string",
+          "description": "Transaction commitment level (e.g. confirmed, finalized)",
+          "required": false,
+          "sensitive": false
+        },
+        "SOLANA_PUBLIC_KEY": {
+          "type": "string",
+          "description": "Public key / wallet address",
+          "required": false,
+          "sensitive": false
+        },
+        "SOLANA_PRIVATE_KEY": {
+          "type": "string",
+          "description": "Private key for Solana",
+          "required": true,
+          "sensitive": true
+        },
+        "EVM_PRIVATE_KEY": {
+          "type": "string",
+          "description": "Private key for Evm",
+          "required": true,
+          "sensitive": true
+        },
+        "ETHEREUM_RPC_URL": {
+          "type": "string",
+          "description": "RPC endpoint URL",
+          "required": false,
+          "sensitive": false
+        },
+        "EVM_PROVIDER_MAINNET": {
+          "type": "string",
+          "description": "RPC provider URL for Evm",
+          "required": false,
+          "sensitive": false
+        },
+        "BASE_RPC_URL": {
+          "type": "string",
+          "description": "RPC endpoint URL",
+          "required": false,
+          "sensitive": false
+        },
+        "EVM_PROVIDER_BASE": {
+          "type": "string",
+          "description": "RPC provider URL for Evm",
+          "required": false,
+          "sensitive": false
+        },
+        "BSC_RPC_URL": {
+          "type": "string",
+          "description": "RPC endpoint URL",
+          "required": false,
+          "sensitive": false
+        },
+        "EVM_PROVIDER_BSC": {
+          "type": "string",
+          "description": "RPC provider URL for Evm",
+          "required": false,
+          "sensitive": false
+        },
+        "ARBITRUM_RPC_URL": {
+          "type": "string",
+          "description": "RPC endpoint URL",
+          "required": false,
+          "sensitive": false
+        },
+        "EVM_PROVIDER_ARBITRUM": {
+          "type": "string",
+          "description": "RPC provider URL for Evm",
+          "required": false,
+          "sensitive": false
+        },
+        "LP_SOLANA_DEXES": {
+          "type": "string",
+          "description": "Comma-separated DEX list to manage",
+          "required": false,
+          "sensitive": false
+        },
+        "LP_EVM_DEXES": {
+          "type": "string",
+          "description": "Comma-separated DEX list to manage",
+          "required": false,
+          "sensitive": false
+        }
+      }
     },
     {
       "id": "matrix",
@@ -2143,9 +3021,68 @@
       "npmName": "@elizaos/plugin-matrix",
       "description": "",
       "category": "connector",
-      "envKey": null,
-      "configKeys": [],
-      "version": "2.0.0-alpha.4"
+      "envKey": "MATRIX_ACCESS_TOKEN",
+      "configKeys": [
+        "MATRIX_HOMESERVER",
+        "MATRIX_USER_ID",
+        "MATRIX_ACCESS_TOKEN",
+        "MATRIX_DEVICE_ID",
+        "MATRIX_ROOMS",
+        "MATRIX_AUTO_JOIN",
+        "MATRIX_ENCRYPTION",
+        "MATRIX_REQUIRE_MENTION"
+      ],
+      "version": "2.0.0-alpha.4",
+      "pluginParameters": {
+        "MATRIX_HOMESERVER": {
+          "type": "string",
+          "description": "Homeserver URL",
+          "required": false,
+          "sensitive": false
+        },
+        "MATRIX_USER_ID": {
+          "type": "string",
+          "description": "User identifier",
+          "required": false,
+          "sensitive": false
+        },
+        "MATRIX_ACCESS_TOKEN": {
+          "type": "string",
+          "description": "Access token for Matrix",
+          "required": true,
+          "sensitive": true
+        },
+        "MATRIX_DEVICE_ID": {
+          "type": "string",
+          "description": "Device identifier",
+          "required": false,
+          "sensitive": false
+        },
+        "MATRIX_ROOMS": {
+          "type": "string",
+          "description": "Comma-separated room/channel list",
+          "required": false,
+          "sensitive": false
+        },
+        "MATRIX_AUTO_JOIN": {
+          "type": "boolean",
+          "description": "Automatically join/discover channels",
+          "required": false,
+          "sensitive": false
+        },
+        "MATRIX_ENCRYPTION": {
+          "type": "boolean",
+          "description": "Enable encryption",
+          "required": false,
+          "sensitive": false
+        },
+        "MATRIX_REQUIRE_MENTION": {
+          "type": "boolean",
+          "description": "Only respond when mentioned",
+          "required": false,
+          "sensitive": false
+        }
+      }
     },
     {
       "id": "mattermost",
@@ -2154,9 +3091,82 @@
       "npmName": "@elizaos/plugin-mattermost",
       "description": "Mattermost integration plugin for elizaOS agents - TypeScript implementation",
       "category": "connector",
-      "envKey": null,
-      "configKeys": [],
-      "version": "2.0.0-alpha.4"
+      "envKey": "MATTERMOST_BOT_TOKEN",
+      "configKeys": [
+        "MATTERMOST_SERVER_URL",
+        "MATTERMOST_BOT_TOKEN",
+        "MATTERMOST_TEAM_ID",
+        "MATTERMOST_ENABLED",
+        "MATTERMOST_DM_POLICY",
+        "MATTERMOST_GROUP_POLICY",
+        "MATTERMOST_ALLOWED_USERS",
+        "MATTERMOST_ALLOWED_CHANNELS",
+        "MATTERMOST_REQUIRE_MENTION",
+        "MATTERMOST_IGNORE_BOT_MESSAGES"
+      ],
+      "version": "2.0.0-alpha.4",
+      "pluginParameters": {
+        "MATTERMOST_SERVER_URL": {
+          "type": "string",
+          "description": "Server URL",
+          "required": false,
+          "sensitive": false
+        },
+        "MATTERMOST_BOT_TOKEN": {
+          "type": "string",
+          "description": "Bot token for Mattermost",
+          "required": true,
+          "sensitive": true
+        },
+        "MATTERMOST_TEAM_ID": {
+          "type": "string",
+          "description": "Team/tenant ID",
+          "required": false,
+          "sensitive": false
+        },
+        "MATTERMOST_ENABLED": {
+          "type": "boolean",
+          "description": "Enable or disable this feature",
+          "required": false,
+          "sensitive": false
+        },
+        "MATTERMOST_DM_POLICY": {
+          "type": "string",
+          "description": "DM policy (e.g. allow, deny, allowlist)",
+          "required": false,
+          "sensitive": false
+        },
+        "MATTERMOST_GROUP_POLICY": {
+          "type": "string",
+          "description": "Group message policy (e.g. allow, deny)",
+          "required": false,
+          "sensitive": false
+        },
+        "MATTERMOST_ALLOWED_USERS": {
+          "type": "string",
+          "description": "Comma-separated allowed user list",
+          "required": false,
+          "sensitive": false
+        },
+        "MATTERMOST_ALLOWED_CHANNELS": {
+          "type": "string",
+          "description": "Comma-separated room/channel list",
+          "required": false,
+          "sensitive": false
+        },
+        "MATTERMOST_REQUIRE_MENTION": {
+          "type": "boolean",
+          "description": "Only respond when mentioned",
+          "required": false,
+          "sensitive": false
+        },
+        "MATTERMOST_IGNORE_BOT_MESSAGES": {
+          "type": "boolean",
+          "description": "Ignore messages from other bots",
+          "required": false,
+          "sensitive": false
+        }
+      }
     },
     {
       "id": "mcp",
@@ -2164,7 +3174,7 @@
       "name": "Mcp",
       "npmName": "@elizaos/plugin-mcp",
       "description": "elizaOS plugin to integrate with MCP (Model Context Protocol) servers",
-      "category": "feature",
+      "category": "connector",
       "envKey": null,
       "configKeys": ["PATH", "mcp"],
       "version": "2.0.0-alpha.4",
@@ -2200,10 +3210,55 @@
       "name": "Minecraft",
       "npmName": "@elizaos/plugin-minecraft",
       "description": "Minecraft automation plugin for ElizaOS (Mineflayer bridge)",
-      "category": "feature",
+      "category": "app",
       "envKey": null,
-      "configKeys": [],
-      "version": "2.0.0-alpha.4"
+      "configKeys": [
+        "MC_HOST",
+        "MC_PORT",
+        "MC_SERVER_PORT",
+        "MC_USERNAME",
+        "MC_AUTH",
+        "MC_VERSION"
+      ],
+      "version": "2.0.0-alpha.4",
+      "pluginParameters": {
+        "MC_HOST": {
+          "type": "string",
+          "description": "Server host address",
+          "required": false,
+          "sensitive": false
+        },
+        "MC_PORT": {
+          "type": "number",
+          "description": "Minecraft server port",
+          "required": false,
+          "sensitive": false
+        },
+        "MC_SERVER_PORT": {
+          "type": "number",
+          "description": "Local server port",
+          "required": false,
+          "sensitive": false
+        },
+        "MC_USERNAME": {
+          "type": "string",
+          "description": "Minecraft username",
+          "required": false,
+          "sensitive": false
+        },
+        "MC_AUTH": {
+          "type": "string",
+          "description": "Minecraft auth mode (offline/microsoft)",
+          "required": false,
+          "sensitive": false
+        },
+        "MC_VERSION": {
+          "type": "string",
+          "description": "Minecraft version",
+          "required": false,
+          "sensitive": false
+        }
+      }
     },
     {
       "id": "moltbook",
@@ -2212,9 +3267,61 @@
       "npmName": "@elizaos/plugin-moltbook",
       "description": "Moltbook social plugin for Eliza agents - Reddit-style platform for AI agents",
       "category": "feature",
-      "envKey": null,
-      "configKeys": [],
-      "version": "2.0.0-alpha.4"
+      "envKey": "MOLTBOOK_TOKEN",
+      "configKeys": [
+        "MOLTBOOK_TOKEN",
+        "MOLTBOOK_AGENT_NAME",
+        "MOLTBOOK_MODEL",
+        "MOLTBOOK_PERSONALITY",
+        "MOLTBOOK_AUTONOMY_INTERVAL_MS",
+        "MOLTBOOK_AUTONOMY_MAX_STEPS",
+        "MOLTBOOK_AUTONOMOUS_MODE"
+      ],
+      "version": "2.0.0-alpha.4",
+      "pluginParameters": {
+        "MOLTBOOK_TOKEN": {
+          "type": "string",
+          "description": "Authentication token for Moltbook",
+          "required": false,
+          "sensitive": true
+        },
+        "MOLTBOOK_AGENT_NAME": {
+          "type": "string",
+          "description": "Agent display name",
+          "required": false,
+          "sensitive": false
+        },
+        "MOLTBOOK_MODEL": {
+          "type": "string",
+          "description": "Model identifier",
+          "required": false,
+          "sensitive": false
+        },
+        "MOLTBOOK_PERSONALITY": {
+          "type": "string",
+          "description": "Agent personality description",
+          "required": false,
+          "sensitive": false
+        },
+        "MOLTBOOK_AUTONOMY_INTERVAL_MS": {
+          "type": "number",
+          "description": "Interval in milliseconds",
+          "required": false,
+          "sensitive": false
+        },
+        "MOLTBOOK_AUTONOMY_MAX_STEPS": {
+          "type": "number",
+          "description": "Maximum number of steps",
+          "required": false,
+          "sensitive": false
+        },
+        "MOLTBOOK_AUTONOMOUS_MODE": {
+          "type": "string",
+          "description": "Enable autonomous operation mode",
+          "required": false,
+          "sensitive": false
+        }
+      }
     },
     {
       "id": "msteams",
@@ -2224,8 +3331,74 @@
       "description": "Microsoft Teams integration for ElizaOS",
       "category": "connector",
       "envKey": null,
-      "configKeys": [],
-      "version": "2.0.0-alpha.4"
+      "configKeys": [
+        "MSTEAMS_APP_ID",
+        "MSTEAMS_APP_PASSWORD",
+        "MSTEAMS_TENANT_ID",
+        "MSTEAMS_ENABLED",
+        "MSTEAMS_WEBHOOK_PORT",
+        "MSTEAMS_WEBHOOK_PATH",
+        "MSTEAMS_ALLOWED_TENANTS",
+        "MSTEAMS_SHAREPOINT_SITE_ID",
+        "MSTEAMS_MEDIA_MAX_MB"
+      ],
+      "version": "2.0.0-alpha.4",
+      "pluginParameters": {
+        "MSTEAMS_APP_ID": {
+          "type": "string",
+          "description": "Application/client ID",
+          "required": false,
+          "sensitive": false
+        },
+        "MSTEAMS_APP_PASSWORD": {
+          "type": "string",
+          "description": "Password for Msteams App",
+          "required": true,
+          "sensitive": true
+        },
+        "MSTEAMS_TENANT_ID": {
+          "type": "string",
+          "description": "Team/tenant ID",
+          "required": false,
+          "sensitive": false
+        },
+        "MSTEAMS_ENABLED": {
+          "type": "boolean",
+          "description": "Enable or disable this feature",
+          "required": false,
+          "sensitive": false
+        },
+        "MSTEAMS_WEBHOOK_PORT": {
+          "type": "number",
+          "description": "Port number",
+          "required": false,
+          "sensitive": false
+        },
+        "MSTEAMS_WEBHOOK_PATH": {
+          "type": "string",
+          "description": "Webhook path",
+          "required": false,
+          "sensitive": false
+        },
+        "MSTEAMS_ALLOWED_TENANTS": {
+          "type": "string",
+          "description": "Comma-separated allowed channel/room list",
+          "required": false,
+          "sensitive": false
+        },
+        "MSTEAMS_SHAREPOINT_SITE_ID": {
+          "type": "string",
+          "description": "Site identifier",
+          "required": false,
+          "sensitive": false
+        },
+        "MSTEAMS_MEDIA_MAX_MB": {
+          "type": "number",
+          "description": "Maximum size in MB",
+          "required": false,
+          "sensitive": false
+        }
+      }
     },
     {
       "id": "mysticism",
@@ -2235,9 +3408,33 @@
       "description": "Mystical divination engines for ElizaOS — Tarot, I Ching, and Astrology readings",
       "category": "feature",
       "envKey": null,
-      "configKeys": [],
+      "configKeys": [
+        "MYSTICISM_PRICE_TAROT",
+        "MYSTICISM_PRICE_ICHING",
+        "MYSTICISM_PRICE_ASTROLOGY"
+      ],
       "version": "2.0.0-alpha.1",
-      "pluginDeps": ["form"]
+      "pluginDeps": ["form"],
+      "pluginParameters": {
+        "MYSTICISM_PRICE_TAROT": {
+          "type": "number",
+          "description": "Price in SOL for this reading type",
+          "required": false,
+          "sensitive": false
+        },
+        "MYSTICISM_PRICE_ICHING": {
+          "type": "number",
+          "description": "Price in SOL for this reading type",
+          "required": false,
+          "sensitive": false
+        },
+        "MYSTICISM_PRICE_ASTROLOGY": {
+          "type": "number",
+          "description": "Price in SOL for this reading type",
+          "required": false,
+          "sensitive": false
+        }
+      }
     },
     {
       "id": "n8n",
@@ -2295,8 +3492,67 @@
       "description": "Nextcloud Talk plugin for elizaOS - TypeScript implementation",
       "category": "connector",
       "envKey": null,
-      "configKeys": [],
-      "version": "2.0.0-alpha.4"
+      "configKeys": [
+        "NEXTCLOUD_URL",
+        "NEXTCLOUD_BOT_SECRET",
+        "NEXTCLOUD_ENABLED",
+        "NEXTCLOUD_WEBHOOK_PORT",
+        "NEXTCLOUD_WEBHOOK_HOST",
+        "NEXTCLOUD_WEBHOOK_PATH",
+        "NEXTCLOUD_WEBHOOK_PUBLIC_URL",
+        "NEXTCLOUD_ALLOWED_ROOMS"
+      ],
+      "version": "2.0.0-alpha.4",
+      "pluginParameters": {
+        "NEXTCLOUD_URL": {
+          "type": "string",
+          "description": "URL for Nextcloud",
+          "required": false,
+          "sensitive": false
+        },
+        "NEXTCLOUD_BOT_SECRET": {
+          "type": "string",
+          "description": "Secret for Nextcloud Bot",
+          "required": false,
+          "sensitive": true
+        },
+        "NEXTCLOUD_ENABLED": {
+          "type": "boolean",
+          "description": "Enable or disable this feature",
+          "required": false,
+          "sensitive": false
+        },
+        "NEXTCLOUD_WEBHOOK_PORT": {
+          "type": "number",
+          "description": "Port number",
+          "required": false,
+          "sensitive": false
+        },
+        "NEXTCLOUD_WEBHOOK_HOST": {
+          "type": "string",
+          "description": "Host address",
+          "required": false,
+          "sensitive": false
+        },
+        "NEXTCLOUD_WEBHOOK_PATH": {
+          "type": "string",
+          "description": "Webhook path",
+          "required": false,
+          "sensitive": false
+        },
+        "NEXTCLOUD_WEBHOOK_PUBLIC_URL": {
+          "type": "string",
+          "description": "Public-facing webhook URL",
+          "required": false,
+          "sensitive": false
+        },
+        "NEXTCLOUD_ALLOWED_ROOMS": {
+          "type": "string",
+          "description": "Comma-separated room/channel list",
+          "required": false,
+          "sensitive": false
+        }
+      }
     },
     {
       "id": "nostr",
@@ -2306,8 +3562,46 @@
       "description": "",
       "category": "connector",
       "envKey": null,
-      "configKeys": [],
-      "version": "2.0.0-alpha.4"
+      "configKeys": [
+        "NOSTR_PRIVATE_KEY",
+        "NOSTR_RELAYS",
+        "NOSTR_DM_POLICY",
+        "NOSTR_ALLOW_FROM",
+        "NOSTR_ENABLED"
+      ],
+      "version": "2.0.0-alpha.4",
+      "pluginParameters": {
+        "NOSTR_PRIVATE_KEY": {
+          "type": "string",
+          "description": "Private key for Nostr",
+          "required": true,
+          "sensitive": true
+        },
+        "NOSTR_RELAYS": {
+          "type": "string",
+          "description": "Comma-separated list of relay URLs",
+          "required": false,
+          "sensitive": false
+        },
+        "NOSTR_DM_POLICY": {
+          "type": "string",
+          "description": "DM policy (e.g. allow, deny, allowlist)",
+          "required": false,
+          "sensitive": false
+        },
+        "NOSTR_ALLOW_FROM": {
+          "type": "string",
+          "description": "Comma-separated allowed user list",
+          "required": false,
+          "sensitive": false
+        },
+        "NOSTR_ENABLED": {
+          "type": "boolean",
+          "description": "Enable or disable this feature",
+          "required": false,
+          "sensitive": false
+        }
+      }
     },
     {
       "id": "ollama",
@@ -2406,7 +3700,7 @@
         "OPENAI_BROWSER_BASE_URL",
         "OPENAI_BROWSER_EMBEDDING_URL"
       ],
-      "version": "2.0.0-alpha.4",
+      "version": "2.0.0-alpha.5",
       "pluginParameters": {
         "OPENAI_API_KEY": {
           "type": "string",
@@ -2555,7 +3849,7 @@
         "OPENROUTER_AUTO_CLEANUP_IMAGES",
         "OPENROUTER_TOOL_EXECUTION_MAX_STEPS"
       ],
-      "version": "2.0.0-alpha.4",
+      "version": "2.0.0-alpha.5",
       "pluginParameters": {
         "OPENROUTER_API_KEY": {
           "type": "string",
@@ -2694,8 +3988,16 @@
       "description": "ElizaOS plugin for agent self-modification and character evolution",
       "category": "feature",
       "envKey": null,
-      "configKeys": [],
-      "version": "2.0.0-alpha.4"
+      "configKeys": ["ADMIN_USERS"],
+      "version": "2.0.0-alpha.4",
+      "pluginParameters": {
+        "ADMIN_USERS": {
+          "type": "string",
+          "description": "Comma-separated admin user list",
+          "required": false,
+          "sensitive": false
+        }
+      }
     },
     {
       "id": "plugin-manager",
@@ -2813,7 +4115,7 @@
       "name": "Roblox",
       "npmName": "@elizaos/plugin-roblox",
       "description": "",
-      "category": "feature",
+      "category": "app",
       "envKey": "ROBLOX_API_KEY",
       "configKeys": [
         "ROBLOX_API_KEY",
@@ -3018,8 +4320,16 @@
       "description": "Scheduling and calendar coordination plugin for ElizaOS agents",
       "category": "feature",
       "envKey": null,
-      "configKeys": [],
-      "version": "2.0.0-alpha.6"
+      "configKeys": ["DEFAULT_TIMEZONE"],
+      "version": "2.0.0-alpha.6",
+      "pluginParameters": {
+        "DEFAULT_TIMEZONE": {
+          "type": "string",
+          "description": "Default timezone (e.g. America/New_York)",
+          "required": false,
+          "sensitive": false
+        }
+      }
     },
     {
       "id": "scratchpad",
@@ -3272,9 +4582,54 @@
       "npmName": "@elizaos/plugin-social-alpha",
       "description": "Social Alpha Plugin — Tracks token recommendations (shills/FUD), builds trust scores based on P&L outcomes, and exposes a Social Alpha Provider with win rate, rank, and recommender analytics.",
       "category": "feature",
-      "envKey": null,
-      "configKeys": [],
-      "version": "2.0.0-alpha.4"
+      "envKey": "BIRDEYE_API_KEY",
+      "configKeys": [
+        "BIRDEYE_API_KEY",
+        "DEXSCREENER_API_KEY",
+        "JUPITER_API_KEY",
+        "HELIUS_API_KEY",
+        "COINGECKO_API_KEY",
+        "MORALIS_API_KEY"
+      ],
+      "version": "2.0.0-alpha.4",
+      "pluginParameters": {
+        "BIRDEYE_API_KEY": {
+          "type": "string",
+          "description": "API key for Birdeye",
+          "required": true,
+          "sensitive": true
+        },
+        "DEXSCREENER_API_KEY": {
+          "type": "string",
+          "description": "API key for Dexscreener",
+          "required": true,
+          "sensitive": true
+        },
+        "JUPITER_API_KEY": {
+          "type": "string",
+          "description": "API key for Jupiter",
+          "required": true,
+          "sensitive": true
+        },
+        "HELIUS_API_KEY": {
+          "type": "string",
+          "description": "API key for Helius",
+          "required": true,
+          "sensitive": true
+        },
+        "COINGECKO_API_KEY": {
+          "type": "string",
+          "description": "API key for Coingecko",
+          "required": true,
+          "sensitive": true
+        },
+        "MORALIS_API_KEY": {
+          "type": "string",
+          "description": "API key for Moralis",
+          "required": true,
+          "sensitive": true
+        }
+      }
     },
     {
       "id": "solana",
@@ -3462,8 +4817,60 @@
       "description": "",
       "category": "connector",
       "envKey": null,
-      "configKeys": [],
-      "version": "2.0.0-alpha.4"
+      "configKeys": [
+        "TLON_SHIP",
+        "TLON_URL",
+        "TLON_CODE",
+        "TLON_ENABLED",
+        "TLON_GROUP_CHANNELS",
+        "TLON_DM_ALLOWLIST",
+        "TLON_AUTO_DISCOVER_CHANNELS"
+      ],
+      "version": "2.0.0-alpha.4",
+      "pluginParameters": {
+        "TLON_SHIP": {
+          "type": "string",
+          "description": "Ship/node identifier",
+          "required": false,
+          "sensitive": false
+        },
+        "TLON_URL": {
+          "type": "string",
+          "description": "URL for Tlon",
+          "required": false,
+          "sensitive": false
+        },
+        "TLON_CODE": {
+          "type": "string",
+          "description": "Authentication/access code",
+          "required": false,
+          "sensitive": false
+        },
+        "TLON_ENABLED": {
+          "type": "boolean",
+          "description": "Enable or disable this feature",
+          "required": false,
+          "sensitive": false
+        },
+        "TLON_GROUP_CHANNELS": {
+          "type": "string",
+          "description": "Comma-separated room/channel list",
+          "required": false,
+          "sensitive": false
+        },
+        "TLON_DM_ALLOWLIST": {
+          "type": "string",
+          "description": "Comma-separated allowed user list",
+          "required": false,
+          "sensitive": false
+        },
+        "TLON_AUTO_DISCOVER_CHANNELS": {
+          "type": "boolean",
+          "description": "Comma-separated room/channel list",
+          "required": false,
+          "sensitive": false
+        }
+      }
     },
     {
       "id": "todo",
@@ -3511,9 +4918,23 @@
       "description": "Trust and permission management plugin for ElizaOS",
       "category": "feature",
       "envKey": null,
-      "configKeys": [],
+      "configKeys": ["OWNER_ENTITY_ID", "WORLD_ID"],
       "version": "2.0.0-alpha.4",
-      "pluginDeps": ["anthropic"]
+      "pluginDeps": ["anthropic"],
+      "pluginParameters": {
+        "OWNER_ENTITY_ID": {
+          "type": "string",
+          "description": "Entity identifier",
+          "required": false,
+          "sensitive": false
+        },
+        "WORLD_ID": {
+          "type": "string",
+          "description": "World identifier",
+          "required": false,
+          "sensitive": false
+        }
+      }
     },
     {
       "id": "tts",
@@ -3574,10 +4995,132 @@
       "name": "Twilio",
       "npmName": "@elizaos/plugin-twilio",
       "description": "Twilio plugin for bidirectional voice and text messaging integration",
-      "category": "feature",
-      "envKey": null,
-      "configKeys": [],
-      "version": "2.0.0-alpha.4"
+      "category": "connector",
+      "envKey": "TWILIO_AUTH_TOKEN",
+      "configKeys": [
+        "TWILIO_ACCOUNT_SID",
+        "TWILIO_AUTH_TOKEN",
+        "TWILIO_PHONE_NUMBER",
+        "TWILIO_WEBHOOK_URL",
+        "TWILIO_WEBHOOK_PORT",
+        "VOICE_CALL_PROVIDER",
+        "VOICE_CALL_FROM_NUMBER",
+        "VOICE_CALL_TO_NUMBER",
+        "VOICE_CALL_WEBHOOK_PORT",
+        "VOICE_CALL_WEBHOOK_PATH",
+        "VOICE_CALL_PUBLIC_URL",
+        "VOICE_CALL_MAX_DURATION_SECONDS",
+        "VOICE_CALL_MAX_CONCURRENT_CALLS",
+        "VOICE_CALL_INBOUND_POLICY",
+        "VOICE_CALL_ALLOW_FROM",
+        "VOICE_CALL_INBOUND_GREETING",
+        "VOICE_CALL_ENABLED"
+      ],
+      "version": "2.0.0-alpha.4",
+      "pluginParameters": {
+        "TWILIO_ACCOUNT_SID": {
+          "type": "string",
+          "description": "Account SID for Twilio",
+          "required": true,
+          "sensitive": true
+        },
+        "TWILIO_AUTH_TOKEN": {
+          "type": "string",
+          "description": "Auth token for Twilio",
+          "required": true,
+          "sensitive": true
+        },
+        "TWILIO_PHONE_NUMBER": {
+          "type": "string",
+          "description": "Phone number",
+          "required": false,
+          "sensitive": false
+        },
+        "TWILIO_WEBHOOK_URL": {
+          "type": "string",
+          "description": "Webhook URL",
+          "required": false,
+          "sensitive": false
+        },
+        "TWILIO_WEBHOOK_PORT": {
+          "type": "number",
+          "description": "Port number",
+          "required": false,
+          "sensitive": false
+        },
+        "VOICE_CALL_PROVIDER": {
+          "type": "string",
+          "description": "Provider selection",
+          "required": false,
+          "sensitive": false
+        },
+        "VOICE_CALL_FROM_NUMBER": {
+          "type": "string",
+          "description": "Phone number",
+          "required": false,
+          "sensitive": false
+        },
+        "VOICE_CALL_TO_NUMBER": {
+          "type": "string",
+          "description": "Phone number",
+          "required": false,
+          "sensitive": false
+        },
+        "VOICE_CALL_WEBHOOK_PORT": {
+          "type": "number",
+          "description": "Port number",
+          "required": false,
+          "sensitive": false
+        },
+        "VOICE_CALL_WEBHOOK_PATH": {
+          "type": "string",
+          "description": "Webhook path",
+          "required": false,
+          "sensitive": false
+        },
+        "VOICE_CALL_PUBLIC_URL": {
+          "type": "string",
+          "description": "Public URL",
+          "required": false,
+          "sensitive": false
+        },
+        "VOICE_CALL_MAX_DURATION_SECONDS": {
+          "type": "number",
+          "description": "Maximum duration in seconds",
+          "required": false,
+          "sensitive": false
+        },
+        "VOICE_CALL_MAX_CONCURRENT_CALLS": {
+          "type": "number",
+          "description": "Maximum concurrent calls",
+          "required": false,
+          "sensitive": false
+        },
+        "VOICE_CALL_INBOUND_POLICY": {
+          "type": "string",
+          "description": "Inbound message/call policy",
+          "required": false,
+          "sensitive": false
+        },
+        "VOICE_CALL_ALLOW_FROM": {
+          "type": "string",
+          "description": "Comma-separated allowed user list",
+          "required": false,
+          "sensitive": false
+        },
+        "VOICE_CALL_INBOUND_GREETING": {
+          "type": "string",
+          "description": "Greeting message for inbound connections",
+          "required": false,
+          "sensitive": false
+        },
+        "VOICE_CALL_ENABLED": {
+          "type": "boolean",
+          "description": "Enable or disable this feature",
+          "required": false,
+          "sensitive": false
+        }
+      }
     },
     {
       "id": "twitch",
@@ -3586,9 +5129,75 @@
       "npmName": "@elizaos/plugin-twitch",
       "description": "",
       "category": "connector",
-      "envKey": null,
-      "configKeys": [],
-      "version": "2.0.0-alpha.4"
+      "envKey": "TWITCH_ACCESS_TOKEN",
+      "configKeys": [
+        "TWITCH_USERNAME",
+        "TWITCH_CLIENT_ID",
+        "TWITCH_ACCESS_TOKEN",
+        "TWITCH_CLIENT_SECRET",
+        "TWITCH_REFRESH_TOKEN",
+        "TWITCH_CHANNEL",
+        "TWITCH_CHANNELS",
+        "TWITCH_REQUIRE_MENTION",
+        "TWITCH_ALLOWED_ROLES"
+      ],
+      "version": "2.0.0-alpha.4",
+      "pluginParameters": {
+        "TWITCH_USERNAME": {
+          "type": "string",
+          "description": "Username for authentication",
+          "required": false,
+          "sensitive": false
+        },
+        "TWITCH_CLIENT_ID": {
+          "type": "string",
+          "description": "Application/client ID",
+          "required": false,
+          "sensitive": false
+        },
+        "TWITCH_ACCESS_TOKEN": {
+          "type": "string",
+          "description": "Access token for Twitch",
+          "required": true,
+          "sensitive": true
+        },
+        "TWITCH_CLIENT_SECRET": {
+          "type": "string",
+          "description": "Client secret for Twitch",
+          "required": false,
+          "sensitive": true
+        },
+        "TWITCH_REFRESH_TOKEN": {
+          "type": "string",
+          "description": "Refresh token for Twitch",
+          "required": false,
+          "sensitive": true
+        },
+        "TWITCH_CHANNEL": {
+          "type": "string",
+          "description": "Channel name",
+          "required": false,
+          "sensitive": false
+        },
+        "TWITCH_CHANNELS": {
+          "type": "string",
+          "description": "Comma-separated room/channel list",
+          "required": false,
+          "sensitive": false
+        },
+        "TWITCH_REQUIRE_MENTION": {
+          "type": "boolean",
+          "description": "Only respond when mentioned",
+          "required": false,
+          "sensitive": false
+        },
+        "TWITCH_ALLOWED_ROLES": {
+          "type": "string",
+          "description": "Comma-separated allowed roles",
+          "required": false,
+          "sensitive": false
+        }
+      }
     },
     {
       "id": "vercel-ai-gateway",
@@ -3720,9 +5329,61 @@
       "npmName": "@elizaos/plugin-whatsapp",
       "description": "WhatsApp Cloud API plugin for ElizaOS",
       "category": "connector",
-      "envKey": null,
-      "configKeys": [],
-      "version": "2.0.0-alpha.4"
+      "envKey": "WHATSAPP_ACCESS_TOKEN",
+      "configKeys": [
+        "WHATSAPP_ACCESS_TOKEN",
+        "WHATSAPP_PHONE_NUMBER_ID",
+        "WHATSAPP_WEBHOOK_VERIFY_TOKEN",
+        "WHATSAPP_BUSINESS_ACCOUNT_ID",
+        "WHATSAPP_API_VERSION",
+        "WHATSAPP_DM_POLICY",
+        "WHATSAPP_GROUP_POLICY"
+      ],
+      "version": "2.0.0-alpha.4",
+      "pluginParameters": {
+        "WHATSAPP_ACCESS_TOKEN": {
+          "type": "string",
+          "description": "Access token for Whatsapp",
+          "required": true,
+          "sensitive": true
+        },
+        "WHATSAPP_PHONE_NUMBER_ID": {
+          "type": "string",
+          "description": "Phone number ID",
+          "required": false,
+          "sensitive": false
+        },
+        "WHATSAPP_WEBHOOK_VERIFY_TOKEN": {
+          "type": "string",
+          "description": "Webhook verification token",
+          "required": false,
+          "sensitive": true
+        },
+        "WHATSAPP_BUSINESS_ACCOUNT_ID": {
+          "type": "string",
+          "description": "Business account ID",
+          "required": false,
+          "sensitive": false
+        },
+        "WHATSAPP_API_VERSION": {
+          "type": "string",
+          "description": "API version string",
+          "required": false,
+          "sensitive": false
+        },
+        "WHATSAPP_DM_POLICY": {
+          "type": "string",
+          "description": "DM policy (e.g. allow, deny, allowlist)",
+          "required": false,
+          "sensitive": false
+        },
+        "WHATSAPP_GROUP_POLICY": {
+          "type": "string",
+          "description": "Group message policy",
+          "required": false,
+          "sensitive": false
+        }
+      }
     },
     {
       "id": "x402",
@@ -3732,8 +5393,74 @@
       "description": "x402 HTTP payment protocol plugin for ElizaOS - send and receive crypto payments",
       "category": "feature",
       "envKey": null,
-      "configKeys": [],
-      "version": "2.0.0-alpha.4"
+      "configKeys": [
+        "X402_AGENT_URL",
+        "X402_PRIVATE_KEY",
+        "X402_NETWORK",
+        "X402_PAY_TO",
+        "X402_FACILITATOR_URL",
+        "X402_MAX_PAYMENT_USD",
+        "X402_MAX_TOTAL_USD",
+        "X402_ENABLED",
+        "X402_DB_PATH"
+      ],
+      "version": "2.0.0-alpha.4",
+      "pluginParameters": {
+        "X402_AGENT_URL": {
+          "type": "string",
+          "description": "Agent endpoint URL",
+          "required": false,
+          "sensitive": false
+        },
+        "X402_PRIVATE_KEY": {
+          "type": "string",
+          "description": "Private key for X402",
+          "required": true,
+          "sensitive": true
+        },
+        "X402_NETWORK": {
+          "type": "string",
+          "description": "Network name (e.g. mainnet, testnet)",
+          "required": false,
+          "sensitive": false
+        },
+        "X402_PAY_TO": {
+          "type": "string",
+          "description": "Payment recipient address",
+          "required": false,
+          "sensitive": false
+        },
+        "X402_FACILITATOR_URL": {
+          "type": "string",
+          "description": "Facilitator service URL",
+          "required": false,
+          "sensitive": false
+        },
+        "X402_MAX_PAYMENT_USD": {
+          "type": "number",
+          "description": "Maximum single payment in USD",
+          "required": false,
+          "sensitive": false
+        },
+        "X402_MAX_TOTAL_USD": {
+          "type": "number",
+          "description": "Maximum total spend in USD",
+          "required": false,
+          "sensitive": false
+        },
+        "X402_ENABLED": {
+          "type": "boolean",
+          "description": "Enable or disable this feature",
+          "required": false,
+          "sensitive": false
+        },
+        "X402_DB_PATH": {
+          "type": "string",
+          "description": "Database file path",
+          "required": false,
+          "sensitive": false
+        }
+      }
     },
     {
       "id": "xai",
@@ -3886,111 +5613,88 @@
       }
     },
     {
-      "id": "zai",
-      "dirName": "plugin-zai",
-      "name": "z.ai",
-      "npmName": "@homunculuslabs/plugin-zai",
-      "description": "GLM models via z.ai Coding Plan.",
-      "category": "ai-provider",
-      "envKey": "ZAI_API_KEY",
-      "configKeys": [
-        "ZAI_API_KEY",
-        "ZAI_SMALL_MODEL",
-        "ZAI_LARGE_MODEL",
-        "ZAI_BASE_URL",
-        "ZAI_COT_BUDGET",
-        "ZAI_COT_BUDGET_SMALL",
-        "ZAI_COT_BUDGET_LARGE",
-        "ZAI_EXPERIMENTAL_TELEMETRY",
-        "ZAI_BROWSER_BASE_URL"
-      ],
-      "pluginParameters": {
-        "ZAI_API_KEY": {
-          "type": "string",
-          "description": "API key used to authenticate requests to z.ai.",
-          "required": true,
-          "sensitive": true
-        },
-        "ZAI_BASE_URL": {
-          "type": "string",
-          "description": "Base URL for z.ai API (should end with /v1).",
-          "required": false,
-          "default": "https://api.z.ai/api/anthropic/v1",
-          "sensitive": false
-        },
-        "ZAI_SMALL_MODEL": {
-          "type": "string",
-          "description": "z.ai small model for faster/smaller tasks.",
-          "required": false,
-          "default": "glm-4.7-flash",
-          "sensitive": false,
-          "options": [
-            "glm-4.5",
-            "glm-4.5-air",
-            "glm-4.6",
-            "glm-4.6v",
-            "glm-4.7",
-            "glm-4.7-flash"
-          ]
-        },
-        "ZAI_LARGE_MODEL": {
-          "type": "string",
-          "description": "z.ai large model for text generation.",
-          "required": false,
-          "default": "glm-4.7",
-          "sensitive": false,
-          "options": [
-            "glm-4.5",
-            "glm-4.5-air",
-            "glm-4.6",
-            "glm-4.6v",
-            "glm-4.7",
-            "glm-4.7-flash"
-          ]
-        },
-        "ZAI_COT_BUDGET": {
-          "type": "string",
-          "description": "Shared chain-of-thought budget (tokens) for reasoning mode.",
-          "required": false,
-          "sensitive": false
-        },
-        "ZAI_COT_BUDGET_SMALL": {
-          "type": "string",
-          "description": "Small-model chain-of-thought budget (tokens).",
-          "required": false,
-          "sensitive": false
-        },
-        "ZAI_COT_BUDGET_LARGE": {
-          "type": "string",
-          "description": "Large-model chain-of-thought budget (tokens).",
-          "required": false,
-          "sensitive": false
-        },
-        "ZAI_EXPERIMENTAL_TELEMETRY": {
-          "type": "boolean",
-          "description": "Enable experimental telemetry for debugging and analytics.",
-          "required": false,
-          "default": false,
-          "sensitive": false
-        },
-        "ZAI_BROWSER_BASE_URL": {
-          "type": "string",
-          "description": "Browser-only proxy endpoint base URL for z.ai requests.",
-          "required": false,
-          "sensitive": false
-        }
-      }
-    },
-    {
       "id": "zalo",
       "dirName": "plugin-zalo",
       "name": "Zalo",
       "npmName": "@elizaos/plugin-zalo",
       "description": "",
       "category": "connector",
-      "envKey": null,
-      "configKeys": [],
-      "version": "2.0.0-alpha.4"
+      "envKey": "ZALO_ACCESS_TOKEN",
+      "configKeys": [
+        "ZALO_APP_ID",
+        "ZALO_SECRET_KEY",
+        "ZALO_ACCESS_TOKEN",
+        "ZALO_REFRESH_TOKEN",
+        "ZALO_WEBHOOK_URL",
+        "ZALO_WEBHOOK_PATH",
+        "ZALO_WEBHOOK_PORT",
+        "ZALO_USE_POLLING",
+        "ZALO_ENABLED",
+        "ZALO_PROXY_URL"
+      ],
+      "version": "2.0.0-alpha.4",
+      "pluginParameters": {
+        "ZALO_APP_ID": {
+          "type": "string",
+          "description": "Application/client ID",
+          "required": false,
+          "sensitive": false
+        },
+        "ZALO_SECRET_KEY": {
+          "type": "string",
+          "description": "Secret for Zalo Secret Key",
+          "required": true,
+          "sensitive": true
+        },
+        "ZALO_ACCESS_TOKEN": {
+          "type": "string",
+          "description": "Access token for Zalo",
+          "required": true,
+          "sensitive": true
+        },
+        "ZALO_REFRESH_TOKEN": {
+          "type": "string",
+          "description": "Refresh token for Zalo",
+          "required": false,
+          "sensitive": true
+        },
+        "ZALO_WEBHOOK_URL": {
+          "type": "string",
+          "description": "Webhook URL",
+          "required": false,
+          "sensitive": false
+        },
+        "ZALO_WEBHOOK_PATH": {
+          "type": "string",
+          "description": "Webhook path",
+          "required": false,
+          "sensitive": false
+        },
+        "ZALO_WEBHOOK_PORT": {
+          "type": "number",
+          "description": "Port number",
+          "required": false,
+          "sensitive": false
+        },
+        "ZALO_USE_POLLING": {
+          "type": "boolean",
+          "description": "Use polling instead of webhooks",
+          "required": false,
+          "sensitive": false
+        },
+        "ZALO_ENABLED": {
+          "type": "boolean",
+          "description": "Enable or disable this feature",
+          "required": false,
+          "sensitive": false
+        },
+        "ZALO_PROXY_URL": {
+          "type": "string",
+          "description": "Proxy URL",
+          "required": false,
+          "sensitive": false
+        }
+      }
     },
     {
       "id": "zalouser",
@@ -4000,8 +5704,81 @@
       "description": "",
       "category": "connector",
       "envKey": null,
-      "configKeys": [],
-      "version": "2.0.0-alpha.4"
+      "configKeys": [
+        "ZALOUSER_COOKIE_PATH",
+        "ZALOUSER_IMEI",
+        "ZALOUSER_USER_AGENT",
+        "ZALOUSER_PROFILES",
+        "ZALOUSER_ENABLED",
+        "ZALOUSER_DEFAULT_PROFILE",
+        "ZALOUSER_LISTEN_TIMEOUT",
+        "ZALOUSER_ALLOWED_THREADS",
+        "ZALOUSER_DM_POLICY",
+        "ZALOUSER_GROUP_POLICY"
+      ],
+      "version": "2.0.0-alpha.4",
+      "pluginParameters": {
+        "ZALOUSER_COOKIE_PATH": {
+          "type": "string",
+          "description": "Directory/file path",
+          "required": false,
+          "sensitive": false
+        },
+        "ZALOUSER_IMEI": {
+          "type": "string",
+          "description": "Device IMEI identifier",
+          "required": false,
+          "sensitive": false
+        },
+        "ZALOUSER_USER_AGENT": {
+          "type": "string",
+          "description": "User agent string",
+          "required": false,
+          "sensitive": false
+        },
+        "ZALOUSER_PROFILES": {
+          "type": "string",
+          "description": "Profile configuration",
+          "required": false,
+          "sensitive": false
+        },
+        "ZALOUSER_ENABLED": {
+          "type": "boolean",
+          "description": "Enable or disable this feature",
+          "required": false,
+          "sensitive": false
+        },
+        "ZALOUSER_DEFAULT_PROFILE": {
+          "type": "string",
+          "description": "Profile configuration",
+          "required": false,
+          "sensitive": false
+        },
+        "ZALOUSER_LISTEN_TIMEOUT": {
+          "type": "number",
+          "description": "Timeout value",
+          "required": false,
+          "sensitive": false
+        },
+        "ZALOUSER_ALLOWED_THREADS": {
+          "type": "string",
+          "description": "Comma-separated allowed channel/room list",
+          "required": false,
+          "sensitive": false
+        },
+        "ZALOUSER_DM_POLICY": {
+          "type": "string",
+          "description": "DM policy (e.g. allow, deny, allowlist)",
+          "required": false,
+          "sensitive": false
+        },
+        "ZALOUSER_GROUP_POLICY": {
+          "type": "string",
+          "description": "Group message policy (e.g. allow, deny)",
+          "required": false,
+          "sensitive": false
+        }
+      }
     }
   ]
 }

@@ -120,9 +120,9 @@ const ApprovalsSchema = z
   .strict()
   .optional();
 
-// --- Channels (merged from zod-schema.providers.ts) ---
+// --- Connectors (messaging platform connectors) ---
 
-const ChannelsSchema = z
+const ConnectorsSchema = z
   .object({
     defaults: z
       .object({
@@ -141,7 +141,7 @@ const ChannelsSchema = z
     bluebubbles: BlueBubblesConfigSchema.optional(),
     msteams: MSTeamsConfigSchema.optional(),
   })
-  .passthrough() // Allow extension channel configs (nostr, matrix, zalo, etc.)
+  .passthrough() // Allow extension connector configs (nostr, matrix, zalo, etc.)
   .optional();
 
 const BrowserSnapshotDefaultsSchema = z
@@ -523,7 +523,9 @@ export const MilaidySchema = z
       })
       .strict()
       .optional(),
-    channels: ChannelsSchema,
+    connectors: ConnectorsSchema,
+    /** @deprecated Use `connectors`. Kept for backward compatibility. */
+    channels: ConnectorsSchema,
     discovery: z
       .object({
         wideArea: z

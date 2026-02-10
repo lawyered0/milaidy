@@ -14,8 +14,8 @@ import type { MilaidyConfig } from "./config/config.js";
 // Shared presets used by both CLI and API server
 import { SHARED_STYLE_RULES, STYLE_PRESETS } from "./onboarding-presets.js";
 import {
-  applyChannelSecretsToEnv,
   applyCloudConfigToEnv,
+  applyConnectorSecretsToEnv,
   buildCharacterFromConfig,
   collectPluginNames,
   resolvePrimaryModel,
@@ -148,25 +148,8 @@ describe("plugin loading parity across modes", () => {
       "@elizaos/plugin-local-embedding",
       "@elizaos/plugin-agent-skills",
       "@elizaos/plugin-agent-orchestrator",
-      "@elizaos/plugin-directives",
-      "@elizaos/plugin-commands",
       "@elizaos/plugin-shell",
-      "@elizaos/plugin-personality",
-      "@elizaos/plugin-experience",
       "@elizaos/plugin-plugin-manager",
-      "@elizaos/plugin-cli",
-      // "@elizaos/plugin-code", // disabled: Provider spec mismatch
-      "@elizaos/plugin-edge-tts",
-      "@elizaos/plugin-knowledge",
-      "@elizaos/plugin-mcp",
-      "@elizaos/plugin-pdf",
-      "@elizaos/plugin-scratchpad",
-      "@elizaos/plugin-secrets-manager",
-      "@elizaos/plugin-todo",
-      "@elizaos/plugin-trust",
-      // "@elizaos/plugin-form", // disabled: packaging issue
-      // "@elizaos/plugin-goals", // disabled: spec mismatch
-      // "@elizaos/plugin-scheduling", // disabled: packaging issue
     ];
     for (const plugin of essentials) {
       expect(names.has(plugin)).toBe(true);
@@ -198,7 +181,8 @@ describe("plugin loading parity across modes", () => {
     } as MilaidyConfig;
 
     const names = collectPluginNames(config);
-    expect(names.has("@elizaos/plugin-telegram")).toBe(true);
+    // Telegram maps to the local enhanced plugin, not the upstream one
+    expect(names.has("@milaidy/plugin-telegram-enhanced")).toBe(true);
     expect(names.has("@elizaos/plugin-discord")).toBe(true);
     expect(names.has("@elizaos/plugin-slack")).toBe(true);
     // Unconfigured channels should NOT be loaded
@@ -271,16 +255,16 @@ describe("config env propagation parity", () => {
   });
   afterEach(() => snap.restore());
 
-  it("channel secrets are applied from config to env identically", () => {
+  it("connector secrets are applied from config to env identically", () => {
     const config = {
-      channels: {
+      connectors: {
         discord: { token: "dc-tok-123" },
         telegram: { botToken: "tg-tok-456" },
         slack: { botToken: "xoxb-1", appToken: "xapp-1" },
       },
     } as MilaidyConfig;
 
-    applyChannelSecretsToEnv(config);
+    applyConnectorSecretsToEnv(config);
     expect(process.env.DISCORD_BOT_TOKEN).toBe("dc-tok-123");
     expect(process.env.TELEGRAM_BOT_TOKEN).toBe("tg-tok-456");
     expect(process.env.SLACK_BOT_TOKEN).toBe("xoxb-1");
@@ -302,17 +286,19 @@ describe("config env propagation parity", () => {
     expect(process.env.ELIZAOS_CLOUD_BASE_URL).toBe("https://cloud.example");
   });
 
-  it("existing env values are never overwritten", () => {
+  it("connector env values are never overwritten but cloud config always wins", () => {
     process.env.TELEGRAM_BOT_TOKEN = "already-set";
-    process.env.ELIZAOS_CLOUD_API_KEY = "existing";
+    process.env.ELIZAOS_CLOUD_API_KEY = "old-key";
 
-    applyChannelSecretsToEnv({
-      channels: { telegram: { botToken: "new" } },
+    applyConnectorSecretsToEnv({
+      connectors: { telegram: { botToken: "new" } },
     } as MilaidyConfig);
     applyCloudConfigToEnv({ cloud: { apiKey: "new-key" } } as MilaidyConfig);
 
+    // Connectors respect existing env (set via .env files)
     expect(process.env.TELEGRAM_BOT_TOKEN).toBe("already-set");
-    expect(process.env.ELIZAOS_CLOUD_API_KEY).toBe("existing");
+    // Cloud config always overwrites (config file is source of truth for cloud keys)
+    expect(process.env.ELIZAOS_CLOUD_API_KEY).toBe("new-key");
   });
 });
 

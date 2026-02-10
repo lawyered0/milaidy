@@ -3,6 +3,8 @@
  */
 
 import type http from "node:http";
+import type { AgentRuntime } from "@elizaos/core";
+import { logger } from "@elizaos/core";
 import type { CloudManager } from "../cloud/cloud-manager.js";
 import type { MilaidyConfig } from "../config/config.js";
 import { saveMilaidyConfig } from "../config/config.js";
@@ -10,6 +12,8 @@ import { saveMilaidyConfig } from "../config/config.js";
 export interface CloudRouteState {
   config: MilaidyConfig;
   cloudManager: CloudManager | null;
+  /** The running agent runtime — needed to persist cloud credentials to the DB. */
+  runtime: AgentRuntime | null;
 }
 
 const UUID_RE =
@@ -119,14 +123,53 @@ export async function handleCloudRoute(
     };
 
     if (data.status === "authenticated" && data.apiKey) {
+      // ── 1. Save to config file (on-disk persistence) ────────────────
       const cloud = (state.config.cloud ?? {}) as NonNullable<
         typeof state.config.cloud
       >;
       cloud.enabled = true;
       cloud.apiKey = data.apiKey;
       (state.config as Record<string, unknown>).cloud = cloud;
-      saveMilaidyConfig(state.config);
+      try {
+        saveMilaidyConfig(state.config);
+        logger.info("[cloud-login] API key saved to config file");
+      } catch (saveErr) {
+        logger.error(
+          `[cloud-login] Failed to save config: ${saveErr instanceof Error ? saveErr.message : saveErr}`,
+        );
+      }
 
+      // ── 2. Push into process.env (immediate, no restart needed) ─────
+      process.env.ELIZAOS_CLOUD_API_KEY = data.apiKey;
+      process.env.ELIZAOS_CLOUD_ENABLED = "true";
+
+      // ── 3. Persist to agent DB record (survives config-file resets) ─
+      if (state.runtime) {
+        try {
+          // Update in-memory character secrets
+          if (!state.runtime.character.secrets) {
+            state.runtime.character.secrets = {};
+          }
+          const secrets = state.runtime.character.secrets as Record<
+            string,
+            string
+          >;
+          secrets.ELIZAOS_CLOUD_API_KEY = data.apiKey;
+          secrets.ELIZAOS_CLOUD_ENABLED = "true";
+
+          // Write to database
+          await state.runtime.updateAgent(state.runtime.agentId, {
+            secrets: { ...secrets },
+          });
+          logger.info("[cloud-login] API key persisted to agent DB record");
+        } catch (dbErr) {
+          logger.warn(
+            `[cloud-login] DB persistence failed (non-fatal): ${dbErr instanceof Error ? dbErr.message : dbErr}`,
+          );
+        }
+      }
+
+      // ── 4. Init cloud manager if needed ─────────────────────────────
       if (state.cloudManager && !state.cloudManager.getClient())
         state.cloudManager.init();
 

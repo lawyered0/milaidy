@@ -215,13 +215,20 @@ export class ElizaCloudClient {
 
   async heartbeat(agentId: string): Promise<boolean> {
     const url = `${this.baseUrl}/api/v1/milaidy/agents/${agentId}/bridge`;
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Api-Key": this.apiKey },
-      body: JSON.stringify({ jsonrpc: "2.0", method: "heartbeat" }),
-      signal: AbortSignal.timeout(10_000),
-    }).catch(() => null);
-    return response?.ok ?? false;
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Api-Key": this.apiKey,
+        },
+        body: JSON.stringify({ jsonrpc: "2.0", method: "heartbeat" }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
   }
 
   private async request<T>(

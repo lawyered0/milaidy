@@ -11,14 +11,15 @@ import { OnboardingWizard } from "./components/OnboardingWizard.js";
 import { ChatView } from "./components/ChatView.js";
 import { ConversationsSidebar } from "./components/ConversationsSidebar.js";
 import { WidgetSidebar } from "./components/WidgetSidebar.js";
-import { PluginsView } from "./components/PluginsView.js";
+import { FeaturesView, ConnectorsView } from "./components/PluginsView.js";
 import { SkillsView } from "./components/SkillsView.js";
 import { InventoryView } from "./components/InventoryView.js";
+import { CharacterView } from "./components/CharacterView.js";
 import { ConfigView } from "./components/ConfigView.js";
-import { LogsView } from "./components/LogsView.js";
+import { AdminView } from "./components/AdminView.js";
 import { AppsView } from "./components/AppsView.js";
 import { GameView } from "./components/GameView.js";
-import { DatabaseView } from "./components/DatabaseView.js";
+import { LoadingScreen } from "./components/LoadingScreen.js";
 
 function ViewRouter() {
   const { tab } = useApp();
@@ -27,11 +28,12 @@ function ViewRouter() {
     case "apps": return <AppsView />;
     case "game": return <GameView />;
     case "inventory": return <InventoryView />;
-    case "plugins": return <PluginsView />;
+    case "features": return <FeaturesView />;
+    case "connectors": return <ConnectorsView />;
     case "skills": return <SkillsView />;
-    case "database": return <DatabaseView />;
+    case "character": return <CharacterView />;
     case "config": return <ConfigView />;
-    case "logs": return <LogsView />;
+    case "admin": return <AdminView />;
     default: return <ChatView />;
   }
 }
@@ -40,11 +42,7 @@ export function App() {
   const { onboardingLoading, authRequired, onboardingComplete, tab, actionNotice } = useApp();
 
   if (onboardingLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-screen bg-bg font-body text-txt">
-        <div className="text-muted italic">Loading...</div>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   if (authRequired) return <PairingView />;

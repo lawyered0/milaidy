@@ -17,19 +17,19 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import dotenv from "dotenv";
 import {
   AgentRuntime,
+  ChannelType,
   createCharacter,
   createMessageMemory,
-  stringToUuid,
-  ChannelType,
   logger,
   type Plugin,
   type Service,
+  stringToUuid,
   type UUID,
 } from "@elizaos/core";
+import dotenv from "dotenv";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { startApiServer } from "../src/api/server.js";
 import { ensureAgentWorkspace } from "../src/providers/workspace.js";
 
@@ -765,7 +765,11 @@ describe("Agent Runtime E2E", () => {
         // Write a config with an agent name so onboarding is skipped
         fs.writeFileSync(
           path.join(subConfigDir, "milaidy.json"),
-          JSON.stringify({ agent: { name: "SubprocessAgent", bio: "test" } }),
+          JSON.stringify({
+            agents: {
+              list: [{ id: "main", name: "SubprocessAgent", bio: ["test"] }],
+            },
+          }),
         );
 
         // Build env: inherit everything, override HOME + PGLITE + XDG dirs
