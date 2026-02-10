@@ -12,6 +12,9 @@ on:
 
 jobs:
   claude-review:
+    # Claude review action requires write-level actor permissions.
+    # Skip for external fork contributors to avoid hard-failing CI.
+    if: ${{ contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.pull_request.author_association) }}
     # Optional: Filter by PR author
     # if: |
     #   github.event.pull_request.user.login == 'external-contributor' ||
