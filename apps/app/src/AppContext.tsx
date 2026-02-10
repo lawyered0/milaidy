@@ -154,6 +154,8 @@ export interface AppState {
   conversations: Conversation[];
   activeConversationId: string | null;
   conversationMessages: ConversationMessage[];
+  /** Conversation IDs with unread proactive messages from the agent. */
+  unreadConversations: Set<string>;
 
   // Plugins
   plugins: PluginInfo[];
@@ -468,6 +470,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [conversationMessages, setConversationMessages] = useState<ConversationMessage[]>([]);
+  const [unreadConversations, setUnreadConversations] = useState<Set<string>>(new Set());
+  const activeConversationIdRef = useRef<string | null>(null);
 
   // --- Plugins ---
   const [plugins, setPlugins] = useState<PluginInfo[]>([]);
@@ -983,6 +987,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setOnboardingStep("welcome");
       setConversationMessages([]);
       setActiveConversationId(null);
+      activeConversationIdRef.current = null;
       setConversations([]);
       setPlugins([]);
       setSkills([]);
@@ -1023,10 +1028,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const { conversation } = await client.createConversation();
       setConversations((prev) => [conversation, ...prev]);
       setActiveConversationId(conversation.id);
+      activeConversationIdRef.current = conversation.id;
       setConversationMessages([]);
       // Agent sends the first message
       greetingFiredRef.current = true;
       void fetchGreeting(conversation.id);
+      client.sendWsMessage({ type: "active-conversation", conversationId: conversation.id });
     } catch {
       /* ignore */
     }
@@ -1042,6 +1049,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const { conversation } = await client.createConversation();
         setConversations((prev) => [conversation, ...prev]);
         setActiveConversationId(conversation.id);
+        activeConversationIdRef.current = conversation.id;
+        client.sendWsMessage({ type: "active-conversation", conversationId: conversation.id });
         convId = conversation.id;
       } catch {
         return;
@@ -1093,6 +1102,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (activeConversationId) {
       await client.deleteConversation(activeConversationId);
       setActiveConversationId(null);
+      activeConversationIdRef.current = null;
       setConversationMessages([]);
       await loadConversations();
     }
@@ -1102,6 +1112,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     async (id: string) => {
       if (id === activeConversationId) return;
       setActiveConversationId(id);
+      activeConversationIdRef.current = id;
+      client.sendWsMessage({ type: "active-conversation", conversationId: id });
+      setUnreadConversations((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       await loadConversationMessages(id);
     },
     [activeConversationId, loadConversationMessages],
@@ -1112,6 +1129,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await client.deleteConversation(id);
       if (activeConversationId === id) {
         setActiveConversationId(null);
+        activeConversationIdRef.current = null;
         setConversationMessages([]);
       }
       await loadConversations();
@@ -2009,6 +2027,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (c.length > 0) {
           const latest = c[0];
           setActiveConversationId(latest.id);
+          activeConversationIdRef.current = latest.id;
+          client.sendWsMessage({ type: "active-conversation", conversationId: latest.id });
           try {
             const { messages } = await client.getConversationMessages(latest.id);
             setConversationMessages(messages);
@@ -2064,6 +2084,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
       client.connectWs();
       client.onWsEvent("status", (data: Record<string, unknown>) => {
         setAgentStatus(data as unknown as AgentStatus);
+      });
+
+      // Handle proactive messages from autonomy
+      client.onWsEvent("proactive-message", (data: Record<string, unknown>) => {
+        const convId = data.conversationId as string;
+        const msg = data.message as ConversationMessage;
+
+        if (convId === activeConversationIdRef.current) {
+          // Active conversation — append in real-time (deduplicate by id)
+          setConversationMessages((prev) => {
+            if (prev.some((m) => m.id === msg.id)) return prev;
+            return [...prev, msg];
+          });
+        } else {
+          // Non-active — mark unread
+          setUnreadConversations((prev) => new Set([...prev, convId]));
+        }
+
+        // Bump conversation to top of list
+        setConversations((prev) => {
+          const updated = prev.map((c) =>
+            c.id === convId
+              ? { ...c, updatedAt: new Date().toISOString() }
+              : c,
+          );
+          return updated.sort(
+            (a, b) =>
+              new Date(b.updatedAt).getTime() -
+              new Date(a.updatedAt).getTime(),
+          );
+        });
       });
 
       // Load status
@@ -2146,7 +2197,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     tab, currentTheme, connected, agentStatus, onboardingComplete, onboardingLoading,
     authRequired, actionNotice,
     pairingEnabled, pairingExpiresAt, pairingCodeInput, pairingError, pairingBusy,
-    chatInput, chatSending, conversations, activeConversationId, conversationMessages,
+    chatInput, chatSending, conversations, activeConversationId, conversationMessages, unreadConversations,
     plugins, pluginFilter, pluginStatusFilter, pluginSearch, pluginSettingsOpen,
     pluginAdvancedOpen, pluginSaving, pluginSaveSuccess,
     skills, skillsSubTab, skillCreateFormOpen, skillCreateName, skillCreateDescription,

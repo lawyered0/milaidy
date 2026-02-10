@@ -272,6 +272,11 @@ export function ChatView() {
                 }`}
               >
                 {msg.role === "user" ? "You" : agentName}
+                {msg.role === "assistant" && typeof msg.source === "string" && msg.source && (
+                  <span className="ml-1.5 text-[11px] font-normal text-muted px-1.5 py-0.5 bg-bg-hover rounded">
+                    via {msg.source}
+                  </span>
+                )}
               </div>
               <div className="text-txt">
                 {msg.id === streamingMsgId ? (
