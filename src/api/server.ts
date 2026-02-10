@@ -1581,6 +1581,36 @@ function extractAuthToken(req: http.IncomingMessage): string | null {
   return null;
 }
 
+function isLoopbackBindHost(host: string): boolean {
+  const normalized = host.trim().toLowerCase().replace(/^\[|\]$/g, "");
+  if (!normalized) return true;
+  if (
+    normalized === "localhost" ||
+    normalized === "::1" ||
+    normalized === "::ffff:127.0.0.1"
+  ) {
+    return true;
+  }
+  if (normalized.startsWith("127.")) return true;
+  return false;
+}
+
+function ensureApiTokenForBindHost(host: string): void {
+  const token = process.env.MILAIDY_API_TOKEN?.trim();
+  if (token) return;
+  if (isLoopbackBindHost(host)) return;
+
+  const generated = crypto.randomBytes(32).toString("hex");
+  process.env.MILAIDY_API_TOKEN = generated;
+
+  logger.warn(
+    `[milaidy-api] MILAIDY_API_BIND=${host} is non-loopback and MILAIDY_API_TOKEN is unset.`,
+  );
+  logger.warn(
+    `[milaidy-api] Generated temporary MILAIDY_API_TOKEN=${generated}. Set MILAIDY_API_TOKEN explicitly to override.`,
+  );
+}
+
 function isAuthorized(req: http.IncomingMessage): boolean {
   const expected = process.env.MILAIDY_API_TOKEN?.trim();
   if (!expected) return true;
@@ -5963,6 +5993,7 @@ export async function startApiServer(opts?: {
   const port = opts?.port ?? 2138;
   const host =
     (process.env.MILAIDY_API_BIND ?? "127.0.0.1").trim() || "127.0.0.1";
+  ensureApiTokenForBindHost(host);
 
   let config: MilaidyConfig;
   try {
