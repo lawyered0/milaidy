@@ -1628,10 +1628,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const handleOnboardingFinish = useCallback(async () => {
     if (!onboardingOptions) return;
-    const style = onboardingOptions.styles.find((s: StylePreset) => s.catchphrase === onboardingStyle);
-    const systemPrompt = style?.system
-      ? style.system.replace(/\{\{name\}\}/g, onboardingName)
-      : `You are ${onboardingName}, an autonomous AI agent powered by ElizaOS. ${onboardingOptions.sharedStyleRules}`;
+
+    // Try to fetch archetype character data if an archetype was selected
+    let archetypeChar: any = null;
+    if (onboardingStyle && onboardingStyle !== "custom") {
+      try {
+        const res = await fetch(`/api/archetypes/${onboardingStyle}`);
+        if (res.ok) {
+          const data = await res.json();
+          archetypeChar = data.character;
+        }
+      } catch { /* fall back to style presets */ }
+    }
+
+    // Fall back to legacy style presets if no archetype
+    const style = !archetypeChar
+      ? onboardingOptions.styles.find((s: StylePreset) => s.catchphrase === onboardingStyle)
+      : null;
+
+    const bio = archetypeChar?.bio ?? style?.bio ?? ["An autonomous AI agent."];
+    const systemPrompt = archetypeChar?.system
+      ? archetypeChar.system.replace(/\{\{name\}\}/g, onboardingName)
+      : style?.system
+        ? style.system.replace(/\{\{name\}\}/g, onboardingName)
+        : `You are ${onboardingName}, an autonomous AI agent powered by ElizaOS. ${onboardingOptions.sharedStyleRules}`;
 
     const inventoryProviders: Array<{ chain: string; rpcProvider: string; rpcApiKey?: string }> = [];
     if (onboardingRunMode === "local") {
@@ -1647,12 +1667,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         name: onboardingName,
         theme: onboardingTheme,
         runMode: (onboardingRunMode || "local") as "local" | "cloud",
-        bio: style?.bio ?? ["An autonomous AI agent."],
+        bio,
         systemPrompt,
-        style: style?.style,
-        adjectives: style?.adjectives,
-        topics: style?.topics,
-        messageExamples: style?.messageExamples,
+        style: archetypeChar?.style ?? style?.style,
+        adjectives: archetypeChar?.adjectives ?? style?.adjectives,
+        topics: archetypeChar?.topics ?? style?.topics,
+        messageExamples: archetypeChar?.messageExamples ?? style?.messageExamples,
         cloudProvider: onboardingRunMode === "cloud" ? onboardingCloudProvider : undefined,
         smallModel: onboardingRunMode === "cloud" ? onboardingSmallModel : undefined,
         largeModel: onboardingRunMode === "cloud" ? onboardingLargeModel : undefined,
