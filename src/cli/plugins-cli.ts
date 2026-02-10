@@ -607,7 +607,7 @@ export function registerPluginsCli(program: Command): void {
     .action(async (nameOrPath?: string) => {
       const nodePath = await import("node:path");
       const nodeFs = await import("node:fs");
-      const { execSync } = await import("node:child_process");
+      const { spawnSync } = await import("node:child_process");
       const { resolveStateDir, resolveUserPath } = await import(
         "../config/paths.js"
       );
@@ -649,11 +649,83 @@ export function registerPluginsCli(program: Command): void {
         }
       }
 
-      const editor = process.env.EDITOR || "code";
-      console.log(`\nOpening ${chalk.cyan(targetDir)} with ${editor}...\n`);
+      // Minimal shell-like splitter for $EDITOR to avoid invoking a shell.
+      function splitCommand(command: string): { cmd: string; args: string[] } {
+        const trimmed = command.trim();
+        if (!trimmed) return { cmd: "code", args: [] };
+
+        const tokens: string[] = [];
+        let current = "";
+        let quote: '"' | "'" | null = null;
+        let escape = false;
+
+        for (let i = 0; i < trimmed.length; i++) {
+          const char = trimmed[i];
+          if (escape) {
+            current += char;
+            escape = false;
+            continue;
+          }
+
+          if (char === "\\") {
+            if (quote === "'") {
+              current += char;
+              continue;
+            }
+            const next = trimmed[i + 1];
+            if (
+              next === "\"" ||
+              next === "'" ||
+              next === "\\" ||
+              (next && /\s/.test(next))
+            ) {
+              escape = true;
+              continue;
+            }
+            current += char;
+            continue;
+          }
+
+          if (quote) {
+            if (char === quote) {
+              quote = null;
+              continue;
+            }
+            current += char;
+            continue;
+          }
+
+          if (char === "\"" || char === "'") {
+            quote = char;
+            continue;
+          }
+
+          if (/\s/.test(char)) {
+            if (current) {
+              tokens.push(current);
+              current = "";
+            }
+            continue;
+          }
+
+          current += char;
+        }
+
+        if (current) tokens.push(current);
+
+        const [cmd, ...args] = tokens.length > 0 ? tokens : ["code"];
+        return { cmd, args };
+      }
+
+      const editorRaw = process.env.EDITOR || "code";
+      const { cmd: editorCmd, args: editorArgs } = splitCommand(editorRaw);
+      console.log(`\nOpening ${chalk.cyan(targetDir)} with ${editorCmd}...\n`);
 
       try {
-        execSync(`${editor} "${targetDir}"`, { stdio: "inherit" });
+        const result = spawnSync(editorCmd, [...editorArgs, targetDir], {
+          stdio: "inherit",
+        });
+        if (result.error) throw result.error;
       } catch {
         // Some editors (like code) return immediately and that's fine.
         // If the command actually fails, the user will see it.
