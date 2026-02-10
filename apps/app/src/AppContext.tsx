@@ -151,6 +151,7 @@ export interface AppState {
   // Chat
   chatInput: string;
   chatSending: boolean;
+  chatFirstTokenReceived: boolean;
   conversations: Conversation[];
   activeConversationId: string | null;
   conversationMessages: ConversationMessage[];
@@ -350,6 +351,7 @@ export interface AppActions {
 
   // Chat
   handleChatSend: () => Promise<void>;
+  handleChatStop: () => void;
   handleChatClear: () => Promise<void>;
   handleNewConversation: () => Promise<void>;
   handleSelectConversation: (id: string) => Promise<void>;
@@ -465,6 +467,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // --- Chat ---
   const [chatInput, setChatInput] = useState("");
   const [chatSending, setChatSending] = useState(false);
+  const [chatFirstTokenReceived, setChatFirstTokenReceived] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [conversationMessages, setConversationMessages] = useState<ConversationMessage[]>([]);
@@ -656,6 +659,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const prevAgentStateRef = useRef<string | null>(null);
   /** Guards against double-greeting when both init and state-transition paths fire. */
   const greetingFiredRef = useRef(false);
+  const chatAbortRef = useRef<AbortController | null>(null);
 
   // ── Action notice ──────────────────────────────────────────────────
 
@@ -1048,46 +1052,88 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    const now = Date.now();
+    const userMsgId = `temp-${now}`;
+    const assistantMsgId = `temp-resp-${now}`;
+
     setConversationMessages((prev: ConversationMessage[]) => [
       ...prev,
-      { id: `temp-${Date.now()}`, role: "user", text, timestamp: Date.now() },
+      { id: userMsgId, role: "user", text, timestamp: now },
+      { id: assistantMsgId, role: "assistant", text: "", timestamp: Date.now() },
     ]);
     setChatInput("");
     setChatSending(true);
+    setChatFirstTokenReceived(false);
+
+    const controller = new AbortController();
+    chatAbortRef.current = controller;
 
     try {
-      const data = await client.sendConversationMessage(convId, text);
-      setConversationMessages((prev: ConversationMessage[]) => [
-        ...prev,
-        { id: `temp-resp-${Date.now()}`, role: "assistant", text: data.text, timestamp: Date.now() },
-      ]);
+      const data = await client.sendConversationMessageStream(
+        convId,
+        text,
+        (token) => {
+          setChatFirstTokenReceived(true);
+          setConversationMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantMsgId ? { ...m, text: `${m.text}${token}` } : m,
+            ),
+          );
+        },
+        controller.signal,
+      );
+
+      setConversationMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantMsgId ? { ...m, text: data.text } : m,
+        ),
+      );
+      await loadConversations();
     } catch (err) {
-      // If the conversation was lost (server restart), create a fresh one and retry
+      const abortErr = err as Error;
+      if (abortErr.name === "AbortError") {
+        // Keep any partial text; if none arrived, remove placeholder.
+        setConversationMessages((prev) =>
+          prev.filter((m) => !(m.id === assistantMsgId && !m.text.trim())),
+        );
+        return;
+      }
+
+      // If the conversation was lost (server restart), create a fresh one and retry once.
       const status = (err as { status?: number }).status;
       if (status === 404) {
         try {
           const { conversation } = await client.createConversation();
           setConversations((prev) => [conversation, ...prev]);
           setActiveConversationId(conversation.id);
-          convId = conversation.id;
-          const data = await client.sendConversationMessage(convId, text);
+
+          const retryData = await client.sendConversationMessage(conversation.id, text);
           setConversationMessages([
             { id: `temp-${Date.now()}`, role: "user", text, timestamp: Date.now() },
-            { id: `temp-resp-${Date.now()}`, role: "assistant", text: data.text, timestamp: Date.now() },
+            { id: `temp-resp-${Date.now()}`, role: "assistant", text: retryData.text, timestamp: Date.now() },
           ]);
         } catch {
-          // Give up — show whatever we have
-          setConversationMessages([
-            { id: `temp-${Date.now()}`, role: "user", text, timestamp: Date.now() },
-          ]);
+          setConversationMessages((prev) =>
+            prev.filter((m) => !(m.id === assistantMsgId && !m.text.trim())),
+          );
         }
       } else {
         await loadConversationMessages(convId);
       }
     } finally {
+      if (chatAbortRef.current === controller) {
+        chatAbortRef.current = null;
+      }
       setChatSending(false);
+      setChatFirstTokenReceived(false);
     }
-  }, [chatInput, chatSending, activeConversationId, loadConversationMessages]);
+  }, [chatInput, chatSending, activeConversationId, loadConversationMessages, loadConversations]);
+
+  const handleChatStop = useCallback(() => {
+    chatAbortRef.current?.abort();
+    chatAbortRef.current = null;
+    setChatSending(false);
+  }, []);
 
   const handleChatClear = useCallback(async () => {
     if (activeConversationId) {
@@ -2146,7 +2192,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     tab, currentTheme, connected, agentStatus, onboardingComplete, onboardingLoading,
     authRequired, actionNotice,
     pairingEnabled, pairingExpiresAt, pairingCodeInput, pairingError, pairingBusy,
-    chatInput, chatSending, conversations, activeConversationId, conversationMessages,
+    chatInput, chatSending, chatFirstTokenReceived, conversations, activeConversationId, conversationMessages,
     plugins, pluginFilter, pluginStatusFilter, pluginSearch, pluginSettingsOpen,
     pluginAdvancedOpen, pluginSaving, pluginSaveSuccess,
     skills, skillsSubTab, skillCreateFormOpen, skillCreateName, skillCreateDescription,
@@ -2190,7 +2236,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // Actions
     setTab, setTheme,
     handleStart, handleStop, handlePauseResume, handleRestart, handleReset,
-    handleChatSend, handleChatClear, handleNewConversation,
+    handleChatSend, handleChatStop, handleChatClear, handleNewConversation,
     handleSelectConversation, handleDeleteConversation, handleRenameConversation,
     handlePairingSubmit,
     loadPlugins, handlePluginToggle, handlePluginConfigSave,
