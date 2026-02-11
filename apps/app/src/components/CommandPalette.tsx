@@ -67,7 +67,7 @@ export function CommandPalette() {
       { id: "nav-apps", label: "Open Apps", action: () => setTab("apps") },
       { id: "nav-agent", label: "Open Agent", action: () => setTab("agent") },
       { id: "nav-plugins", label: "Open Plugins", action: () => setTab("plugins") },
-      { id: "nav-config", label: "Open Config", action: () => setTab("advanced") },
+      { id: "nav-config", label: "Open Config", action: () => setTab("settings") },
       { id: "nav-database", label: "Open Database", action: () => setTab("database") },
       { id: "nav-settings", label: "Open Settings", action: () => setTab("settings") },
       { id: "nav-logs", label: "Open Logs", action: () => setTab("logs") }

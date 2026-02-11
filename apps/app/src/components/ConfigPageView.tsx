@@ -15,7 +15,7 @@ import { SecretsView } from "./SecretsView";
 
 /* ── ConfigPageView ──────────────────────────────────────────────────── */
 
-export function ConfigPageView() {
+export function ConfigPageView({ embedded = false }: { embedded?: boolean }) {
   const {
     cloudConnected,
     cloudCredits,
@@ -52,27 +52,33 @@ export function ConfigPageView() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-1">
-        <h2 className="text-lg font-bold">Config</h2>
-        <button
-          className="flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] text-[var(--muted)] hover:text-[var(--txt)] bg-transparent border border-[var(--border)] rounded cursor-pointer transition-colors hover:border-[var(--accent)]"
-          onClick={() => setSecretsOpen(true)}
-          title="Secrets Vault"
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-          </svg>
-          Secrets
-        </button>
-      </div>
-      <p className="text-[13px] text-[var(--muted)] mb-5">Wallet providers and secrets.</p>
+      {!embedded && (
+        <>
+          <h2 className="text-lg font-bold mb-1">Config</h2>
+          <p className="text-[13px] text-[var(--muted)] mb-5">
+            Wallet providers and secrets.
+          </p>
+        </>
+      )}
 
       {/* ═══════════════════════════════════════════════════════════════
           1. WALLET & RPC
           ═══════════════════════════════════════════════════════════════ */}
       <div className="p-4 border border-[var(--border)] bg-[var(--card)]">
-        <div className="font-bold text-sm mb-4">Wallet &amp; RPC</div>
+        <div className="flex items-center justify-between mb-4">
+          <div className="font-bold text-sm">Wallet &amp; RPC</div>
+          <button
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] text-[var(--muted)] hover:text-[var(--txt)] bg-transparent border border-[var(--border)] rounded cursor-pointer transition-colors hover:border-[var(--accent)]"
+            onClick={() => setSecretsOpen(true)}
+            title="Secrets Vault"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            Secrets
+          </button>
+        </div>
 
         <div className="grid grid-cols-2 gap-6">
           {/* EVM */}

@@ -14,6 +14,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useApp, THEMES } from "../AppContext";
 import { client, type PluginParamDef, type OnboardingOptions } from "../api-client";
+import { ConfigPageView } from "./ConfigPageView";
 import { ConfigRenderer, defaultRegistry } from "./config-renderer";
 import { MediaSettingsSection } from "./MediaSettingsSection";
 import { VoiceConfigView } from "./VoiceConfigView";
@@ -652,7 +653,14 @@ export function SettingsView() {
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════
-          3. MEDIA GENERATION
+          3. WALLET / RPC / SECRETS
+          ═══════════════════════════════════════════════════════════════ */}
+      <div className="mt-6">
+        <ConfigPageView embedded />
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════════
+          4. MEDIA GENERATION
           ═══════════════════════════════════════════════════════════════ */}
       <div className="mt-6 p-4 border border-[var(--border)] bg-[var(--card)]">
         <div className="font-bold text-sm mb-4">Media Generation</div>
@@ -660,7 +668,7 @@ export function SettingsView() {
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════
-          4. SPEECH (TTS / STT)
+          5. SPEECH (TTS / STT)
           ═══════════════════════════════════════════════════════════════ */}
       <div className="mt-6 p-4 border border-[var(--border)] bg-[var(--card)]">
         <div className="font-bold text-sm mb-4">Speech (TTS / STT)</div>
@@ -668,7 +676,7 @@ export function SettingsView() {
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════
-          5. UPDATES
+          6. UPDATES
           ═══════════════════════════════════════════════════════════════ */}
       <div className="mt-6 p-4 border border-[var(--border)] bg-[var(--card)]">
         <div className="flex justify-between items-center mb-3">

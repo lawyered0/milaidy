@@ -34,10 +34,6 @@ export interface VerificationResult {
 
 // ── Verification Message ─────────────────────────────────────────────────
 
-/**
- * Generate the verification message the user must tweet.
- * Format: Verifying my Milaidy agent "Name" | 0xABCD...1234 #MilaidyAgent
- */
 export function generateVerificationMessage(
   agentName: string,
   walletAddress: string,
@@ -48,33 +44,21 @@ export function generateVerificationMessage(
 
 // ── Tweet Verification ───────────────────────────────────────────────────
 
-/**
- * Extract tweet ID and screen name from a tweet URL.
- * Supports twitter.com and x.com URLs.
- */
-function parseTweetUrl(
-  url: string,
-): { screenName: string; tweetId: string } | null {
-  const match = url.match(/(?:twitter\.com|x\.com)\/(\w+)\/status\/(\d+)/);
+function parseTweetUrl(url: string): { screenName: string; tweetId: string } | null {
+  const match = url.match(
+    /(?:twitter\.com|x\.com)\/(\w+)\/status\/(\d+)/,
+  );
   if (!match) return null;
   return { screenName: match[1], tweetId: match[2] };
 }
 
-/**
- * Verify that a tweet contains the expected verification content.
- * Uses the FxTwitter API which is free and requires no authentication.
- */
 export async function verifyTweet(
   tweetUrl: string,
   walletAddress: string,
 ): Promise<VerificationResult> {
   const parsed = parseTweetUrl(tweetUrl);
   if (!parsed) {
-    return {
-      verified: false,
-      error: "Invalid tweet URL. Use a twitter.com or x.com status URL.",
-      handle: null,
-    };
+    return { verified: false, error: "Invalid tweet URL. Use a twitter.com or x.com status URL.", handle: null };
   }
 
   const apiUrl = `https://api.fxtwitter.com/${parsed.screenName}/status/${parsed.tweetId}`;
@@ -87,27 +71,14 @@ export async function verifyTweet(
     });
   } catch (err) {
     logger.warn(`[twitter-verify] FxTwitter fetch failed: ${err}`);
-    return {
-      verified: false,
-      error: "Could not reach tweet verification service. Try again later.",
-      handle: null,
-    };
+    return { verified: false, error: "Could not reach tweet verification service. Try again later.", handle: null };
   }
 
   if (!response.ok) {
     if (response.status === 404) {
-      return {
-        verified: false,
-        error:
-          "Tweet not found. Make sure the URL is correct and the tweet is public.",
-        handle: null,
-      };
+      return { verified: false, error: "Tweet not found. Make sure the URL is correct and the tweet is public.", handle: null };
     }
-    return {
-      verified: false,
-      error: `Tweet fetch failed (HTTP ${response.status})`,
-      handle: null,
-    };
+    return { verified: false, error: `Tweet fetch failed (HTTP ${response.status})`, handle: null };
   }
 
   let data: {
@@ -119,49 +90,27 @@ export async function verifyTweet(
   };
 
   try {
-    data = (await response.json()) as typeof data;
+    data = await response.json() as typeof data;
   } catch {
-    return {
-      verified: false,
-      error: "Invalid response from verification service",
-      handle: null,
-    };
+    return { verified: false, error: "Invalid response from verification service", handle: null };
   }
 
   if (!data.tweet?.text) {
-    return {
-      verified: false,
-      error: "Could not read tweet content",
-      handle: null,
-    };
+    return { verified: false, error: "Could not read tweet content", handle: null };
   }
 
   const tweetText = data.tweet.text;
   const handle = data.tweet.author?.screen_name ?? parsed.screenName;
 
-  // Verify the tweet contains the wallet address fragment and hashtag.
-  // We check for the short address and the hashtag rather than the full message,
-  // since users might slightly modify the formatting.
   const shortAddr = `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`;
-  const hasAddress =
-    tweetText.includes(shortAddr) ||
-    tweetText.toLowerCase().includes(walletAddress.toLowerCase().slice(0, 10));
+  const hasAddress = tweetText.includes(shortAddr) || tweetText.toLowerCase().includes(walletAddress.toLowerCase().slice(0, 10));
   const hasHashtag = tweetText.includes("#MilaidyAgent");
 
   if (!hasAddress) {
-    return {
-      verified: false,
-      error:
-        "Tweet does not contain your wallet address. Make sure you copied the full verification message.",
-      handle,
-    };
+    return { verified: false, error: "Tweet does not contain your wallet address. Make sure you copied the full verification message.", handle };
   }
   if (!hasHashtag) {
-    return {
-      verified: false,
-      error: "Tweet is missing #MilaidyAgent hashtag.",
-      handle,
-    };
+    return { verified: false, error: "Tweet is missing #MilaidyAgent hashtag.", handle };
   }
 
   return { verified: true, error: null, handle };
@@ -192,9 +141,6 @@ function saveWhitelist(data: WhitelistData): void {
   });
 }
 
-/**
- * Mark a wallet address as Twitter-verified for the whitelist.
- */
 export function markAddressVerified(
   address: string,
   tweetUrl: string,
@@ -207,20 +153,16 @@ export function markAddressVerified(
     handle,
   };
   saveWhitelist(wl);
-  logger.info(`[twitter-verify] Address ${address} verified via @${handle}`);
+  logger.info(
+    `[twitter-verify] Address ${address} verified via @${handle}`,
+  );
 }
 
-/**
- * Check if a wallet address has been Twitter-verified.
- */
 export function isAddressWhitelisted(address: string): boolean {
   const wl = loadWhitelist();
   return address.toLowerCase() in wl.verified;
 }
 
-/**
- * Get the list of all verified wallet addresses (for Merkle tree generation).
- */
 export function getVerifiedAddresses(): string[] {
   const wl = loadWhitelist();
   return Object.keys(wl.verified);

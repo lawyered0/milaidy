@@ -27,7 +27,6 @@ function ViewRouter() {
     case "advanced":
     case "plugins":
     case "trajectories":
-    case "voice":
     case "runtime":
     case "database":
     case "logs":

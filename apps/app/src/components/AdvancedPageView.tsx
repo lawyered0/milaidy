@@ -2,7 +2,6 @@
  * AdvancedPageView — container for advanced configuration sub-tabs.
  *
  * Sub-tabs:
- *   - Config: Wallet/RPC providers, secrets (original ConfigPageView content)
  *   - Plugins: Feature/connector/skills plugin management
  *   - Trajectories: LLM call viewer and analysis
  *   - Runtime: Runtime object inspection
@@ -12,7 +11,6 @@
 
 import { useState } from "react";
 import { useApp } from "../AppContext";
-import { ConfigPageView } from "./ConfigPageView";
 import { PluginsPageView } from "./PluginsPageView";
 import { TrajectoriesView } from "./TrajectoriesView";
 import { TrajectoryDetailView } from "./TrajectoryDetailView";
@@ -21,16 +19,9 @@ import { DatabasePageView } from "./DatabasePageView";
 import { LogsPageView } from "./LogsPageView";
 import type { Tab } from "../navigation";
 
-type SubTab =
-  | "config"
-  | "plugins"
-  | "trajectories"
-  | "runtime"
-  | "database"
-  | "logs";
+type SubTab = "plugins" | "trajectories" | "runtime" | "database" | "logs";
 
 const SUB_TABS: Array<{ id: SubTab; label: string; description: string }> = [
-  { id: "config", label: "Config", description: "Wallet, RPC providers, and secrets" },
   { id: "plugins", label: "Plugins", description: "Features, connectors, and skills" },
   { id: "trajectories", label: "Trajectories", description: "LLM call history and analysis" },
   { id: "runtime", label: "Runtime", description: "Deep runtime object introspection and load order" },
@@ -45,7 +36,7 @@ function mapTabToSubTab(tab: Tab): SubTab {
     case "runtime": return "runtime";
     case "database": return "database";
     case "logs": return "logs";
-    default: return "config";
+    default: return "plugins";
   }
 }
 
@@ -74,7 +65,7 @@ export function AdvancedPageView() {
         setTab("logs");
         break;
       default:
-        setTab("advanced");
+        setTab("plugins");
     }
   };
 
@@ -101,7 +92,7 @@ export function AdvancedPageView() {
       case "logs":
         return <LogsPageView />;
       default:
-        return <ConfigPageView />;
+        return <PluginsPageView />;
     }
   };
 

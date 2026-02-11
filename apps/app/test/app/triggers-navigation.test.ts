@@ -12,7 +12,7 @@ describe("navigation", () => {
     expect(titleForTab("trajectories")).toBe("Trajectories");
 
     expect(pathForTab("voice")).toBe("/voice");
-    expect(tabFromPath("/voice")).toBe("voice");
+    expect(tabFromPath("/voice")).toBe("settings");
     expect(titleForTab("voice")).toBe("Voice");
 
     expect(pathForTab("runtime")).toBe("/runtime");

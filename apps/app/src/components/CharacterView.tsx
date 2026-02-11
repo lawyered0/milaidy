@@ -6,13 +6,13 @@
  *   2. Personality — system prompt, adjectives + topics (tag editors)
  *   3. Style — 3-column style rule textareas
  *   4. Examples — collapsible chat + post examples
- *   5. Voice — provider selection + config (unchanged)
+ *   5. Voice — voice selection + preview
  *   + Save bar at bottom
  */
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useApp } from "../AppContext";
-import { client, type VoiceProvider, type VoiceConfig } from "../api-client";
+import { client, type VoiceConfig } from "../api-client";
 import { AvatarSelector } from "./AvatarSelector";
 import { ConfigRenderer, defaultRegistry } from "./config-renderer";
 import type { ConfigUiHint } from "../types";
@@ -210,14 +210,6 @@ export function CharacterView() {
     loadCharacter,
     setState,
     selectedVrmIndex,
-    // Cloud (for ElevenLabs via Eliza Cloud)
-    cloudConnected,
-    cloudUserId,
-    cloudLoginBusy,
-    cloudLoginError,
-    cloudDisconnecting,
-    handleCloudLogin,
-    handleCloudDisconnect,
     // Registry / Drop
     registryStatus,
     registryLoading,
@@ -326,13 +318,11 @@ export function CharacterView() {
   const [generating, setGenerating] = useState<string | null>(null);
 
   /* ── Voice config state ─────────────────────────────────────────── */
-  const [voiceProvider, setVoiceProvider] = useState<VoiceProvider>("elevenlabs");
   const [voiceConfig, setVoiceConfig] = useState<VoiceConfig>({});
   const [voiceLoading, setVoiceLoading] = useState(false);
   const [voiceSaving, setVoiceSaving] = useState(false);
   const [voiceSaveSuccess, setVoiceSaveSuccess] = useState(false);
   const [voiceSaveError, setVoiceSaveError] = useState<string | null>(null);
-  const [voiceMode, setVoiceMode] = useState<"cloud" | "own-key">("cloud");
   const [voiceTesting, setVoiceTesting] = useState(false);
   const [voiceTestAudio, setVoiceTestAudio] = useState<HTMLAudioElement | null>(null);
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
@@ -369,10 +359,8 @@ export function CharacterView() {
         const cfg = await client.getConfig();
         const messages = cfg.messages as Record<string, Record<string, unknown>> | undefined;
         const tts = messages?.tts as VoiceConfig | undefined;
-        if (tts?.provider) setVoiceProvider(tts.provider);
         if (tts) {
           setVoiceConfig(tts);
-          if (tts.elevenlabs?.apiKey) setVoiceMode("own-key");
           if (tts.elevenlabs?.voiceId) {
             const preset = VOICE_PRESETS.find((p) => p.voiceId === tts.elevenlabs?.voiceId);
             setSelectedPresetId(preset?.id ?? "custom");
@@ -384,10 +372,10 @@ export function CharacterView() {
   }, []);
 
   const handleVoiceFieldChange = useCallback(
-    (provider: "elevenlabs" | "edge", key: string, value: string | number) => {
+    (key: string, value: string | number) => {
       setVoiceConfig((prev) => ({
         ...prev,
-        [provider]: { ...(prev[provider] ?? {}), [key]: value },
+        elevenlabs: { ...(prev.elevenlabs ?? {}), [key]: value },
       }));
     },
     [],
@@ -433,18 +421,11 @@ export function CharacterView() {
     setVoiceSaveError(null);
     setVoiceSaveSuccess(false);
     try {
-      const elConfig = { ...(voiceConfig.elevenlabs ?? {}) };
-      if (voiceMode === "cloud") {
-        delete elConfig.apiKey;
-      }
       await client.updateConfig({
         messages: {
           tts: {
-            provider: voiceProvider,
-            ...(voiceProvider === "elevenlabs" ? { elevenlabs: elConfig } : {}),
-            ...(voiceProvider === "edge" && voiceConfig.edge
-              ? { edge: voiceConfig.edge }
-              : {}),
+            ...voiceConfig,
+            provider: voiceConfig.provider ?? "elevenlabs",
           },
         },
       });
@@ -454,7 +435,7 @@ export function CharacterView() {
       setVoiceSaveError(err instanceof Error ? err.message : "Failed to save — is the agent running?");
     }
     setVoiceSaving(false);
-  }, [voiceProvider, voiceConfig, voiceMode]);
+  }, [voiceConfig]);
 
   const d = characterDraft;
   const bioText = typeof d.bio === "string" ? d.bio : Array.isArray(d.bio) ? d.bio.join("\n") : "";
@@ -974,302 +955,142 @@ export function CharacterView() {
         {voiceLoading ? (
           <div className="text-center py-4 text-[var(--muted)] text-[13px]">Loading voice config...</div>
         ) : (
-          <>
-            {/* Provider tabs */}
-            <div className="flex gap-0 border-b border-[var(--border)] mb-4">
-              {([
-                { id: "elevenlabs" as const, label: "ElevenLabs" },
-                { id: "simple-voice" as const, label: "Simple Voice" },
-                { id: "edge" as const, label: "Edge TTS" },
-              ] as const).map((p) => {
-                const active = voiceProvider === p.id;
-                return (
-                  <button
-                    key={p.id}
-                    className={`px-3 py-1.5 text-xs font-semibold cursor-pointer transition-colors border-b-2 -mb-px ${
-                      active
-                        ? "border-[var(--accent)] text-[var(--accent)]"
-                        : "border-transparent text-[var(--muted)] hover:text-[var(--text)]"
-                    }`}
-                    onClick={() => setVoiceProvider(p.id)}
-                  >
-                    {p.label}
-                  </button>
-                );
-              })}
+          <div className="flex flex-col gap-4">
+            <div className="text-xs text-[var(--muted)]">
+              Choose the speaking voice here. Provider and TTS/STT backend setup is in Settings.
             </div>
 
-            {/* ── ElevenLabs settings ─────────────────────────────── */}
-            {voiceProvider === "elevenlabs" && (
-              <div className="flex flex-col gap-4">
-                {/* API source toggle — inline */}
-                <div className="flex items-center gap-3">
-                  <span className={labelCls}>API source</span>
-                  <div className="flex items-center gap-0 border border-[var(--border)]">
-                    <button
-                      className={`px-2.5 py-1 text-[11px] font-semibold cursor-pointer transition-colors ${
-                        voiceMode === "cloud"
-                          ? "bg-[var(--accent)] text-[var(--accent-foreground)]"
-                          : "bg-[var(--card)] text-[var(--muted)] hover:text-[var(--text)]"
-                      }`}
-                      onClick={() => setVoiceMode("cloud")}
-                    >
-                      Eliza Cloud
-                    </button>
-                    <button
-                      className={`px-2.5 py-1 text-[11px] font-semibold cursor-pointer transition-colors border-l border-[var(--border)] ${
-                        voiceMode === "own-key"
-                          ? "bg-[var(--accent)] text-[var(--accent-foreground)]"
-                          : "bg-[var(--card)] text-[var(--muted)] hover:text-[var(--text)]"
-                      }`}
-                      onClick={() => setVoiceMode("own-key")}
-                    >
-                      Own Key
-                    </button>
-                  </div>
-                </div>
-
-                {/* Cloud mode status */}
-                {voiceMode === "cloud" && (
-                  <div className="flex items-center justify-between py-2 px-3 border border-[var(--border)] bg-[var(--bg-muted)]">
-                    {cloudConnected ? (
-                      <>
-                        <div className="flex items-center gap-2">
-                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--ok,#16a34a)]" />
-                          <span className="text-[11px] font-semibold">Connected</span>
-                          {cloudUserId && (
-                            <code className="text-[10px] text-[var(--muted)] font-[var(--mono)]">{cloudUserId}</code>
-                          )}
-                        </div>
-                        <button
-                          className={tinyBtnCls}
-                          onClick={() => void handleCloudDisconnect()}
-                          disabled={cloudDisconnecting}
-                        >
-                          {cloudDisconnecting ? "..." : "disconnect"}
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <div className="flex items-center gap-2">
-                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--muted)]" />
-                          <span className="text-[11px] text-[var(--muted)]">Not connected</span>
-                        </div>
-                        <button
-                          className={tinyBtnCls}
-                          onClick={() => void handleCloudLogin()}
-                          disabled={cloudLoginBusy}
-                        >
-                          {cloudLoginBusy ? "waiting..." : "log in"}
-                        </button>
-                      </>
-                    )}
-                    {cloudLoginError && (
-                      <div className="text-[10px] text-[var(--danger,#e74c3c)] mt-1">{cloudLoginError}</div>
-                    )}
-                  </div>
-                )}
-
-                {/* Own key mode */}
-                {voiceMode === "own-key" && (
-                  <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-1.5 text-xs">
-                      <label className="font-semibold">API Key</label>
-                      {voiceConfig.elevenlabs?.apiKey && (
-                        <span className="text-[10px] text-[var(--ok,#16a34a)]">set</span>
-                      )}
-                      <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank" rel="noopener noreferrer" className="text-[10px] text-[var(--accent)] ml-auto">get key</a>
-                    </div>
-                    <input
-                      type="password"
-                      value={voiceConfig.elevenlabs?.apiKey ?? ""}
-                      placeholder="sk_..."
-                      onChange={(e) => handleVoiceFieldChange("elevenlabs", "apiKey", e.target.value)}
-                      className={inputCls + " w-full font-[var(--mono)]"}
-                    />
-                  </div>
-                )}
-
-                {/* ── Voice selection — themed dropdown + preview ──── */}
-                <div className="flex flex-col gap-1">
-                  <label className={labelCls}>voice</label>
-                  <div className="flex items-center gap-2">
-                    <ThemedSelect
-                      value={selectedPresetId === "custom" ? "__custom__" : (selectedPresetId ?? null)}
-                      groups={[
-                        {
-                          label: "Female",
-                          items: VOICE_PRESETS.filter((p) => p.gender === "female").map((p) => ({
-                            id: p.id, text: p.name, hint: p.hint,
-                          })),
-                        },
-                        {
-                          label: "Male",
-                          items: VOICE_PRESETS.filter((p) => p.gender === "male").map((p) => ({
-                            id: p.id, text: p.name, hint: p.hint,
-                          })),
-                        },
-                        {
-                          label: "Character",
-                          items: VOICE_PRESETS.filter((p) => p.gender === "character").map((p) => ({
-                            id: p.id, text: p.name, hint: p.hint,
-                          })),
-                        },
-                        {
-                          label: "Other",
-                          items: [{ id: "__custom__", text: "Custom voice ID..." }],
-                        },
-                      ]}
-                      onChange={(id) => {
-                        if (id === "__custom__") {
-                          setSelectedPresetId("custom");
-                        } else {
-                          const preset = VOICE_PRESETS.find((p) => p.id === id);
-                          if (preset) handleSelectPreset(preset);
-                        }
-                      }}
-                      placeholder="select a voice..."
-                    />
-                    {(() => {
-                      const activePreset = VOICE_PRESETS.find((p) => p.id === selectedPresetId);
-                      if (!activePreset) return null;
-                      return voiceTesting ? (
-                        <button
-                          className={tinyBtnCls}
-                          onClick={handleStopTest}
-                          type="button"
-                        >
-                          stop
-                        </button>
-                      ) : (
-                        <button
-                          className={tinyBtnCls}
-                          onClick={() => handleTestVoice(activePreset.previewUrl)}
-                          type="button"
-                        >
-                          preview
-                        </button>
-                      );
-                    })()}
-                  </div>
-                </div>
-
-                {/* Custom voice ID input */}
-                {selectedPresetId === "custom" && (
-                  <div className="flex flex-col gap-1">
-                    <label className={labelCls}>voice ID</label>
-                    <input
-                      type="text"
-                      value={voiceConfig.elevenlabs?.voiceId ?? ""}
-                      placeholder="paste ElevenLabs voice ID"
-                      onChange={(e) => handleVoiceFieldChange("elevenlabs", "voiceId", e.target.value)}
-                      className={inputCls + " w-full font-[var(--mono)] text-[13px]"}
-                    />
-                  </div>
-                )}
-
-                {/* ── Advanced settings (collapsed) ─────────────────── */}
-                <details className="group">
-                  <summary className="flex items-center gap-1.5 cursor-pointer select-none text-xs font-semibold list-none [&::-webkit-details-marker]:hidden">
-                    <span className="inline-block transition-transform group-open:rotate-90">&#9654;</span>
-                    advanced settings
-                  </summary>
-                  <div className="mt-3">
-                    <ConfigRenderer
-                      schema={{
-                        type: "object",
-                        properties: {
-                          modelId: { type: "string", enum: ["", "eleven_multilingual_v2", "eleven_turbo_v2_5", "eleven_turbo_v2", "eleven_monolingual_v1"] },
-                          stability: { type: "number", minimum: 0, maximum: 1 },
-                          similarityBoost: { type: "number", minimum: 0, maximum: 1 },
-                          speed: { type: "number", minimum: 0.5, maximum: 2 },
-                        },
-                      } satisfies JsonSchemaObject}
-                      hints={{
-                        modelId: { label: "Model", type: "select", width: "full", options: [
-                          { value: "", label: "Default (Multilingual v2)" },
-                          { value: "eleven_multilingual_v2", label: "Multilingual v2" },
-                          { value: "eleven_turbo_v2_5", label: "Turbo v2.5" },
-                          { value: "eleven_turbo_v2", label: "Turbo v2" },
-                          { value: "eleven_monolingual_v1", label: "Monolingual v1" },
-                        ] } satisfies ConfigUiHint,
-                        stability: { label: "Stability", type: "number", width: "third", placeholder: "0.5", step: 0.05 } satisfies ConfigUiHint,
-                        similarityBoost: { label: "Similarity", type: "number", width: "third", placeholder: "0.75", step: 0.05 } satisfies ConfigUiHint,
-                        speed: { label: "Speed", type: "number", width: "third", placeholder: "1.0", step: 0.1 } satisfies ConfigUiHint,
-                      }}
-                      values={{
-                        modelId: voiceConfig.elevenlabs?.modelId ?? "",
-                        stability: voiceConfig.elevenlabs?.stability ?? "",
-                        similarityBoost: voiceConfig.elevenlabs?.similarityBoost ?? "",
-                        speed: voiceConfig.elevenlabs?.speed ?? "",
-                      }}
-                      registry={defaultRegistry}
-                      onChange={(key, value) => {
-                        handleVoiceFieldChange("elevenlabs", key, key === "modelId" ? String(value) : (typeof value === "number" ? value : parseFloat(String(value)) || 0));
-                      }}
-                    />
-                  </div>
-                </details>
-              </div>
-            )}
-
-            {/* ── Simple Voice settings ───────────────────────────── */}
-            {voiceProvider === "simple-voice" && (
-              <div className="text-[11px] text-[var(--muted)]">
-                No configuration needed. Works offline with retro SAM text-to-speech.
-              </div>
-            )}
-
-            {/* ── Microsoft Edge TTS settings ─────────────────────── */}
-            {voiceProvider === "edge" && (
-              <div>
-                <ConfigRenderer
-                  schema={{
-                    type: "object",
-                    properties: {
-                      voice: { type: "string" },
-                      lang: { type: "string" },
-                      rate: { type: "string" },
-                      pitch: { type: "string" },
-                      volume: { type: "string" },
+            <div className="flex flex-col gap-1">
+              <label className={labelCls}>voice</label>
+              <div className="flex items-center gap-2">
+                <ThemedSelect
+                  value={selectedPresetId === "custom" ? "__custom__" : (selectedPresetId ?? null)}
+                  groups={[
+                    {
+                      label: "Female",
+                      items: VOICE_PRESETS.filter((p) => p.gender === "female").map((p) => ({
+                        id: p.id, text: p.name, hint: p.hint,
+                      })),
                     },
-                  } satisfies JsonSchemaObject}
-                  hints={{
-                    voice: { label: "Voice", width: "half", placeholder: "en-US-AriaNeural" } satisfies ConfigUiHint,
-                    lang: { label: "Language", width: "half", placeholder: "en-US" } satisfies ConfigUiHint,
-                    rate: { label: "Rate", width: "third", placeholder: "+0%" } satisfies ConfigUiHint,
-                    pitch: { label: "Pitch", width: "third", placeholder: "+0Hz" } satisfies ConfigUiHint,
-                    volume: { label: "Volume", width: "third", placeholder: "+0%" } satisfies ConfigUiHint,
+                    {
+                      label: "Male",
+                      items: VOICE_PRESETS.filter((p) => p.gender === "male").map((p) => ({
+                        id: p.id, text: p.name, hint: p.hint,
+                      })),
+                    },
+                    {
+                      label: "Character",
+                      items: VOICE_PRESETS.filter((p) => p.gender === "character").map((p) => ({
+                        id: p.id, text: p.name, hint: p.hint,
+                      })),
+                    },
+                    {
+                      label: "Other",
+                      items: [{ id: "__custom__", text: "Custom voice ID..." }],
+                    },
+                  ]}
+                  onChange={(id) => {
+                    if (id === "__custom__") {
+                      setSelectedPresetId("custom");
+                    } else {
+                      const preset = VOICE_PRESETS.find((p) => p.id === id);
+                      if (preset) handleSelectPreset(preset);
+                    }
                   }}
-                  values={{
-                    voice: voiceConfig.edge?.voice ?? "",
-                    lang: voiceConfig.edge?.lang ?? "",
-                    rate: voiceConfig.edge?.rate ?? "",
-                    pitch: voiceConfig.edge?.pitch ?? "",
-                    volume: voiceConfig.edge?.volume ?? "",
-                  }}
-                  registry={defaultRegistry}
-                  onChange={(key, value) => {
-                    handleVoiceFieldChange("edge", key, String(value));
-                  }}
+                  placeholder="select a voice..."
+                />
+                {(() => {
+                  const activePreset = VOICE_PRESETS.find((p) => p.id === selectedPresetId);
+                  if (!activePreset) return null;
+                  return voiceTesting ? (
+                    <button
+                      className={tinyBtnCls}
+                      onClick={handleStopTest}
+                      type="button"
+                    >
+                      stop
+                    </button>
+                  ) : (
+                    <button
+                      className={tinyBtnCls}
+                      onClick={() => handleTestVoice(activePreset.previewUrl)}
+                      type="button"
+                    >
+                      preview
+                    </button>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {selectedPresetId === "custom" && (
+              <div className="flex flex-col gap-1">
+                <label className={labelCls}>voice ID</label>
+                <input
+                  type="text"
+                  value={voiceConfig.elevenlabs?.voiceId ?? ""}
+                  placeholder="paste ElevenLabs voice ID"
+                  onChange={(e) => handleVoiceFieldChange("voiceId", e.target.value)}
+                  className={inputCls + " w-full font-[var(--mono)] text-[13px]"}
                 />
               </div>
             )}
 
-            {/* Save voice config */}
-            <div className="flex items-center gap-3 mt-4 pt-3 border-t border-[var(--border)]">
+            <details className="group">
+              <summary className="flex items-center gap-1.5 cursor-pointer select-none text-xs font-semibold list-none [&::-webkit-details-marker]:hidden">
+                <span className="inline-block transition-transform group-open:rotate-90">&#9654;</span>
+                advanced voice settings
+              </summary>
+              <div className="mt-3">
+                <ConfigRenderer
+                  schema={{
+                    type: "object",
+                    properties: {
+                      modelId: { type: "string", enum: ["", "eleven_multilingual_v2", "eleven_turbo_v2_5", "eleven_turbo_v2", "eleven_monolingual_v1"] },
+                      stability: { type: "number", minimum: 0, maximum: 1 },
+                      similarityBoost: { type: "number", minimum: 0, maximum: 1 },
+                      speed: { type: "number", minimum: 0.5, maximum: 2 },
+                    },
+                  } satisfies JsonSchemaObject}
+                  hints={{
+                    modelId: { label: "Model", type: "select", width: "full", options: [
+                      { value: "", label: "Default (Multilingual v2)" },
+                      { value: "eleven_multilingual_v2", label: "Multilingual v2" },
+                      { value: "eleven_turbo_v2_5", label: "Turbo v2.5" },
+                      { value: "eleven_turbo_v2", label: "Turbo v2" },
+                      { value: "eleven_monolingual_v1", label: "Monolingual v1" },
+                    ] } satisfies ConfigUiHint,
+                    stability: { label: "Stability", type: "number", width: "third", placeholder: "0.5", step: 0.05 } satisfies ConfigUiHint,
+                    similarityBoost: { label: "Similarity", type: "number", width: "third", placeholder: "0.75", step: 0.05 } satisfies ConfigUiHint,
+                    speed: { label: "Speed", type: "number", width: "third", placeholder: "1.0", step: 0.1 } satisfies ConfigUiHint,
+                  }}
+                  values={{
+                    modelId: voiceConfig.elevenlabs?.modelId ?? "",
+                    stability: voiceConfig.elevenlabs?.stability ?? "",
+                    similarityBoost: voiceConfig.elevenlabs?.similarityBoost ?? "",
+                    speed: voiceConfig.elevenlabs?.speed ?? "",
+                  }}
+                  registry={defaultRegistry}
+                  onChange={(key, value) => {
+                    handleVoiceFieldChange(key, key === "modelId" ? String(value) : (typeof value === "number" ? value : parseFloat(String(value)) || 0));
+                  }}
+                />
+              </div>
+            </details>
+
+            <div className="flex items-center gap-3 mt-2 pt-3 border-t border-[var(--border)]">
               <button
                 className={`btn text-xs py-[5px] px-4 !mt-0 ${voiceSaveSuccess ? "!bg-[var(--ok,#16a34a)] !border-[var(--ok,#16a34a)]" : ""}`}
                 onClick={() => void handleVoiceSave()}
                 disabled={voiceSaving}
               >
-                {voiceSaving ? "saving..." : voiceSaveSuccess ? "saved" : "save voice config"}
+                {voiceSaving ? "saving..." : voiceSaveSuccess ? "saved" : "save voice"}
               </button>
               {voiceSaveError && (
                 <span className="text-xs text-[var(--danger,#e74c3c)]">{voiceSaveError}</span>
               )}
             </div>
-          </>
+          </div>
         )}
       </div>
 

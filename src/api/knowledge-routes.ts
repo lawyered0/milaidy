@@ -61,11 +61,34 @@ interface KnowledgeServiceLike {
   deleteMemory(memoryId: UUID): Promise<void>;
 }
 
-function getKnowledgeService(
+async function getKnowledgeService(
   runtime: AgentRuntime | null,
-): KnowledgeServiceLike | null {
+): Promise<KnowledgeServiceLike | null> {
   if (!runtime) return null;
-  return runtime.getService("knowledge") as KnowledgeServiceLike | null;
+
+  // Try to get the service directly first
+  let service = runtime.getService("knowledge") as KnowledgeServiceLike | null;
+  if (service) return service;
+
+  // Service might still be loading - wait for it with a timeout
+  try {
+    const servicePromise = runtime.getServiceLoadPromise("knowledge");
+    const timeout = new Promise<never>((_resolve, reject) => {
+      setTimeout(() => {
+        reject(new Error("Knowledge service load timeout (10s)"));
+      }, 10_000);
+    });
+
+    await Promise.race([servicePromise, timeout]);
+
+    // Try again after waiting
+    service = runtime.getService("knowledge") as KnowledgeServiceLike | null;
+  } catch {
+    // Service didn't load in time or isn't registered
+    return null;
+  }
+
+  return service;
 }
 
 function parsePositiveInt(value: string | null, fallback: number): number {
@@ -263,7 +286,7 @@ export async function handleKnowledgeRoutes(
 
   if (!pathname.startsWith("/api/knowledge")) return false;
 
-  const knowledgeService = getKnowledgeService(runtime);
+  const knowledgeService = await getKnowledgeService(runtime);
   if (!knowledgeService) {
     error(
       res,
