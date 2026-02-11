@@ -1581,17 +1581,66 @@ function extractAuthToken(req: http.IncomingMessage): string | null {
   return null;
 }
 
-function isAuthorized(req: http.IncomingMessage): boolean {
-  const expected = process.env.MILAIDY_API_TOKEN?.trim();
-  if (!expected) return true;
-  const provided = extractAuthToken(req);
-  if (!provided) return false;
+function tokenMatches(expected: string, provided: string): boolean {
   const a = Buffer.from(expected, "utf8");
   const b = Buffer.from(provided, "utf8");
   if (a.length !== b.length) return false;
   return crypto.timingSafeEqual(a, b);
 }
 
+function isAuthorized(req: http.IncomingMessage): boolean {
+  const expected = process.env.MILAIDY_API_TOKEN?.trim();
+  if (!expected) return true;
+  const provided = extractAuthToken(req);
+  if (!provided) return false;
+  return tokenMatches(expected, provided);
+}
+
+function extractWsQueryToken(url: URL): string | null {
+  const token =
+    url.searchParams.get("token") ??
+    url.searchParams.get("apiKey") ??
+    url.searchParams.get("api_key");
+  return token?.trim() || null;
+}
+
+function isWebSocketAuthorized(
+  request: http.IncomingMessage,
+  url: URL,
+): boolean {
+  const expected = process.env.MILAIDY_API_TOKEN?.trim();
+  if (!expected) return true;
+
+  const headerToken = extractAuthToken(request);
+  if (headerToken) return tokenMatches(expected, headerToken);
+
+  const queryToken = extractWsQueryToken(url);
+  if (!queryToken) return false;
+  return tokenMatches(expected, queryToken);
+}
+
+function rejectWebSocketUpgrade(
+  socket: import("node:net").Socket,
+  statusCode: number,
+  message: string,
+): void {
+  const statusText =
+    statusCode === 401
+      ? "Unauthorized"
+      : statusCode === 403
+        ? "Forbidden"
+        : "Bad Request";
+  const body = `${message}\n`;
+  socket.write(
+    `HTTP/1.1 ${statusCode} ${statusText}\r\n` +
+      "Connection: close\r\n" +
+      "Content-Type: text/plain; charset=utf-8\r\n" +
+      `Content-Length: ${Buffer.byteLength(body)}\r\n` +
+      "\r\n" +
+      body,
+  );
+  socket.destroy();
+}
 async function handleRequest(
   req: http.IncomingMessage,
   res: http.ServerResponse,
@@ -6209,17 +6258,35 @@ export async function startApiServer(opts?: {
   // Handle upgrade requests for WebSocket
   server.on("upgrade", (request, socket, head) => {
     try {
-      const { pathname: wsPath } = new URL(
+      const wsUrl = new URL(
         request.url ?? "/",
-        `http://${request.headers.host}`,
+        `http://${request.headers.host ?? "localhost"}`,
       );
-      if (wsPath === "/ws") {
-        wss.handleUpgrade(request, socket, head, (ws) => {
-          wss.emit("connection", ws, request);
-        });
-      } else {
+      if (wsUrl.pathname !== "/ws") {
         socket.destroy();
+        return;
       }
+
+      // Enforce the same origin allowlist for WebSocket upgrades.
+      const origin =
+        typeof request.headers.origin === "string"
+          ? request.headers.origin
+          : undefined;
+      const allowedOrigin = resolveCorsOrigin(origin);
+      if (origin && !allowedOrigin) {
+        rejectWebSocketUpgrade(socket, 403, "Origin not allowed");
+        return;
+      }
+
+      // Enforce API token auth for WebSocket upgrades.
+      if (!isWebSocketAuthorized(request, wsUrl)) {
+        rejectWebSocketUpgrade(socket, 401, "Unauthorized");
+        return;
+      }
+
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit("connection", ws, request);
+      });
     } catch (err) {
       logger.error(
         `[milaidy-api] WebSocket upgrade error: ${err instanceof Error ? err.message : err}`,

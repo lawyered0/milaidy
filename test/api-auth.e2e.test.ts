@@ -15,6 +15,7 @@
  */
 import http from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { WebSocket } from "ws";
 import { startApiServer } from "../src/api/server.js";
 
 // ---------------------------------------------------------------------------
@@ -70,6 +71,38 @@ function req(
     r.on("error", reject);
     if (b) r.write(b);
     r.end();
+  });
+}
+
+type WsConnectResult = { kind: "open" } | { kind: "rejected"; status?: number };
+
+function connectWs(
+  url: string,
+  headers?: Record<string, string>,
+): Promise<WsConnectResult> {
+  return new Promise((resolve) => {
+    const ws = new WebSocket(url, { headers });
+    let settled = false;
+
+    const finish = (result: WsConnectResult) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try {
+        ws.terminate();
+      } catch {
+        // noop
+      }
+      resolve(result);
+    };
+
+    const timer = setTimeout(() => finish({ kind: "rejected" }), 3000);
+
+    ws.on("open", () => finish({ kind: "open" }));
+    ws.on("unexpected-response", (_req, res) =>
+      finish({ kind: "rejected", status: res.statusCode }),
+    );
+    ws.on("error", () => finish({ kind: "rejected" }));
   });
 }
 
@@ -213,6 +246,21 @@ describe("Token auth gate (MILAIDY_API_TOKEN set)", () => {
       headers: { Authorization: `bearer ${TEST_TOKEN}` },
     });
     expect(status).toBe(200);
+  });
+
+  it("rejects WebSocket upgrade without token", async () => {
+    const result = await connectWs(`ws://127.0.0.1:${port}/ws`);
+    expect(result.kind).toBe("rejected");
+    if (result.kind === "rejected") {
+      expect(result.status).toBe(401);
+    }
+  });
+
+  it("accepts WebSocket upgrade with query token", async () => {
+    const result = await connectWs(
+      `ws://127.0.0.1:${port}/ws?token=${encodeURIComponent(TEST_TOKEN)}`,
+    );
+    expect(result.kind).toBe("open");
   });
 
   // ── Auth endpoints exempt from token ───────────────────────────────────
@@ -397,6 +445,23 @@ describe("CORS origin restrictions", () => {
     } finally {
       delete process.env.MILAIDY_ALLOW_NULL_ORIGIN;
     }
+  });
+
+  it("rejects WebSocket from non-local origin", async () => {
+    const result = await connectWs(`ws://127.0.0.1:${port}/ws`, {
+      Origin: "https://evil.example.com",
+    });
+    expect(result.kind).toBe("rejected");
+    if (result.kind === "rejected") {
+      expect(result.status).toBe(403);
+    }
+  });
+
+  it("allows WebSocket from localhost origin", async () => {
+    const result = await connectWs(`ws://127.0.0.1:${port}/ws`, {
+      Origin: `http://localhost:${port}`,
+    });
+    expect(result.kind).toBe("open");
   });
 });
 

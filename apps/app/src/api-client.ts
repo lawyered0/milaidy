@@ -1336,7 +1336,11 @@ export class MilaidyClient {
     if (!host) return;
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const url = `${protocol}//${host}/ws`;
+    let url = `${protocol}//${host}/ws`;
+    const token = this.apiToken;
+    if (token) {
+      url += `?token=${encodeURIComponent(token)}`;
+    }
 
     this.ws = new WebSocket(url);
 
