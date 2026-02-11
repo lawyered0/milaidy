@@ -137,6 +137,51 @@ describe("Auth bypass (no MILAIDY_API_TOKEN)", () => {
   });
 });
 
+describe("Non-loopback bind auto-enforces token auth", () => {
+  let port: number;
+  let close: () => Promise<void>;
+  let envBackup: { restore: () => void };
+  let generatedToken = "";
+
+  beforeAll(async () => {
+    envBackup = saveEnv(
+      "MILAIDY_API_TOKEN",
+      "MILAIDY_API_BIND",
+      "MILAIDY_PAIRING_DISABLED",
+    );
+    delete process.env.MILAIDY_API_TOKEN;
+    process.env.MILAIDY_API_BIND = "0.0.0.0";
+    delete process.env.MILAIDY_PAIRING_DISABLED;
+
+    const server = await startApiServer({ port: 0 });
+    port = server.port;
+    close = server.close;
+    generatedToken = process.env.MILAIDY_API_TOKEN ?? "";
+  }, 30_000);
+
+  afterAll(async () => {
+    await close();
+    envBackup.restore();
+  });
+
+  it("auto-generates a token when bind is non-loopback", () => {
+    expect(generatedToken).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it("rejects unauthenticated requests", async () => {
+    const { status, data } = await req(port, "GET", "/api/status");
+    expect(status).toBe(401);
+    expect(data.error).toBe("Unauthorized");
+  });
+
+  it("accepts requests with the generated token", async () => {
+    const { status } = await req(port, "GET", "/api/status", undefined, {
+      headers: { Authorization: `Bearer ${generatedToken}` },
+    });
+    expect(status).toBe(200);
+  });
+});
+
 // ═══════════════════════════════════════════════════════════════════════════
 // 2. TOKEN AUTH GATE
 // ═══════════════════════════════════════════════════════════════════════════

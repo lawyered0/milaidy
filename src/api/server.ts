@@ -1592,6 +1592,40 @@ function isAuthorized(req: http.IncomingMessage): boolean {
   return crypto.timingSafeEqual(a, b);
 }
 
+function normalizeBindHost(rawBind: string): string {
+  const trimmed = rawBind.trim().toLowerCase();
+  if (!trimmed) return "127.0.0.1";
+
+  // [::1] -> ::1
+  if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+    return trimmed.slice(1, -1);
+  }
+
+  // Handle host:port forms for localhost/IPv4 binds.
+  if ((trimmed.match(/:/g) ?? []).length === 1) {
+    const [host, port] = trimmed.split(":");
+    if (
+      port &&
+      /^\d+$/.test(port) &&
+      (host === "localhost" || /^\d+\.\d+\.\d+\.\d+$/.test(host))
+    ) {
+      return host;
+    }
+  }
+
+  return trimmed;
+}
+
+function isLoopbackBind(rawBind: string): boolean {
+  const host = normalizeBindHost(rawBind);
+  return (
+    host === "localhost" ||
+    host === "::1" ||
+    host === "0:0:0:0:0:0:0:1" ||
+    host.startsWith("127.")
+  );
+}
+
 async function handleRequest(
   req: http.IncomingMessage,
   res: http.ServerResponse,
@@ -5963,6 +5997,20 @@ export async function startApiServer(opts?: {
   const port = opts?.port ?? 2138;
   const host =
     (process.env.MILAIDY_API_BIND ?? "127.0.0.1").trim() || "127.0.0.1";
+
+  // Security: if the API is exposed beyond loopback, always enforce auth.
+  // Auto-generate a per-process token when one isn't explicitly configured.
+  if (!process.env.MILAIDY_API_TOKEN?.trim() && !isLoopbackBind(host)) {
+    const generatedToken = crypto.randomBytes(32).toString("hex");
+    process.env.MILAIDY_API_TOKEN = generatedToken;
+    logger.warn(
+      `[milaidy-api] MILAIDY_API_BIND="${host}" is non-loopback and MILAIDY_API_TOKEN was not set.`,
+    );
+    logger.warn(
+      "[milaidy-api] Generated a temporary API token for this process. Set MILAIDY_API_TOKEN explicitly to persist it across restarts.",
+    );
+    logger.warn(`[milaidy-api] Generated MILAIDY_API_TOKEN: ${generatedToken}`);
+  }
 
   let config: MilaidyConfig;
   try {
