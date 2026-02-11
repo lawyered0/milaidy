@@ -47,3 +47,4 @@ temp_capture_*.jpg
 # Agent learning docs & knowledge base
 knowledge/
 scripts/knowledge-loop.mjs
+test/contracts/
