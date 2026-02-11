@@ -20,9 +20,10 @@ import type { StreamEvent } from "./pi-ai-model-handler.js";
 import { milaidyMarkdownTheme, tuiTheme } from "./theme.js";
 import type { MilaidyTUI } from "./tui-app.js";
 
-const TUI_ROOM_ID = stringToUuid("milaidy-tui-room") as UUID;
+// NOTE: Room + world IDs are derived from the agentId so that switching
+// characters (which changes agentId) does not reuse the same persisted
+// conversation history / metadata.
 const TUI_USER_ID = stringToUuid("milaidy-tui-user") as UUID;
-const TUI_WORLD_ID = stringToUuid("milaidy-tui-world") as UUID;
 
 export class ElizaTUIBridge {
   private isProcessing = false;
@@ -47,10 +48,19 @@ export class ElizaTUIBridge {
   private pendingActions = new Map<string, ToolExecutionComponent>();
   private allToolComponents = new Set<ToolExecutionComponent>();
 
+  private readonly worldId: UUID;
+  private readonly roomId: UUID;
+  private readonly channelId: string;
+
   constructor(
     private runtime: AgentRuntime,
     private tui: MilaidyTUI,
-  ) {}
+  ) {
+    const agentScope = String(this.runtime.agentId);
+    this.worldId = stringToUuid(`milaidy-tui-world:${agentScope}`) as UUID;
+    this.roomId = stringToUuid(`milaidy-tui-room:${agentScope}`) as UUID;
+    this.channelId = `milaidy-tui:${agentScope}`;
+  }
 
   getAbortSignal(): AbortSignal | undefined {
     return this.abortController?.signal;
@@ -62,31 +72,31 @@ export class ElizaTUIBridge {
 
   async initialize(): Promise<void> {
     await this.runtime.ensureWorldExists({
-      id: TUI_WORLD_ID,
+      id: this.worldId,
       name: "Milaidy TUI",
       agentId: this.runtime.agentId,
     });
 
     await this.runtime.ensureRoomExists({
-      id: TUI_ROOM_ID,
+      id: this.roomId,
       name: "Milaidy TUI",
       type: ChannelType.DM,
       source: "milaidy-tui",
-      worldId: TUI_WORLD_ID,
-      channelId: "milaidy-tui",
+      worldId: this.worldId,
+      channelId: this.channelId,
       metadata: { ownership: { ownerId: TUI_USER_ID } },
     });
 
     await this.runtime.ensureConnection({
       entityId: TUI_USER_ID,
-      roomId: TUI_ROOM_ID,
-      worldId: TUI_WORLD_ID,
+      roomId: this.roomId,
+      worldId: this.worldId,
       worldName: "Milaidy TUI",
       userName: "User",
       name: "User",
       source: "milaidy-tui",
       type: ChannelType.DM,
-      channelId: "milaidy-tui",
+      channelId: this.channelId,
       metadata: { ownership: { ownerId: TUI_USER_ID } },
     });
 
@@ -210,7 +220,7 @@ export class ElizaTUIBridge {
         id: crypto.randomUUID() as UUID,
         entityId: TUI_USER_ID,
         agentId: this.runtime.agentId,
-        roomId: TUI_ROOM_ID,
+        roomId: this.roomId,
         content: {
           text,
           source: "milaidy-tui",
