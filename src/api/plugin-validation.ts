@@ -48,6 +48,8 @@ export interface PluginParamInfo {
   default?: string;
 }
 
+const BLOCKED_CONFIG_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
 // ---------------------------------------------------------------------------
 // API key prefix patterns for format validation
 // ---------------------------------------------------------------------------
@@ -89,6 +91,38 @@ export function validatePluginConfig(
 ): PluginValidationResult {
   const errors: Array<{ field: string; message: string }> = [];
   const warnings: Array<{ field: string; message: string }> = [];
+  const configKeys = _configKeys ?? [];
+
+  // ── Reject undeclared or dangerous keys in provided config ────────────
+  if (providedConfig && Object.keys(providedConfig).length > 0) {
+    const allowedKeys = new Set<string>();
+    if (paramDefs && paramDefs.length > 0) {
+      for (const param of paramDefs) {
+        allowedKeys.add(param.key);
+      }
+    } else {
+      for (const key of configKeys) {
+        allowedKeys.add(key);
+      }
+      if (envKey) allowedKeys.add(envKey);
+    }
+
+    for (const key of Object.keys(providedConfig)) {
+      if (BLOCKED_CONFIG_KEYS.has(key)) {
+        errors.push({
+          field: key,
+          message: `${key} is not allowed in plugin config`,
+        });
+        continue;
+      }
+      if (!allowedKeys.has(key)) {
+        errors.push({
+          field: key,
+          message: `${key} is not a declared config key for this plugin`,
+        });
+      }
+    }
+  }
 
   // ── Check all required parameters ─────────────────────────────────────
   if (paramDefs && paramDefs.length > 0) {

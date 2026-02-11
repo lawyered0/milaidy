@@ -337,6 +337,48 @@ describe("Plugin Lifecycle E2E", () => {
       );
     });
 
+    it("rejects undeclared config keys with 422", async () => {
+      const { data: listData } = await http$(
+        server.port,
+        "GET",
+        "/api/plugins",
+      );
+      const plugins = listData.plugins as Array<Record<string, unknown>>;
+      const provider = plugins.find(
+        (p) =>
+          p.category === "ai-provider" &&
+          (p.parameters as Array<Record<string, unknown>>).some(
+            (pr) => pr.required === true,
+          ),
+      );
+      if (!provider) return;
+
+      const requiredParams = (
+        provider.parameters as Array<Record<string, unknown>>
+      ).filter((pr) => pr.required === true);
+      const config: Record<string, string> = {};
+      for (const param of requiredParams) {
+        config[param.key as string] = "sk-ant-test-1234567890abcdefghij";
+      }
+
+      const injectedKey = "MILAIDY_INJECTION_TEST_KEY";
+      delete process.env[injectedKey];
+      config[injectedKey] = "should-not-be-accepted";
+
+      const { status, data } = await http$(
+        server.port,
+        "PUT",
+        `/api/plugins/${provider.id}`,
+        { config },
+      );
+      expect(status).toBe(422);
+      expect(data.ok).toBe(false);
+      expect((data.validationErrors as Array<unknown>).length).toBeGreaterThan(
+        0,
+      );
+      expect(process.env[injectedKey]).toBeUndefined();
+    });
+
     it("accepts valid config value", async () => {
       const { data: listData } = await http$(
         server.port,
