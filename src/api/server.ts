@@ -3162,6 +3162,42 @@ function isAuthorized(req: http.IncomingMessage): boolean {
   return tokenMatches(expected, provided);
 }
 
+export interface PluginConfigMutationRejection {
+  field: string;
+  message: string;
+}
+
+export function resolvePluginConfigMutationRejections(
+  pluginParams: Array<{ key: string }>,
+  config: Record<string, unknown>,
+): PluginConfigMutationRejection[] {
+  const allowedParamKeys = new Set(
+    pluginParams.map((p) => p.key.toUpperCase().trim()),
+  );
+  const rejections: PluginConfigMutationRejection[] = [];
+
+  for (const key of Object.keys(config)) {
+    const normalized = key.toUpperCase().trim();
+
+    if (!allowedParamKeys.has(normalized)) {
+      rejections.push({
+        field: key,
+        message: `${key} is not a declared config key for this plugin`,
+      });
+      continue;
+    }
+
+    if (BLOCKED_ENV_KEYS.has(normalized)) {
+      rejections.push({
+        field: key,
+        message: `${key} is blocked for security reasons`,
+      });
+    }
+  }
+
+  return rejections;
+}
+
 interface WalletExportRequestBody {
   confirm?: boolean;
   exportToken?: string;
@@ -5748,6 +5784,19 @@ async function handleRequest(
       plugin.enabled = body.enabled;
     }
     if (body.config) {
+      const configRejections = resolvePluginConfigMutationRejections(
+        plugin.parameters,
+        body.config,
+      );
+      if (configRejections.length > 0) {
+        json(
+          res,
+          { ok: false, plugin, validationErrors: configRejections },
+          422,
+        );
+        return;
+      }
+
       // Only validate the fields actually being submitted — not all required
       // fields. Users may save partial config (e.g. just the API key) from
       // the Settings page; blocking the save because OTHER required fields
@@ -5781,21 +5830,12 @@ async function handleRequest(
         return;
       }
 
-      // Only allow env vars declared in the plugin's parameter definitions.
-      // This prevents attackers from injecting arbitrary env vars like
-      // NODE_OPTIONS, LD_PRELOAD, PATH, etc. via the config endpoint.
-      const allowedParamKeys = new Set(plugin.parameters.map((p) => p.key));
-
       // Persist config values to state.config.env so they survive restarts
       if (!state.config.env) {
         state.config.env = {};
       }
       for (const [key, value] of Object.entries(body.config)) {
-        if (
-          allowedParamKeys.has(key) &&
-          typeof value === "string" &&
-          value.trim()
-        ) {
+        if (typeof value === "string" && value.trim()) {
           process.env[key] = value;
           (state.config.env as Record<string, unknown>)[key] = value;
         }
