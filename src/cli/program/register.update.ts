@@ -10,8 +10,8 @@
 
 import type { Command } from "commander";
 import type { ReleaseChannel } from "../../config/types.milaidy.js";
-import { VERSION } from "../../runtime/version.js";
 import { theme } from "../../terminal/theme.js";
+import { CLI_VERSION } from "../version.js";
 
 const ALL_CHANNELS: readonly ReleaseChannel[] = ["stable", "beta", "nightly"];
 
@@ -86,7 +86,7 @@ async function updateAction(opts: {
   console.log(
     `\n${theme.heading("Milaidy Update")}  ${theme.muted(`(channel: ${effectiveChannel})`)}`,
   );
-  console.log(theme.muted(`Current version: ${VERSION}\n`));
+  console.log(theme.muted(`Current version: ${CLI_VERSION}\n`));
   console.log("Checking for updates...\n");
 
   const result = await checkForUpdate({ force: opts.force ?? !!newChannel });
@@ -100,14 +100,14 @@ async function updateAction(opts: {
   if (!result.updateAvailable) {
     console.log(
       theme.success(
-        `  Already up to date! (${VERSION} is the latest on ${effectiveChannel})\n`,
+        `  Already up to date! (${CLI_VERSION} is the latest on ${effectiveChannel})\n`,
       ),
     );
     return;
   }
 
   console.log(
-    `  ${theme.accent("Update available:")} ${VERSION} -> ${theme.success(result.latestVersion ?? "unknown")}`,
+    `  ${theme.accent("Update available:")} ${CLI_VERSION} -> ${theme.success(result.latestVersion ?? "unknown")}`,
   );
   console.log(
     theme.muted(
@@ -133,7 +133,11 @@ async function updateAction(opts: {
   console.log(theme.muted(`  Install method: ${method}`));
   console.log("  Installing update...\n");
 
-  const updateResult = await performUpdate(VERSION, effectiveChannel, method);
+  const updateResult = await performUpdate(
+    CLI_VERSION,
+    effectiveChannel,
+    method,
+  );
 
   if (!updateResult.success) {
     console.error(theme.error(`\n  Update failed: ${updateResult.error}\n`));
@@ -148,7 +152,7 @@ async function updateAction(opts: {
   if (updateResult.newVersion) {
     console.log(
       theme.success(
-        `\n  Updated successfully! ${VERSION} -> ${updateResult.newVersion}`,
+        `\n  Updated successfully! ${CLI_VERSION} -> ${updateResult.newVersion}`,
       ),
     );
   } else {
@@ -177,7 +181,7 @@ async function statusAction(): Promise<void> {
   const config = loadMilaidyConfig();
   const channel = resolveChannel(config.update);
 
-  console.log(`  Installed:  ${theme.accent(VERSION)}`);
+  console.log(`  Installed:  ${theme.accent(CLI_VERSION)}`);
   console.log(`  Channel:    ${channelLabel(channel)}`);
   console.log(`  Install:    ${theme.muted(detectInstallMethod())}`);
 

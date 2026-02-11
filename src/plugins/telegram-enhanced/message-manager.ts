@@ -98,14 +98,18 @@ export class EnhancedTelegramMessageManager extends MessageManager {
     if (typeof ctx.telegram.editMessageText !== "function") {
       const sentMessages: Array<object | boolean | null | undefined> = [];
       for (let i = 0; i < chunks.length; i += 1) {
-        const sent = await ctx.telegram.sendMessage(ctx.chat.id, chunks[i].html, {
-          parse_mode: "HTML",
-          reply_parameters:
-            i === 0 && replyToMessageId
-              ? { message_id: replyToMessageId }
-              : undefined,
-          ...(i === 0 && finalReplyMarkup ? finalReplyMarkup : {}),
-        });
+        const sent = await ctx.telegram.sendMessage(
+          ctx.chat.id,
+          chunks[i].html,
+          {
+            parse_mode: "HTML",
+            reply_parameters:
+              i === 0 && replyToMessageId
+                ? { message_id: replyToMessageId }
+                : undefined,
+            ...(i === 0 && finalReplyMarkup ? finalReplyMarkup : {}),
+          },
+        );
         sentMessages.push(sent);
       }
       return sentMessages;

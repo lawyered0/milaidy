@@ -71,6 +71,7 @@ export function CommandPalette() {
       { id: "nav-features", label: "Open Features", action: () => setTab("features") },
       { id: "nav-connectors", label: "Open Connectors", action: () => setTab("connectors") },
       { id: "nav-skills", label: "Open Skills", action: () => setTab("skills") },
+      { id: "nav-fine-tuning", label: "Open Fine-Tuning", action: () => setTab("fine_tuning") },
       { id: "nav-character", label: "Open Character", action: () => setTab("character") },
       { id: "nav-config", label: "Open Config", action: () => setTab("config") },
       { id: "nav-admin", label: "Open Admin", action: () => setTab("admin") },

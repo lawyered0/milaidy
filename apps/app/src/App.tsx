@@ -14,6 +14,7 @@ import { AutonomousPanel } from "./components/AutonomousPanel.js";
 import { FeaturesView, ConnectorsView } from "./components/PluginsView.js";
 import { SkillsView } from "./components/SkillsView.js";
 import { TriggersView } from "./components/TriggersView.js";
+import { FineTuningView } from "./components/FineTuningView.js";
 import { InventoryView } from "./components/InventoryView.js";
 import { CharacterView } from "./components/CharacterView.js";
 import { ConfigView } from "./components/ConfigView.js";
@@ -33,6 +34,7 @@ function ViewRouter() {
     case "connectors": return <ConnectorsView />;
     case "skills": return <SkillsView />;
     case "triggers": return <TriggersView />;
+    case "fine_tuning": return <FineTuningView />;
     case "character": return <CharacterView />;
     case "config": return <ConfigView />;
     case "admin": return <AdminView />;

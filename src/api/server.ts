@@ -42,13 +42,13 @@ import {
   searchMcpMarketplace,
 } from "../services/mcp-marketplace.js";
 import type { SandboxManager } from "../services/sandbox-manager.js";
-import { TrainingService } from "../services/training-service.js";
 import {
   installMarketplaceSkill,
   listInstalledMarketplaceSkills,
   searchSkillsMarketplace,
   uninstallMarketplaceSkill,
 } from "../services/skill-marketplace.js";
+import { TrainingService } from "../services/training-service.js";
 import { type CloudRouteState, handleCloudRoute } from "./cloud-routes.js";
 import { handleDatabaseRoute } from "./database.js";
 import {
@@ -1873,7 +1873,7 @@ function isWebSocketAuthorized(
 }
 
 function rejectWebSocketUpgrade(
-  socket: import("node:net").Socket,
+  socket: import("node:stream").Duplex,
   statusCode: number,
   message: string,
 ): void {
@@ -1938,6 +1938,12 @@ async function handleRequest(
       logger.info(
         `[milaidy-api] No in-process restart handler; exiting for external restart (${reason})`,
       );
+      if (process.env.VITEST || process.env.NODE_ENV === "test") {
+        logger.info(
+          "[milaidy-api] Skipping process.exit during test execution",
+        );
+        return;
+      }
       process.exit(API_RESTART_EXIT_CODE);
     };
 
@@ -2668,6 +2674,25 @@ async function handleRequest(
   });
   if (triggerHandled) {
     return;
+  }
+
+  if (pathname.startsWith("/api/training")) {
+    if (!state.trainingService) {
+      error(res, "Training service is not available", 503);
+      return;
+    }
+    const trainingHandled = await handleTrainingRoutes({
+      req,
+      res,
+      method,
+      pathname,
+      runtime: state.runtime,
+      trainingService: state.trainingService,
+      readJsonBody,
+      json,
+      error,
+    });
+    if (trainingHandled) return;
   }
 
   // ── POST /api/agent/restart ────────────────────────────────────────────
@@ -4613,20 +4638,24 @@ async function handleRequest(
       ? Math.min(Math.max(Math.trunc(limitRaw), 1), 1000)
       : 200;
     const afterEventId = url.searchParams.get("after");
+    const autonomyEvents = state.eventBuffer.filter(
+      (event) =>
+        event.type === "agent_event" || event.type === "heartbeat_event",
+    );
     let startIndex = 0;
     if (afterEventId) {
-      const idx = state.eventBuffer.findIndex(
+      const idx = autonomyEvents.findIndex(
         (event) => event.eventId === afterEventId,
       );
       if (idx >= 0) startIndex = idx + 1;
     }
-    const events = state.eventBuffer.slice(startIndex, startIndex + limit);
+    const events = autonomyEvents.slice(startIndex, startIndex + limit);
     const latestEventId =
       events.length > 0 ? events[events.length - 1].eventId : null;
     json(res, {
       events,
       latestEventId,
-      totalBuffered: state.eventBuffer.length,
+      totalBuffered: autonomyEvents.length,
       replayed: true,
     });
     return;
@@ -5341,7 +5370,7 @@ async function handleRequest(
     return;
   }
 
-  // ── POST /api/conversations/:id/messages ────────────────────────────
+  // ── POST /api/conversations/:id/messages/stream ─────────────────────
   if (
     method === "POST" &&
     /^\/api\/conversations\/[^/]+\/messages\/stream$/.test(pathname)
@@ -5427,12 +5456,17 @@ async function handleRequest(
         },
       });
 
-      const result = await generateChatResponse(runtime, message, state.agentName, {
-        isAborted: () => aborted,
-        onChunk: (chunk) => {
-          writeSse(res, { type: "token", text: chunk });
+      const result = await generateChatResponse(
+        runtime,
+        message,
+        state.agentName,
+        {
+          isAborted: () => aborted,
+          onChunk: (chunk) => {
+            writeSse(res, { type: "token", text: chunk });
+          },
         },
-      });
+      );
 
       if (!aborted) {
         conv.updatedAt = new Date().toISOString();
@@ -5702,12 +5736,17 @@ async function handleRequest(
         },
       });
 
-      const result = await generateChatResponse(runtime, message, state.agentName, {
-        isAborted: () => aborted,
-        onChunk: (chunk) => {
-          writeSse(res, { type: "token", text: chunk });
+      const result = await generateChatResponse(
+        runtime,
+        message,
+        state.agentName,
+        {
+          isAborted: () => aborted,
+          onChunk: (chunk) => {
+            writeSse(res, { type: "token", text: chunk });
+          },
         },
-      });
+      );
 
       if (!aborted) {
         writeSse(res, {
@@ -6695,8 +6734,14 @@ export async function startApiServer(opts?: {
       saveMilaidyConfig(nextConfig);
     },
   });
-  await trainingService.initialize();
-  state.trainingService = trainingService;
+  try {
+    await trainingService.initialize();
+    state.trainingService = trainingService;
+  } catch (err) {
+    logger.error(
+      `[milaidy-api] Training service init failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
   const configuredAdminEntityId = config.agents?.defaults?.adminEntityId;
   if (configuredAdminEntityId && isUuidLike(configuredAdminEntityId)) {
     state.adminEntityId = configuredAdminEntityId;

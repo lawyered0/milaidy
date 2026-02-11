@@ -1360,6 +1360,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     chatAbortRef.current?.abort();
     chatAbortRef.current = null;
     setChatSending(false);
+    setChatFirstTokenReceived(false);
   }, []);
 
   const handleChatClear = useCallback(async () => {

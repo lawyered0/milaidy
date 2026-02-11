@@ -16,15 +16,16 @@ import type {
 import * as elizaCore from "@elizaos/core";
 
 type ElizaCoreSessionHelpers = {
-  buildAgentMainSessionKey?: (params: { agentId: string; mainKey: string }) => string;
+  buildAgentMainSessionKey?: (params: {
+    agentId: string;
+    mainKey: string;
+  }) => string;
   ChannelType?: {
     DM: number | string;
     SELF: number | string;
     GROUP: number | string;
   };
-  parseAgentSessionKey?: (
-    key: string,
-  ) =>
+  parseAgentSessionKey?: (key: string) =>
     | {
         agentId?: string;
       }
@@ -38,16 +39,17 @@ const channelType = coreSessionHelpers.ChannelType ?? {
   GROUP: "GROUP",
 };
 
-function buildAgentMainSessionKey(params: { agentId: string; mainKey: string }): string {
+function buildAgentMainSessionKey(params: {
+  agentId: string;
+  mainKey: string;
+}): string {
   if (typeof coreSessionHelpers.buildAgentMainSessionKey === "function") {
     return coreSessionHelpers.buildAgentMainSessionKey(params);
   }
   return `agent:${params.agentId}:${params.mainKey}`;
 }
 
-function parseAgentSessionKey(
-  key: string,
-):
+function parseAgentSessionKey(key: string):
   | {
       agentId?: string;
     }

@@ -89,7 +89,9 @@ describe("CloudManager", () => {
 
     it("throws when apiKey is missing", async () => {
       const mgr = new CloudManager(cfg({ apiKey: undefined }));
-      await expect(mgr.init()).rejects.toThrow("Cloud API key is not configured");
+      await expect(mgr.init()).rejects.toThrow(
+        "Cloud API key is not configured",
+      );
     });
 
     it("strips /api/v1 suffix from baseUrl", async () => {

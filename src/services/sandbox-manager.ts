@@ -163,6 +163,11 @@ export class SandboxManager {
     this.setState("initializing");
 
     try {
+      const image = this.config.image ?? "milaidy-sandbox:bookworm-slim";
+      const containerPrefix = this.config.containerPrefix ?? "milaidy-sandbox";
+      const workdir = this.config.workdir ?? "/workspace";
+      const network = this.config.network ?? "none";
+      const user = this.config.user ?? "1000:1000";
       const wsRoot =
         this.config.workspaceRoot ??
         join(process.env.HOME ?? "/tmp", ".milaidy", "sandbox-workspace");
@@ -174,7 +179,6 @@ export class SandboxManager {
         );
       }
 
-      const image = this.config.image!;
       if (!this.engine.imageExists(image)) {
         try {
           await this.engine.pullImage(image);
@@ -186,7 +190,7 @@ export class SandboxManager {
       }
 
       // Cleanup orphans from previous runs
-      const orphans = this.engine.listContainers(this.config.containerPrefix!);
+      const orphans = this.engine.listContainers(containerPrefix);
       for (const id of orphans) {
         await this.engine.stopContainer(id);
         await this.engine.removeContainer(id);
@@ -195,14 +199,12 @@ export class SandboxManager {
       // Create sandbox container via engine
       this.containerId = await this.engine.runContainer({
         image,
-        name: `${this.config.containerPrefix}-${Date.now()}`,
+        name: `${containerPrefix}-${Date.now()}`,
         detach: true,
-        mounts: [
-          { host: wsRoot, container: this.config.workdir!, readonly: false },
-        ],
+        mounts: [{ host: wsRoot, container: workdir, readonly: false }],
         env: this.config.env ?? {},
-        network: this.config.network!,
-        user: this.config.user!,
+        network,
+        user,
         capDrop: this.config.capDrop ?? [],
         memory: this.config.memory,
         cpus: this.config.cpus,
@@ -262,6 +264,11 @@ export class SandboxManager {
     });
 
     try {
+      const image = this.config.image ?? "milaidy-sandbox:bookworm-slim";
+      const containerPrefix = this.config.containerPrefix ?? "milaidy-sandbox";
+      const workdir = this.config.workdir ?? "/workspace";
+      const network = this.config.network ?? "none";
+      const user = this.config.user ?? "1000:1000";
       if (this.containerId) {
         await this.engine.stopContainer(this.containerId);
         await this.engine.removeContainer(this.containerId);
@@ -273,7 +280,7 @@ export class SandboxManager {
         this.browserContainerId = null;
       }
 
-      const orphans = this.engine.listContainers(this.config.containerPrefix!);
+      const orphans = this.engine.listContainers(containerPrefix);
       for (const id of orphans) {
         await this.engine.stopContainer(id);
         await this.engine.removeContainer(id);
@@ -285,15 +292,13 @@ export class SandboxManager {
       mkdirSync(wsRoot, { recursive: true });
 
       this.containerId = await this.engine.runContainer({
-        image: this.config.image!,
-        name: `${this.config.containerPrefix}-${Date.now()}`,
+        image,
+        name: `${containerPrefix}-${Date.now()}`,
         detach: true,
-        mounts: [
-          { host: wsRoot, container: this.config.workdir!, readonly: false },
-        ],
+        mounts: [{ host: wsRoot, container: workdir, readonly: false }],
         env: this.config.env ?? {},
-        network: this.config.network!,
-        user: this.config.user!,
+        network,
+        user,
         capDrop: this.config.capDrop ?? [],
         memory: this.config.memory,
         cpus: this.config.cpus,

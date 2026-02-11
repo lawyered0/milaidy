@@ -15,6 +15,7 @@ export default defineConfig({
         "test/format-error.test.ts",
       ]),
       "apps/app/test/app/autonomous-panel.test.ts",
+      "apps/app/test/app/chat-stream-api-client.test.ts",
     ],
     exclude: baseTest.exclude ?? [],
   },

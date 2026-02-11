@@ -8,7 +8,7 @@
  * - model artifact registry + local activation helpers
  */
 
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import crypto from "node:crypto";
 import { EventEmitter } from "node:events";
 import { existsSync } from "node:fs";
@@ -20,8 +20,11 @@ import { resolveStateDir } from "../config/paths.js";
 import type { MilaidyConfig } from "../config/types.js";
 
 type SqlPrimitive = string | number | boolean | null;
-type SqlCell = SqlPrimitive | Date | SqlRow | SqlCell[];
-type SqlRow = Record<string, SqlCell>;
+interface SqlCellArray extends Array<SqlCell> {}
+type SqlCell = SqlPrimitive | Date | SqlRow | SqlCellArray;
+interface SqlRow {
+  [key: string]: SqlCell;
+}
 
 type JsonValue =
   | string
@@ -221,7 +224,7 @@ function asIsoString(value: SqlCell | undefined): string {
 
 function pickCell(row: SqlRow, ...keys: string[]): SqlCell | undefined {
   for (const key of keys) {
-    if (Object.prototype.hasOwnProperty.call(row, key)) {
+    if (Object.hasOwn(row, key)) {
       return row[key];
     }
   }
@@ -259,7 +262,9 @@ function extractLlmCallsFromSteps(steps: JsonValue[]): ParsedLlmCall[] {
       const systemPrompt = String(
         rawCall.systemPrompt ?? rawCall.system_prompt ?? "",
       );
-      const userPrompt = String(rawCall.userPrompt ?? rawCall.user_prompt ?? "");
+      const userPrompt = String(
+        rawCall.userPrompt ?? rawCall.user_prompt ?? "",
+      );
       const response = String(rawCall.response ?? "");
       if (
         systemPrompt.trim().length < 8 ||
@@ -289,7 +294,8 @@ function summarizeTrajectory(row: SqlRow): TrainingTrajectorySummary {
     asString(pickCell(row, "trajectoryId", "trajectory_id", "id")) ??
     "unknown-trajectory";
   const id = asString(pickCell(row, "id")) ?? trajectoryId;
-  const agentId = asString(pickCell(row, "agentId", "agent_id")) ?? "unknown-agent";
+  const agentId =
+    asString(pickCell(row, "agentId", "agent_id")) ?? "unknown-agent";
   const createdAt = asIsoString(pickCell(row, "createdAt", "created_at"));
   return {
     id,
@@ -320,7 +326,10 @@ export class TrainingService {
   private readonly datasets = new Map<string, TrainingDatasetRecord>();
   private readonly jobs = new Map<string, TrainingJobRecord>();
   private readonly models = new Map<string, TrainingModelRecord>();
-  private readonly processes = new Map<string, ChildProcessWithoutNullStreams>();
+  private readonly processes = new Map<
+    string,
+    ChildProcessWithoutNullStreams
+  >();
 
   constructor(options: ServiceOptions) {
     this.getRuntime = options.getRuntime;
@@ -434,7 +443,9 @@ export class TrainingService {
     return { rows, columns };
   }
 
-  private async trajectoriesTableExists(runtime: AgentRuntime): Promise<boolean> {
+  private async trajectoriesTableExists(
+    runtime: AgentRuntime,
+  ): Promise<boolean> {
     const probe = await this.executeRawSql(
       runtime,
       "SELECT to_regclass('public.trajectories') AS table_name",
@@ -512,7 +523,9 @@ export class TrainingService {
     const summary = summarizeTrajectory(row);
     const stepsCell = pickCell(row, "stepsJson", "steps_json");
     const stepsJson =
-      typeof stepsCell === "string" ? stepsCell : JSON.stringify(stepsCell ?? []);
+      typeof stepsCell === "string"
+        ? stepsCell
+        : JSON.stringify(stepsCell ?? []);
     return {
       ...summary,
       stepsJson,
@@ -542,7 +555,9 @@ export class TrainingService {
     return trajectories;
   }
 
-  async buildDataset(options: DatasetBuildOptions = {}): Promise<TrainingDatasetRecord> {
+  async buildDataset(
+    options: DatasetBuildOptions = {},
+  ): Promise<TrainingDatasetRecord> {
     await this.initialize();
     const maxTrajectories = Math.max(1, Math.min(5000, options.limit ?? 250));
     const minLlmCalls = Math.max(1, options.minLlmCallsPerTrajectory ?? 1);
@@ -618,7 +633,11 @@ export class TrainingService {
       sampleCount: lines.length,
       trajectoryCount: includedTrajectories,
     };
-    await fs.writeFile(metadataPath, `${JSON.stringify(record, null, 2)}\n`, "utf-8");
+    await fs.writeFile(
+      metadataPath,
+      `${JSON.stringify(record, null, 2)}\n`,
+      "utf-8",
+    );
 
     this.datasets.set(record.id, record);
     await this.saveState();
@@ -657,10 +676,19 @@ export class TrainingService {
   ): { progress: number; phase: string } {
     const normalized = line.toLowerCase();
     if (normalized.includes("loading real training data")) {
-      return { progress: Math.max(currentProgress, 0.1), phase: "loading_data" };
+      return {
+        progress: Math.max(currentProgress, 0.1),
+        phase: "loading_data",
+      };
     }
-    if (normalized.includes("converted") && normalized.includes("training samples")) {
-      return { progress: Math.max(currentProgress, 0.25), phase: "preparing_samples" };
+    if (
+      normalized.includes("converted") &&
+      normalized.includes("training samples")
+    ) {
+      return {
+        progress: Math.max(currentProgress, 0.25),
+        phase: "preparing_samples",
+      };
     }
     if (normalized.includes("training with")) {
       return { progress: Math.max(currentProgress, 0.45), phase: "training" };
@@ -680,7 +708,10 @@ export class TrainingService {
     return match[1].trim();
   }
 
-  private async appendLogLine(job: TrainingJobRecord, line: string): Promise<void> {
+  private async appendLogLine(
+    job: TrainingJobRecord,
+    line: string,
+  ): Promise<void> {
     if (line.trim().length === 0) return;
     job.logs.push(line);
     if (job.logs.length > MAX_STORED_JOB_LOG_LINES) {
@@ -819,7 +850,9 @@ export class TrainingService {
     });
   }
 
-  async startTrainingJob(options: StartTrainingOptions = {}): Promise<TrainingJobRecord> {
+  async startTrainingJob(
+    options: StartTrainingOptions = {},
+  ): Promise<TrainingJobRecord> {
     await this.initialize();
     const runningJob = Array.from(this.jobs.values()).find(
       (job) => job.status === "running" || job.status === "queued",
@@ -951,11 +984,9 @@ export class TrainingService {
       datasetId: dataset.id,
     });
 
-    logger.info(`[training-service] started job ${job.id}`, {
-      datasetId: dataset.id,
-      outputDir,
-      backend: options.backend ?? "cpu",
-    });
+    logger.info(
+      `[training-service] started job ${job.id} datasetId=${dataset.id} outputDir=${outputDir} backend=${options.backend ?? "cpu"}`,
+    );
 
     return job;
   }
@@ -1006,11 +1037,14 @@ export class TrainingService {
     return this.models.get(modelId) ?? null;
   }
 
-  async importModelToOllama(modelId: string, options?: {
-    modelName?: string;
-    baseModel?: string;
-    ollamaUrl?: string;
-  }): Promise<TrainingModelRecord> {
+  async importModelToOllama(
+    modelId: string,
+    options?: {
+      modelName?: string;
+      baseModel?: string;
+      ollamaUrl?: string;
+    },
+  ): Promise<TrainingModelRecord> {
     await this.initialize();
     const model = this.models.get(modelId);
     if (!model) throw new Error(`Model ${modelId} not found`);
@@ -1060,7 +1094,10 @@ export class TrainingService {
     return model;
   }
 
-  async activateModel(modelId: string, providerModel?: string): Promise<ActivateModelResult> {
+  async activateModel(
+    modelId: string,
+    providerModel?: string,
+  ): Promise<ActivateModelResult> {
     await this.initialize();
     const model = this.models.get(modelId);
     if (!model) throw new Error(`Model ${modelId} not found`);
@@ -1134,7 +1171,11 @@ export class TrainingService {
     }
 
     const pythonRoot = this.resolvePythonRoot();
-    const benchmarkScript = path.join(pythonRoot, "scripts", "test_trained_model.py");
+    const benchmarkScript = path.join(
+      pythonRoot,
+      "scripts",
+      "test_trained_model.py",
+    );
     if (!existsSync(benchmarkScript)) {
       throw new Error(
         `Benchmark script not found at ${benchmarkScript}. Set MILAIDY_TRAINING_PYTHON_ROOT to override.`,
@@ -1168,7 +1209,12 @@ export class TrainingService {
       child.on("close", (code: number | null) => {
         const combined = `${stdout}\n${stderr}`.trim();
         if (code === 0) resolve(combined);
-        else reject(new Error(combined || `Benchmark failed with exit code ${String(code)}`));
+        else
+          reject(
+            new Error(
+              combined || `Benchmark failed with exit code ${String(code)}`,
+            ),
+          );
       });
     });
 
@@ -1201,4 +1247,3 @@ export class TrainingService {
     };
   }
 }
-

@@ -56,7 +56,10 @@ export async function handleTrainingRoutes(
 
   // ── GET /api/training/trajectories ─────────────────────────────────────
   if (method === "GET" && pathname === "/api/training/trajectories") {
-    const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+    const url = new URL(
+      req.url ?? "/",
+      `http://${req.headers.host ?? "localhost"}`,
+    );
     const limit = parsePositiveInt(url.searchParams.get("limit"), 100);
     const offset = Math.max(0, Number(url.searchParams.get("offset") ?? "0"));
     const result = await trainingService.listTrajectories({ limit, offset });
@@ -65,7 +68,9 @@ export async function handleTrainingRoutes(
   }
 
   // ── GET /api/training/trajectories/:id ─────────────────────────────────
-  const trajectoryMatch = /^\/api\/training\/trajectories\/([^/]+)$/.exec(pathname);
+  const trajectoryMatch = /^\/api\/training\/trajectories\/([^/]+)$/.exec(
+    pathname,
+  );
   if (method === "GET" && trajectoryMatch) {
     const trajectoryId = decodeURIComponent(trajectoryMatch[1]);
     const detail = await trainingService.getTrajectoryById(trajectoryId);
@@ -170,8 +175,9 @@ export async function handleTrainingRoutes(
   }
 
   // ── POST /api/training/models/:id/import-ollama ───────────────────────
-  const importMatch =
-    /^\/api\/training\/models\/([^/]+)\/import-ollama$/.exec(pathname);
+  const importMatch = /^\/api\/training\/models\/([^/]+)\/import-ollama$/.exec(
+    pathname,
+  );
   if (method === "POST" && importMatch) {
     const modelId = decodeURIComponent(importMatch[1]);
     const body = await readJsonBody<{
@@ -191,8 +197,9 @@ export async function handleTrainingRoutes(
   }
 
   // ── POST /api/training/models/:id/activate ─────────────────────────────
-  const activateMatch =
-    /^\/api\/training\/models\/([^/]+)\/activate$/.exec(pathname);
+  const activateMatch = /^\/api\/training\/models\/([^/]+)\/activate$/.exec(
+    pathname,
+  );
   if (method === "POST" && activateMatch) {
     const modelId = decodeURIComponent(activateMatch[1]);
     const body = await readJsonBody<{ providerModel?: string }>(req, res);
@@ -211,8 +218,9 @@ export async function handleTrainingRoutes(
   }
 
   // ── POST /api/training/models/:id/benchmark ────────────────────────────
-  const benchmarkMatch =
-    /^\/api\/training\/models\/([^/]+)\/benchmark$/.exec(pathname);
+  const benchmarkMatch = /^\/api\/training\/models\/([^/]+)\/benchmark$/.exec(
+    pathname,
+  );
   if (method === "POST" && benchmarkMatch) {
     const modelId = decodeURIComponent(benchmarkMatch[1]);
     try {
@@ -227,4 +235,3 @@ export async function handleTrainingRoutes(
 
   return false;
 }
-

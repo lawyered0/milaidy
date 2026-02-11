@@ -17,7 +17,7 @@
  * These tests exercise REAL production code, not mocks.
  */
 import http from "node:http";
-import type { AgentRuntime } from "@elizaos/core";
+import type { AgentRuntime, Content } from "@elizaos/core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { WebSocket } from "ws";
 import { startApiServer } from "../src/api/server.js";
@@ -67,6 +67,75 @@ function req(
     );
     r.on("error", reject);
     if (b) r.write(b);
+    r.end();
+  });
+}
+
+type SseEventPayload = {
+  type?: string;
+  text?: string;
+  fullText?: string;
+  agentName?: string;
+  message?: string;
+};
+
+function reqSse(
+  port: number,
+  p: string,
+  body: Record<string, string | number | boolean | null>,
+): Promise<{
+  status: number;
+  headers: http.IncomingHttpHeaders;
+  events: SseEventPayload[];
+}> {
+  return new Promise((resolve, reject) => {
+    const b = JSON.stringify(body);
+    const r = http.request(
+      {
+        hostname: "127.0.0.1",
+        port,
+        path: p,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "text/event-stream",
+          "Content-Length": Buffer.byteLength(b),
+        },
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (c: Buffer) => chunks.push(c));
+        res.on("end", () => {
+          const raw = Buffer.concat(chunks).toString("utf-8");
+          const events: SseEventPayload[] = [];
+          const blocks = raw
+            .split("\n\n")
+            .map((block) => block.trim())
+            .filter((block) => block.length > 0);
+
+          for (const block of blocks) {
+            for (const line of block.split("\n")) {
+              if (!line.startsWith("data:")) continue;
+              const payloadText = line.slice(5).trim();
+              if (!payloadText) continue;
+              try {
+                events.push(JSON.parse(payloadText) as SseEventPayload);
+              } catch {
+                // Ignore malformed SSE payloads in test parsing.
+              }
+            }
+          }
+
+          resolve({
+            status: res.statusCode ?? 0,
+            headers: res.headers,
+            events,
+          });
+        });
+      },
+    );
+    r.on("error", reject);
+    r.write(b);
     r.end();
   });
 }
@@ -194,6 +263,51 @@ function createRuntimeForStreamTests(options: {
   return runtimeSubset as AgentRuntime;
 }
 
+function createRuntimeForChatSseTests(): AgentRuntime {
+  const runtimeSubset: Pick<
+    AgentRuntime,
+    | "agentId"
+    | "character"
+    | "messageService"
+    | "ensureConnection"
+    | "getWorld"
+    | "updateWorld"
+    | "getService"
+    | "getRoomsByWorld"
+    | "getMemories"
+    | "getCache"
+    | "setCache"
+  > = {
+    agentId: "chat-stream-agent",
+    character: { name: "ChatStreamAgent" } as AgentRuntime["character"],
+    messageService: {
+      handleMessage: async (
+        _runtime: AgentRuntime,
+        _message: object,
+        onResponse: (content: Content) => Promise<object[]>,
+      ) => {
+        await onResponse({ text: "Hello " } as Content);
+        await onResponse({ text: "world" } as Content);
+        return {
+          responseContent: {
+            text: "Hello world",
+          },
+        };
+      },
+    } as AgentRuntime["messageService"],
+    ensureConnection: async () => {},
+    getWorld: async () => null,
+    updateWorld: async () => {},
+    getService: () => null,
+    getRoomsByWorld: async () => [],
+    getMemories: async () => [],
+    getCache: async () => null,
+    setCache: async () => {},
+  };
+
+  return runtimeSubset as AgentRuntime;
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -305,6 +419,126 @@ describe("API Server E2E (no runtime)", () => {
     it("rejects missing text with 400", async () => {
       const { status } = await req(port, "POST", "/api/chat", {});
       expect(status).toBe(400);
+    });
+  });
+
+  describe("POST /api/chat/stream (no runtime)", () => {
+    it("rejects with 503 when no runtime", async () => {
+      const { status, data } = await req(port, "POST", "/api/chat/stream", {
+        text: "hello",
+      });
+      expect(status).toBe(503);
+      expect(String(data.error)).toContain("not running");
+    });
+
+    it("rejects empty text with 400", async () => {
+      const { status } = await req(port, "POST", "/api/chat/stream", {
+        text: "",
+      });
+      expect(status).toBe(400);
+    });
+  });
+
+  describe("POST /api/conversations/:id/messages/stream (no runtime)", () => {
+    it("returns 404 when conversation does not exist", async () => {
+      const { status } = await req(
+        port,
+        "POST",
+        "/api/conversations/missing/messages/stream",
+        {
+          text: "hello",
+        },
+      );
+      expect(status).toBe(404);
+    });
+
+    it("returns 503 when conversation exists but runtime is absent", async () => {
+      const create = await req(port, "POST", "/api/conversations", {
+        title: "Streaming test",
+      });
+      expect(create.status).toBe(200);
+      const conversation = create.data.conversation as { id?: string };
+      const conversationId = conversation.id ?? "";
+      expect(conversationId.length).toBeGreaterThan(0);
+
+      const { status, data } = await req(
+        port,
+        "POST",
+        `/api/conversations/${conversationId}/messages/stream`,
+        {
+          text: "hello",
+        },
+      );
+      expect(status).toBe(503);
+      expect(String(data.error)).toContain("not running");
+    });
+  });
+
+  describe("streaming chat endpoints (runtime stub)", () => {
+    it("POST /api/chat/stream emits token and done events", async () => {
+      const runtime = createRuntimeForChatSseTests();
+      const streamServer = await startApiServer({ port: 0, runtime });
+      try {
+        const { status, headers, events } = await reqSse(
+          streamServer.port,
+          "/api/chat/stream",
+          { text: "hello", mode: "power" },
+        );
+
+        expect(status).toBe(200);
+        expect(String(headers["content-type"] ?? "")).toContain(
+          "text/event-stream",
+        );
+
+        const tokenEvents = events.filter((event) => event.type === "token");
+        expect(tokenEvents.map((event) => event.text)).toEqual([
+          "Hello ",
+          "world",
+        ]);
+
+        const doneEvent = events.find((event) => event.type === "done");
+        expect(doneEvent?.fullText).toBe("Hello world");
+        expect(doneEvent?.agentName).toBe("ChatStreamAgent");
+      } finally {
+        await streamServer.close();
+      }
+    });
+
+    it("POST /api/conversations/:id/messages/stream emits token and done events", async () => {
+      const runtime = createRuntimeForChatSseTests();
+      const streamServer = await startApiServer({ port: 0, runtime });
+      try {
+        const create = await req(
+          streamServer.port,
+          "POST",
+          "/api/conversations",
+          {
+            title: "SSE conversation",
+          },
+        );
+        expect(create.status).toBe(200);
+        const conversation = create.data.conversation as { id?: string };
+        const conversationId = conversation.id ?? "";
+        expect(conversationId.length).toBeGreaterThan(0);
+
+        const { status, events } = await reqSse(
+          streamServer.port,
+          `/api/conversations/${conversationId}/messages/stream`,
+          { text: "hello", mode: "simple" },
+        );
+
+        expect(status).toBe(200);
+        const tokenEvents = events.filter((event) => event.type === "token");
+        expect(tokenEvents.map((event) => event.text)).toEqual([
+          "Hello ",
+          "world",
+        ]);
+        const doneEvent = events.find((event) => event.type === "done");
+        expect(doneEvent?.fullText).toBe("Hello world");
+        expect(doneEvent?.agentName).toBe("ChatStreamAgent");
+      } finally {
+        await streamServer.close();
+      }
     });
   });
 
@@ -1046,6 +1280,69 @@ describe("API Server E2E (no runtime)", () => {
         expect(typeof server.toolCount).toBe("number");
         expect(typeof server.resourceCount).toBe("number");
       }
+    });
+  });
+});
+
+describe("API Server E2E (chat SSE)", () => {
+  let port: number;
+  let close: () => Promise<void>;
+
+  beforeAll(async () => {
+    const server = await startApiServer({
+      port: 0,
+      runtime: createRuntimeForChatSseTests(),
+    });
+    port = server.port;
+    close = server.close;
+  }, 30_000);
+
+  afterAll(async () => {
+    await close();
+  });
+
+  it("POST /api/chat/stream emits token and done events", async () => {
+    const { status, headers, events } = await reqSse(port, "/api/chat/stream", {
+      text: "hello",
+      mode: "simple",
+    });
+
+    expect(status).toBe(200);
+    expect(String(headers["content-type"])).toContain("text/event-stream");
+    expect(events).toContainEqual({ type: "token", text: "Hello " });
+    expect(events).toContainEqual({ type: "token", text: "world" });
+    expect(events).toContainEqual({
+      type: "done",
+      fullText: "Hello world",
+      agentName: "ChatStreamAgent",
+    });
+  });
+
+  it("POST /api/conversations/:id/messages/stream emits token and done events", async () => {
+    const create = await req(port, "POST", "/api/conversations", {
+      title: "SSE Conversation",
+    });
+    expect(create.status).toBe(200);
+    const createdConversation = create.data.conversation as { id?: string };
+    const conversationId = createdConversation.id ?? "";
+    expect(conversationId.length).toBeGreaterThan(0);
+
+    const { status, events } = await reqSse(
+      port,
+      `/api/conversations/${conversationId}/messages/stream`,
+      {
+        text: "hello",
+        mode: "power",
+      },
+    );
+
+    expect(status).toBe(200);
+    expect(events).toContainEqual({ type: "token", text: "Hello " });
+    expect(events).toContainEqual({ type: "token", text: "world" });
+    expect(events).toContainEqual({
+      type: "done",
+      fullText: "Hello world",
+      agentName: "ChatStreamAgent",
     });
   });
 });

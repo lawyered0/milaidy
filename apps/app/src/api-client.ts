@@ -442,7 +442,7 @@ export interface LogsFilter {
   since?: number;
 }
 
-export type StreamEventType = "agent_event" | "heartbeat_event";
+export type StreamEventType = "agent_event" | "heartbeat_event" | "training_event";
 
 export interface StreamEventEnvelope {
   type: StreamEventType;
@@ -456,6 +456,132 @@ export interface StreamEventEnvelope {
   agentId?: string;
   roomId?: string;
   payload: object;
+}
+
+// Fine-tuning / training
+export type TrainingJobStatus =
+  | "queued"
+  | "running"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+export interface TrainingStatus {
+  runningJobs: number;
+  queuedJobs: number;
+  completedJobs: number;
+  failedJobs: number;
+  modelCount: number;
+  datasetCount: number;
+  runtimeAvailable: boolean;
+}
+
+export interface TrainingTrajectorySummary {
+  id: string;
+  trajectoryId: string;
+  agentId: string;
+  archetype: string | null;
+  createdAt: string;
+  totalReward: number | null;
+  aiJudgeReward: number | null;
+  episodeLength: number | null;
+  hasLlmCalls: boolean;
+  llmCallCount: number;
+}
+
+export interface TrainingTrajectoryDetail extends TrainingTrajectorySummary {
+  stepsJson: string;
+  aiJudgeReasoning: string | null;
+}
+
+export interface TrainingTrajectoryList {
+  available: boolean;
+  reason?: string;
+  total: number;
+  trajectories: TrainingTrajectorySummary[];
+}
+
+export interface TrainingDatasetRecord {
+  id: string;
+  createdAt: string;
+  jsonlPath: string;
+  trajectoryDir: string;
+  metadataPath: string;
+  sampleCount: number;
+  trajectoryCount: number;
+}
+
+export interface StartTrainingOptions {
+  datasetId?: string;
+  maxTrajectories?: number;
+  backend?: "mlx" | "cuda" | "cpu";
+  model?: string;
+  iterations?: number;
+  batchSize?: number;
+  learningRate?: number;
+}
+
+export interface TrainingJobRecord {
+  id: string;
+  createdAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  status: TrainingJobStatus;
+  phase: string;
+  progress: number;
+  error: string | null;
+  exitCode: number | null;
+  signal: string | null;
+  options: StartTrainingOptions;
+  datasetId: string;
+  pythonRoot: string;
+  scriptPath: string;
+  outputDir: string;
+  logPath: string;
+  modelPath: string | null;
+  adapterPath: string | null;
+  modelId: string | null;
+  logs: string[];
+}
+
+export interface TrainingModelRecord {
+  id: string;
+  createdAt: string;
+  jobId: string;
+  outputDir: string;
+  modelPath: string;
+  adapterPath: string | null;
+  sourceModel: string | null;
+  backend: "mlx" | "cuda" | "cpu";
+  ollamaModel: string | null;
+  active: boolean;
+  benchmark: {
+    status: "not_run" | "passed" | "failed";
+    lastRunAt: string | null;
+    output: string | null;
+  };
+}
+
+export type TrainingEventKind =
+  | "job_started"
+  | "job_progress"
+  | "job_log"
+  | "job_completed"
+  | "job_failed"
+  | "job_cancelled"
+  | "dataset_built"
+  | "model_activated"
+  | "model_imported";
+
+export interface TrainingStreamEvent {
+  kind: TrainingEventKind;
+  ts: number;
+  message: string;
+  jobId?: string;
+  modelId?: string;
+  datasetId?: string;
+  progress?: number;
+  phase?: string;
 }
 
 export interface AgentEventsResponse {
@@ -1059,6 +1185,115 @@ export class MilaidyClient {
 
   async getTriggerHealth(): Promise<TriggerHealthSnapshot> {
     return this.fetch("/api/triggers/health");
+  }
+
+  // Fine-tuning / training
+  async getTrainingStatus(): Promise<TrainingStatus> {
+    return this.fetch("/api/training/status");
+  }
+
+  async listTrainingTrajectories(opts?: {
+    limit?: number;
+    offset?: number;
+  }): Promise<TrainingTrajectoryList> {
+    const params = new URLSearchParams();
+    if (typeof opts?.limit === "number") params.set("limit", String(opts.limit));
+    if (typeof opts?.offset === "number")
+      params.set("offset", String(opts.offset));
+    const qs = params.toString();
+    return this.fetch(`/api/training/trajectories${qs ? `?${qs}` : ""}`);
+  }
+
+  async getTrainingTrajectory(
+    trajectoryId: string,
+  ): Promise<{ trajectory: TrainingTrajectoryDetail }> {
+    return this.fetch(
+      `/api/training/trajectories/${encodeURIComponent(trajectoryId)}`,
+    );
+  }
+
+  async listTrainingDatasets(): Promise<{ datasets: TrainingDatasetRecord[] }> {
+    return this.fetch("/api/training/datasets");
+  }
+
+  async buildTrainingDataset(options?: {
+    limit?: number;
+    minLlmCallsPerTrajectory?: number;
+  }): Promise<{ dataset: TrainingDatasetRecord }> {
+    return this.fetch("/api/training/datasets/build", {
+      method: "POST",
+      body: JSON.stringify(options ?? {}),
+    });
+  }
+
+  async listTrainingJobs(): Promise<{ jobs: TrainingJobRecord[] }> {
+    return this.fetch("/api/training/jobs");
+  }
+
+  async startTrainingJob(
+    options?: StartTrainingOptions,
+  ): Promise<{ job: TrainingJobRecord }> {
+    return this.fetch("/api/training/jobs", {
+      method: "POST",
+      body: JSON.stringify(options ?? {}),
+    });
+  }
+
+  async getTrainingJob(jobId: string): Promise<{ job: TrainingJobRecord }> {
+    return this.fetch(`/api/training/jobs/${encodeURIComponent(jobId)}`);
+  }
+
+  async cancelTrainingJob(jobId: string): Promise<{ job: TrainingJobRecord }> {
+    return this.fetch(`/api/training/jobs/${encodeURIComponent(jobId)}/cancel`, {
+      method: "POST",
+    });
+  }
+
+  async listTrainingModels(): Promise<{ models: TrainingModelRecord[] }> {
+    return this.fetch("/api/training/models");
+  }
+
+  async importTrainingModelToOllama(
+    modelId: string,
+    options?: {
+      modelName?: string;
+      baseModel?: string;
+      ollamaUrl?: string;
+    },
+  ): Promise<{ model: TrainingModelRecord }> {
+    return this.fetch(
+      `/api/training/models/${encodeURIComponent(modelId)}/import-ollama`,
+      {
+        method: "POST",
+        body: JSON.stringify(options ?? {}),
+      },
+    );
+  }
+
+  async activateTrainingModel(
+    modelId: string,
+    providerModel?: string,
+  ): Promise<{
+    modelId: string;
+    providerModel: string;
+    needsRestart: boolean;
+  }> {
+    return this.fetch(`/api/training/models/${encodeURIComponent(modelId)}/activate`, {
+      method: "POST",
+      body: JSON.stringify({ providerModel }),
+    });
+  }
+
+  async benchmarkTrainingModel(modelId: string): Promise<{
+    status: "passed" | "failed";
+    output: string;
+  }> {
+    return this.fetch(
+      `/api/training/models/${encodeURIComponent(modelId)}/benchmark`,
+      {
+        method: "POST",
+      },
+    );
   }
 
   async getPlugins(): Promise<{ plugins: PluginInfo[] }> {
