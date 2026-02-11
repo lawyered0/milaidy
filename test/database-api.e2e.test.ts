@@ -27,6 +27,7 @@ function req(
   method: string,
   p: string,
   body?: Record<string, unknown>,
+  opts?: { headers?: Record<string, string> },
 ): Promise<{
   status: number;
   headers: http.IncomingHttpHeaders;
@@ -43,6 +44,7 @@ function req(
         headers: {
           "Content-Type": "application/json",
           ...(b ? { "Content-Length": Buffer.byteLength(b) } : {}),
+          ...(opts?.headers ?? {}),
         },
       },
       (res) => {
@@ -317,6 +319,49 @@ describe("Database API E2E (no runtime)", () => {
       expect("durationMs" in data).toBe(true);
       expect(data.success).toBe(false);
       expect(data.serverVersion).toBeNull();
+    });
+  });
+
+  describe("POST /api/database/test SSRF guard (non-loopback bind)", () => {
+    let guardedPort: number;
+    let guardedClose: () => Promise<void>;
+    let savedBind: string | undefined;
+    let savedToken: string | undefined;
+
+    beforeAll(async () => {
+      savedBind = process.env.MILAIDY_API_BIND;
+      savedToken = process.env.MILAIDY_API_TOKEN;
+      process.env.MILAIDY_API_BIND = "0.0.0.0";
+      process.env.MILAIDY_API_TOKEN = "db-ssrf-test-token";
+
+      const server = await startApiServer({ port: 0 });
+      guardedPort = server.port;
+      guardedClose = server.close;
+    }, 30_000);
+
+    afterAll(async () => {
+      await guardedClose();
+      if (savedBind === undefined) delete process.env.MILAIDY_API_BIND;
+      else process.env.MILAIDY_API_BIND = savedBind;
+      if (savedToken === undefined) delete process.env.MILAIDY_API_TOKEN;
+      else process.env.MILAIDY_API_TOKEN = savedToken;
+    });
+
+    it("blocks fd00::/8 ULA hosts", async () => {
+      const { status, data } = await req(
+        guardedPort,
+        "POST",
+        "/api/database/test",
+        {
+          host: "fd00::1",
+          port: 5432,
+          user: "test",
+          database: "test",
+        },
+        { headers: { Authorization: "Bearer db-ssrf-test-token" } },
+      );
+      expect(status).toBe(400);
+      expect(data.error).toContain("blocked");
     });
   });
 
