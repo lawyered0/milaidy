@@ -34,8 +34,9 @@ RUN chown -R node:node /app
 # Security hardening: Run as non-root user
 USER node
 
-# Bind to all interfaces in container deployments.
+# Default: bind to 0.0.0.0 in containers so the service is reachable.
+# Set MILAIDY_API_TOKEN in production to require auth.
 ENV MILAIDY_API_BIND="0.0.0.0"
 
-# Start API server + dashboard UI.
+# Start the API server + dashboard UI on port 2138.
 CMD ["node", "milaidy.mjs", "start"]

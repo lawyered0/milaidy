@@ -1633,6 +1633,8 @@ function error(res: http.ServerResponse, message: string, status = 400): void {
 // Static UI serving (production)
 // ---------------------------------------------------------------------------
 
+// Serves the built React dashboard from apps/app/dist/ in production mode.
+
 const STATIC_MIME: Record<string, string> = {
   ".css": "text/css; charset=utf-8",
   ".gif": "image/gif",
@@ -1660,7 +1662,6 @@ let uiIndexHtml: Buffer | null = null;
 
 function resolveUiDir(): string | null {
   if (uiDir !== undefined) return uiDir;
-
   if (process.env.NODE_ENV !== "production") {
     uiDir = null;
     return null;
