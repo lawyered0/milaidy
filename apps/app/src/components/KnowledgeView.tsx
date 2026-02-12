@@ -44,9 +44,17 @@ function StatsCard({ stats, loading }: { stats: KnowledgeStats | null; loading: 
           {loading ? "—" : stats?.documentCount ?? 0}
         </div>
       </div>
-      <div className="p-4 border border-[var(--border)] bg-[var(--card)] rounded">
-        <div className="text-[11px] uppercase tracking-wider text-[var(--muted)] mb-1">
+      <div className="p-4 border border-[var(--border)] bg-[var(--card)] rounded overflow-visible">
+        <div className="text-[11px] uppercase tracking-wider text-[var(--muted)] mb-1 flex items-center gap-1">
           Fragments
+          <span className="relative group">
+            <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-[var(--muted)] text-[9px] leading-none cursor-help opacity-60 group-hover:opacity-100 transition-opacity">
+              ?
+            </span>
+            <span className="pointer-events-none absolute left-0 top-full mt-1.5 w-52 px-2.5 py-1.5 rounded bg-[var(--bg-elevated)] text-[var(--text-strong)] text-[11px] normal-case tracking-normal leading-snug opacity-0 group-hover:opacity-100 transition-opacity border border-[var(--border-strong)] shadow-md">
+              Documents are split into smaller text chunks called fragments, tasty snacks for agents, yumm
+            </span>
+          </span>
         </div>
         <div className="text-2xl font-semibold text-[var(--txt)]">
           {loading ? "—" : stats?.fragmentCount ?? 0}

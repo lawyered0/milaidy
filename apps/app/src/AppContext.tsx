@@ -163,6 +163,61 @@ interface ActionNotice {
   text: string;
 }
 
+type LifecycleAction =
+  | "start"
+  | "stop"
+  | "pause"
+  | "resume"
+  | "restart"
+  | "reset";
+
+const LIFECYCLE_MESSAGES: Record<
+  LifecycleAction,
+  {
+    inProgress: string;
+    progress: string;
+    success: string;
+    verb: string;
+  }
+> = {
+  start: {
+    inProgress: "starting",
+    progress: "Starting agent...",
+    success: "Agent started.",
+    verb: "start",
+  },
+  stop: {
+    inProgress: "stopping",
+    progress: "Stopping agent...",
+    success: "Agent stopped.",
+    verb: "stop",
+  },
+  pause: {
+    inProgress: "pausing",
+    progress: "Pausing agent...",
+    success: "Agent paused.",
+    verb: "pause",
+  },
+  resume: {
+    inProgress: "resuming",
+    progress: "Resuming agent...",
+    success: "Agent resumed.",
+    verb: "resume",
+  },
+  restart: {
+    inProgress: "restarting",
+    progress: "Restarting agent...",
+    success: "Agent restarted.",
+    verb: "restart",
+  },
+  reset: {
+    inProgress: "resetting",
+    progress: "Resetting agent...",
+    success: "Agent reset. Returning to onboarding.",
+    verb: "reset",
+  },
+};
+
 type GamePostMessageAuthPayload = AppViewerAuthMessage;
 
 const AGENT_STATES: ReadonlySet<AgentStatus["state"]> = new Set([
@@ -270,6 +325,8 @@ type LoadConversationMessagesResult =
   | { ok: true }
   | { ok: false; status?: number; message: string };
 
+export type StartupPhase = "starting-backend" | "initializing-agent";
+
 // ── Context value type ─────────────────────────────────────────────────
 
 export interface AppState {
@@ -280,8 +337,11 @@ export interface AppState {
   agentStatus: AgentStatus | null;
   onboardingComplete: boolean;
   onboardingLoading: boolean;
+  startupPhase: StartupPhase;
   authRequired: boolean;
   actionNotice: ActionNotice | null;
+  lifecycleBusy: boolean;
+  lifecycleAction: LifecycleAction | null;
 
   // Pairing
   pairingEnabled: boolean;
@@ -668,8 +728,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [agentStatus, setAgentStatus] = useState<AgentStatus | null>(null);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [onboardingLoading, setOnboardingLoading] = useState(true);
+  const [startupPhase, setStartupPhase] =
+    useState<StartupPhase>("starting-backend");
   const [authRequired, setAuthRequired] = useState(false);
   const [actionNotice, setActionNoticeState] = useState<ActionNotice | null>(null);
+  const [lifecycleBusy, setLifecycleBusy] = useState(false);
+  const [lifecycleAction, setLifecycleAction] = useState<LifecycleAction | null>(null);
 
   // --- Pairing ---
   const [pairingEnabled, setPairingEnabled] = useState(false);
@@ -925,9 +989,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const cloudPollInterval = useRef<number | null>(null);
   const cloudLoginPollTimer = useRef<number | null>(null);
   const prevAgentStateRef = useRef<string | null>(null);
+  const lifecycleBusyRef = useRef(false);
+  const lifecycleActionRef = useRef<LifecycleAction | null>(null);
+  const pairingBusyRef = useRef(false);
   /** Guards against double-greeting when both init and state-transition paths fire. */
   const greetingFiredRef = useRef(false);
   const chatAbortRef = useRef<AbortController | null>(null);
+  /** Synchronous lock so same-tick chat submits cannot double-send. */
+  const chatSendBusyRef = useRef(false);
+  /** Synchronous lock for export action to prevent duplicate clicks in the same tick. */
+  const exportBusyRef = useRef(false);
+  /** Synchronous lock for import action to prevent duplicate clicks in the same tick. */
+  const importBusyRef = useRef(false);
+  /** Synchronous lock for cloud login action to prevent duplicate clicks in the same tick. */
+  const cloudLoginBusyRef = useRef(false);
 
   // ── Action notice ──────────────────────────────────────────────────
 
@@ -1395,38 +1470,105 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // ── Lifecycle actions ──────────────────────────────────────────────
 
+  const beginLifecycleAction = useCallback((action: LifecycleAction): boolean => {
+    if (lifecycleBusyRef.current) {
+      const activeAction =
+        lifecycleActionRef.current ?? lifecycleAction ?? action;
+      setActionNotice(
+        `Agent action already in progress (${LIFECYCLE_MESSAGES[activeAction].inProgress}). Please wait.`,
+        "info",
+        2800,
+      );
+      return false;
+    }
+    lifecycleBusyRef.current = true;
+    lifecycleActionRef.current = action;
+    setLifecycleBusy(true);
+    setLifecycleAction(action);
+    return true;
+  }, [lifecycleAction, setActionNotice]);
+
+  const finishLifecycleAction = useCallback(() => {
+    lifecycleBusyRef.current = false;
+    lifecycleActionRef.current = null;
+    setLifecycleBusy(false);
+    setLifecycleAction(null);
+  }, []);
+
   const handleStart = useCallback(async () => {
+    if (!beginLifecycleAction("start")) return;
+    setActionNotice(LIFECYCLE_MESSAGES.start.progress, "info", 3000);
     try {
       const s = await client.startAgent();
       setAgentStatus(s);
-    } catch {
-      /* ignore */
+      setActionNotice(LIFECYCLE_MESSAGES.start.success, "success", 2400);
+    } catch (err) {
+      setActionNotice(
+        `Failed to ${LIFECYCLE_MESSAGES.start.verb} agent: ${
+          err instanceof Error ? err.message : "unknown error"
+        }`,
+        "error",
+        4200,
+      );
+    } finally {
+      finishLifecycleAction();
     }
-  }, []);
+  }, [beginLifecycleAction, finishLifecycleAction, setActionNotice]);
 
   const handleStop = useCallback(async () => {
+    if (!beginLifecycleAction("stop")) return;
+    setActionNotice(LIFECYCLE_MESSAGES.stop.progress, "info", 3000);
     try {
       const s = await client.stopAgent();
       setAgentStatus(s);
-    } catch {
-      /* ignore */
+      setActionNotice(LIFECYCLE_MESSAGES.stop.success, "success", 2400);
+    } catch (err) {
+      setActionNotice(
+        `Failed to ${LIFECYCLE_MESSAGES.stop.verb} agent: ${
+          err instanceof Error ? err.message : "unknown error"
+        }`,
+        "error",
+        4200,
+      );
+    } finally {
+      finishLifecycleAction();
     }
-  }, []);
+  }, [beginLifecycleAction, finishLifecycleAction, setActionNotice]);
 
   const handlePauseResume = useCallback(async () => {
     if (!agentStatus) return;
+    const action: LifecycleAction | null =
+      agentStatus.state === "running"
+        ? "pause"
+        : agentStatus.state === "paused"
+          ? "resume"
+          : null;
+    if (!action) return;
+    if (!beginLifecycleAction(action)) return;
+    setActionNotice(LIFECYCLE_MESSAGES[action].progress, "info", 3000);
     try {
       if (agentStatus.state === "running") {
         setAgentStatus(await client.pauseAgent());
       } else if (agentStatus.state === "paused") {
         setAgentStatus(await client.resumeAgent());
       }
-    } catch {
-      /* ignore */
+      setActionNotice(LIFECYCLE_MESSAGES[action].success, "success", 2400);
+    } catch (err) {
+      setActionNotice(
+        `Failed to ${LIFECYCLE_MESSAGES[action].verb} agent: ${
+          err instanceof Error ? err.message : "unknown error"
+        }`,
+        "error",
+        4200,
+      );
+    } finally {
+      finishLifecycleAction();
     }
-  }, [agentStatus]);
+  }, [agentStatus, beginLifecycleAction, finishLifecycleAction, setActionNotice]);
 
   const handleRestart = useCallback(async () => {
+    if (!beginLifecycleAction("restart")) return;
+    setActionNotice(LIFECYCLE_MESSAGES.restart.progress, "info", 3200);
     try {
       setAgentStatus({
         ...(agentStatus ?? { agentName: "Milaidy", model: undefined, uptime: undefined, startedAt: undefined }),
@@ -1438,7 +1580,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setConversations([]);
       const s = await client.restartAgent();
       setAgentStatus(s);
-    } catch {
+      setActionNotice(LIFECYCLE_MESSAGES.restart.success, "success", 2400);
+    } catch (err) {
+      setActionNotice(
+        `Failed to ${LIFECYCLE_MESSAGES.restart.verb} agent: ${
+          err instanceof Error ? err.message : "unknown error"
+        }`,
+        "error",
+        4200,
+      );
       setTimeout(async () => {
         try {
           setAgentStatus(await client.getStatus());
@@ -1446,16 +1596,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
           /* ignore */
         }
       }, 3000);
+    } finally {
+      finishLifecycleAction();
     }
-  }, [agentStatus]);
+  }, [agentStatus, beginLifecycleAction, finishLifecycleAction, setActionNotice]);
 
   const handleReset = useCallback(async () => {
+    if (lifecycleBusyRef.current) {
+      const activeAction =
+        lifecycleActionRef.current ?? lifecycleAction ?? "reset";
+      setActionNotice(
+        `Agent action already in progress (${LIFECYCLE_MESSAGES[activeAction].inProgress}). Please wait.`,
+        "info",
+        2800,
+      );
+      return;
+    }
     const confirmed = window.confirm(
       "This will completely reset the agent — wiping all config, memory, and data.\n\n" +
         "You will be taken back to the onboarding wizard.\n\n" +
         "Are you sure?",
     );
     if (!confirmed) return;
+    if (!beginLifecycleAction("reset")) return;
+    setActionNotice(LIFECYCLE_MESSAGES.reset.progress, "info", 3200);
     try {
       await client.resetAgent();
       setAgentStatus(null);
@@ -1474,10 +1638,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } catch {
         /* ignore */
       }
-    } catch {
+      setActionNotice(LIFECYCLE_MESSAGES.reset.success, "success", 3200);
+    } catch (err) {
+      setActionNotice(
+        `Failed to ${LIFECYCLE_MESSAGES.reset.verb} agent: ${
+          err instanceof Error ? err.message : "unknown error"
+        }`,
+        "error",
+        4200,
+      );
       window.alert("Reset failed. Check the console for details.");
+    } finally {
+      finishLifecycleAction();
     }
-  }, []);
+  }, [lifecycleAction, beginLifecycleAction, finishLifecycleAction, setActionNotice]);
 
   // ── Chat ───────────────────────────────────────────────────────────
 
@@ -1517,117 +1691,124 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const handleChatSend = useCallback(async (mode: ConversationMode = "simple") => {
     const text = chatInput.trim();
-    if (!text || chatSending) return;
-
-    let convId: string = activeConversationId ?? "";
-    if (!convId) {
-      try {
-        const { conversation } = await client.createConversation();
-        setConversations((prev) => [conversation, ...prev]);
-        setActiveConversationId(conversation.id);
-        activeConversationIdRef.current = conversation.id;
-        convId = conversation.id;
-      } catch {
-        return;
-      }
-    }
-
-    // Keep server-side active conversation in sync for proactive routing.
-    client.sendWsMessage({ type: "active-conversation", conversationId: convId });
-
-    const now = Date.now();
-    const userMsgId = `temp-${now}`;
-    const assistantMsgId = `temp-resp-${now}`;
-
-    setConversationMessages((prev: ConversationMessage[]) => [
-      ...prev,
-      { id: userMsgId, role: "user", text, timestamp: now },
-      { id: assistantMsgId, role: "assistant", text: "", timestamp: now },
-    ]);
-    setChatInput("");
-    setChatSending(true);
-    setChatFirstTokenReceived(false);
-
-    const controller = new AbortController();
-    chatAbortRef.current = controller;
+    if (!text) return;
+    if (chatSendBusyRef.current || chatSending) return;
+    chatSendBusyRef.current = true;
 
     try {
-      const data = await client.sendConversationMessageStream(
-        convId,
-        text,
-        (token) => {
-          setChatFirstTokenReceived(true);
-          setConversationMessages((prev) =>
-            prev.map((message) =>
-              message.id === assistantMsgId
-                ? { ...message, text: `${message.text}${token}` }
-                : message,
-            ),
-          );
-        },
-        mode,
-        controller.signal,
-      );
-
-      setConversationMessages((prev) =>
-        prev.map((message) =>
-          message.id === assistantMsgId
-            ? { ...message, text: data.text }
-            : message,
-        ),
-      );
-      await loadConversations();
-    } catch (err) {
-      const abortError = err as Error;
-      if (abortError.name === "AbortError") {
-        setConversationMessages((prev) =>
-          prev.filter((message) => !(message.id === assistantMsgId && !message.text.trim())),
-        );
-        return;
-      }
-
-      // If the conversation was lost (server restart), create a fresh one and retry once.
-      const status = (err as { status?: number }).status;
-      if (status === 404) {
+      let convId: string = activeConversationId ?? "";
+      if (!convId) {
         try {
           const { conversation } = await client.createConversation();
           setConversations((prev) => [conversation, ...prev]);
           setActiveConversationId(conversation.id);
           activeConversationIdRef.current = conversation.id;
-          client.sendWsMessage({ type: "active-conversation", conversationId: conversation.id });
-
-          const retryData = await client.sendConversationMessage(
-            conversation.id,
-            text,
-            mode,
-          );
-          setConversationMessages([
-            { id: `temp-${Date.now()}`, role: "user", text, timestamp: Date.now() },
-            {
-              id: `temp-resp-${Date.now()}`,
-              role: "assistant",
-              text: retryData.text,
-              timestamp: Date.now(),
-            },
-          ]);
+          convId = conversation.id;
         } catch {
+          return;
+        }
+      }
+
+      // Keep server-side active conversation in sync for proactive routing.
+      client.sendWsMessage({ type: "active-conversation", conversationId: convId });
+
+      const now = Date.now();
+      const userMsgId = `temp-${now}`;
+      const assistantMsgId = `temp-resp-${now}`;
+
+      setConversationMessages((prev: ConversationMessage[]) => [
+        ...prev,
+        { id: userMsgId, role: "user", text, timestamp: now },
+        { id: assistantMsgId, role: "assistant", text: "", timestamp: now },
+      ]);
+      setChatInput("");
+      setChatSending(true);
+      setChatFirstTokenReceived(false);
+
+      const controller = new AbortController();
+      chatAbortRef.current = controller;
+
+      try {
+        const data = await client.sendConversationMessageStream(
+          convId,
+          text,
+          (token) => {
+            setChatFirstTokenReceived(true);
+            setConversationMessages((prev) =>
+              prev.map((message) =>
+                message.id === assistantMsgId
+                  ? { ...message, text: `${message.text}${token}` }
+                  : message,
+              ),
+            );
+          },
+          mode,
+          controller.signal,
+        );
+
+        setConversationMessages((prev) =>
+          prev.map((message) =>
+            message.id === assistantMsgId
+              ? { ...message, text: data.text }
+              : message,
+          ),
+        );
+        await loadConversations();
+      } catch (err) {
+        const abortError = err as Error;
+        if (abortError.name === "AbortError") {
           setConversationMessages((prev) =>
             prev.filter((message) => !(message.id === assistantMsgId && !message.text.trim())),
           );
+          return;
         }
-      } else {
-        await loadConversationMessages(convId);
+
+        // If the conversation was lost (server restart), create a fresh one and retry once.
+        const status = (err as { status?: number }).status;
+        if (status === 404) {
+          try {
+            const { conversation } = await client.createConversation();
+            setConversations((prev) => [conversation, ...prev]);
+            setActiveConversationId(conversation.id);
+            activeConversationIdRef.current = conversation.id;
+            client.sendWsMessage({ type: "active-conversation", conversationId: conversation.id });
+
+            const retryData = await client.sendConversationMessage(
+              conversation.id,
+              text,
+              mode,
+            );
+            setConversationMessages([
+              { id: `temp-${Date.now()}`, role: "user", text, timestamp: Date.now() },
+              {
+                id: `temp-resp-${Date.now()}`,
+                role: "assistant",
+                text: retryData.text,
+                timestamp: Date.now(),
+              },
+            ]);
+          } catch {
+            setConversationMessages((prev) =>
+              prev.filter((message) => !(message.id === assistantMsgId && !message.text.trim())),
+            );
+          }
+        } else {
+          await loadConversationMessages(convId);
+        }
+      } finally {
+        if (chatAbortRef.current === controller) {
+          chatAbortRef.current = null;
+        }
+        setChatSending(false);
+        setChatFirstTokenReceived(false);
       }
     } finally {
-      if (chatAbortRef.current === controller) {
-        chatAbortRef.current = null;
-      }
-      setChatSending(false);
-      setChatFirstTokenReceived(false);
+      chatSendBusyRef.current = false;
     }
   }, [chatInput, chatSending, activeConversationId, loadConversationMessages, loadConversations]);
 
   const handleChatStop = useCallback(() => {
+    chatSendBusyRef.current = false;
     chatAbortRef.current?.abort();
     chatAbortRef.current = null;
     setChatSending(false);
@@ -1853,12 +2034,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // ── Pairing ────────────────────────────────────────────────────────
 
   const handlePairingSubmit = useCallback(async () => {
+    if (pairingBusyRef.current || pairingBusy) return;
     const code = pairingCodeInput.trim();
     if (!code) {
       setPairingError("Enter the pairing code from the server logs.");
       return;
     }
     setPairingError(null);
+    pairingBusyRef.current = true;
     setPairingBusy(true);
     try {
       const { token } = await client.pair(code);
@@ -1870,9 +2053,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       else if (status === 429) setPairingError("Too many attempts. Try again later.");
       else setPairingError("Pairing failed. Check the code and try again.");
     } finally {
+      pairingBusyRef.current = false;
       setPairingBusy(false);
     }
-  }, [pairingCodeInput]);
+  }, [pairingBusy, pairingCodeInput]);
 
   // ── Plugin actions ─────────────────────────────────────────────────
 
@@ -2496,6 +2680,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           clearInterval(cloudLoginPollTimer.current);
           cloudLoginPollTimer.current = null;
         }
+        cloudLoginBusyRef.current = false;
         setCloudLoginBusy(false);
         setCloudLoginError(null);
         break;
@@ -2607,6 +2792,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // ── Cloud ──────────────────────────────────────────────────────────
 
   const handleCloudLogin = useCallback(async () => {
+    if (cloudLoginBusyRef.current || cloudLoginBusy) return;
+    cloudLoginBusyRef.current = true;
     setCloudLoginBusy(true);
     setCloudLoginError(null);
     try {
@@ -2620,6 +2807,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (attempts > 120) {
           if (cloudLoginPollTimer.current) clearInterval(cloudLoginPollTimer.current);
           setCloudLoginError("Login timed out. Please try again.");
+          cloudLoginBusyRef.current = false;
           setCloudLoginBusy(false);
           return;
         }
@@ -2627,6 +2815,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           const poll = await client.cloudLoginPoll(resp.sessionId);
           if (poll.status === "authenticated") {
             if (cloudLoginPollTimer.current) clearInterval(cloudLoginPollTimer.current);
+            cloudLoginBusyRef.current = false;
             setCloudLoginBusy(false);
             // Immediately reflect the login in the UI — don't wait for the
             // background poll which may race with the config save.
@@ -2640,6 +2829,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           } else if (poll.status === "expired" || poll.status === "error") {
             if (cloudLoginPollTimer.current) clearInterval(cloudLoginPollTimer.current);
             setCloudLoginError(poll.error ?? "Session expired. Please try again.");
+            cloudLoginBusyRef.current = false;
             setCloudLoginBusy(false);
           }
         } catch {
@@ -2648,9 +2838,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }, 1000);
     } catch (err) {
       setCloudLoginError(err instanceof Error ? err.message : "Login failed");
+      cloudLoginBusyRef.current = false;
       setCloudLoginBusy(false);
     }
-  }, [setActionNotice, pollCloudCredits, loadWalletConfig]);
+  }, [cloudLoginBusy, setActionNotice, pollCloudCredits, loadWalletConfig]);
 
   const handleCloudDisconnect = useCallback(async () => {
     if (!confirm("Disconnect from Eliza Cloud? The agent will need a local AI provider to continue working."))
@@ -2689,7 +2880,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // ── Agent export/import ────────────────────────────────────────────
 
   const handleAgentExport = useCallback(async () => {
-    if (exportBusy) return;
+    if (exportBusyRef.current || exportBusy) return;
     if (!exportPassword) {
       setExportError("Password is required.");
       setExportSuccess(null);
@@ -2702,10 +2893,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setExportSuccess(null);
       return;
     }
-    setExportBusy(true);
-    setExportError(null);
-    setExportSuccess(null);
     try {
+      exportBusyRef.current = true;
+      setExportBusy(true);
+      setExportError(null);
+      setExportSuccess(null);
       const resp = await client.exportAgent(exportPassword, exportIncludeLogs);
       const blob = await resp.blob();
       const disposition = resp.headers.get("Content-Disposition") ?? "";
@@ -2724,12 +2916,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       setExportError(err instanceof Error ? err.message : "Export failed");
     } finally {
+      exportBusyRef.current = false;
       setExportBusy(false);
     }
   }, [exportBusy, exportPassword, exportIncludeLogs]);
 
   const handleAgentImport = useCallback(async () => {
-    if (importBusy) return;
+    if (importBusyRef.current || importBusy) return;
     if (!importFile) {
       setImportError("Select an export file before importing.");
       setImportSuccess(null);
@@ -2747,10 +2940,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setImportSuccess(null);
       return;
     }
-    setImportBusy(true);
-    setImportError(null);
-    setImportSuccess(null);
     try {
+      importBusyRef.current = true;
+      setImportBusy(true);
+      setImportError(null);
+      setImportSuccess(null);
       const fileBuffer = await importFile.arrayBuffer();
       const result = await client.importAgent(importPassword, fileBuffer);
       const counts = result.counts;
@@ -2767,6 +2961,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       setImportError(err instanceof Error ? err.message : "Import failed");
     } finally {
+      importBusyRef.current = false;
       setImportBusy(false);
     }
   }, [importBusy, importFile, importPassword]);
@@ -2913,16 +3108,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     let unbindAgentEvents: (() => void) | null = null;
     let unbindHeartbeatEvents: (() => void) | null = null;
     let unbindProactiveMessages: (() => void) | null = null;
+    let cancelled = false;
 
     const initApp = async () => {
-      const MAX_RETRIES = 20;
       const BASE_DELAY_MS = 250;
       const MAX_DELAY_MS = 1000;
-      let serverReady = false;
+      const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
       let onboardingNeedsOptions = false;
       let requiresAuth = false;
+      setStartupPhase("starting-backend");
 
-      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      // Keep the splash screen up until the backend is reachable.
+      let backendAttempts = 0;
+      while (!cancelled) {
         try {
           const auth = await client.getAuthStatus();
           if (auth.required && !client.hasToken()) {
@@ -2930,41 +3128,90 @@ export function AppProvider({ children }: { children: ReactNode }) {
             setPairingEnabled(auth.pairingEnabled);
             setPairingExpiresAt(auth.expiresAt);
             requiresAuth = true;
-            serverReady = true;
             break;
           }
           const { complete } = await client.getOnboardingStatus();
           setOnboardingComplete(complete);
-          if (!complete) {
-            onboardingNeedsOptions = true;
-          }
-          serverReady = true;
+          onboardingNeedsOptions = !complete;
           break;
         } catch {
-          if (attempt < MAX_RETRIES) {
-            const delay = Math.min(BASE_DELAY_MS * 2 ** attempt, MAX_DELAY_MS);
-            await new Promise((r) => setTimeout(r, delay));
-          }
+          backendAttempts += 1;
+          const delay = Math.min(BASE_DELAY_MS * 2 ** Math.min(backendAttempts, 2), MAX_DELAY_MS);
+          await sleep(delay);
         }
       }
-      if (!serverReady) {
-        console.warn("[milaidy] Could not reach server after retries.");
+      if (cancelled) {
+        return;
       }
-      setOnboardingLoading(false);
 
-      if (requiresAuth) return;
+      if (requiresAuth) {
+        setOnboardingLoading(false);
+        return;
+      }
 
-      // Fetch onboarding options in the background so we can render quickly.
+      setStartupPhase("initializing-agent");
+
+      // On fresh installs, unblock to onboarding as soon as options are available.
       if (onboardingNeedsOptions) {
-        void (async () => {
+        let optionsLoaded = false;
+        while (!cancelled && !optionsLoaded) {
           try {
             const options = await client.getOnboardingOptions();
             setOnboardingOptions(options);
+            optionsLoaded = true;
           } catch {
-            /* ignore */
+            await sleep(500);
           }
-        })();
+        }
+        if (!cancelled) {
+          setOnboardingLoading(false);
+        }
+        return;
       }
+
+      // Existing installs: keep loading until the runtime reports ready.
+      let agentReady = false;
+      let agentAttempts = 0;
+      while (!cancelled) {
+        try {
+          let status = await client.getStatus();
+          setAgentStatus(status);
+          setConnected(true);
+
+          if (status.state === "not_started" || status.state === "stopped") {
+            try {
+              status = await client.startAgent();
+              setAgentStatus(status);
+            } catch {
+              /* ignore */
+            }
+          }
+
+          if (status.state === "running" || status.state === "paused") {
+            agentReady = true;
+            break;
+          }
+
+          if (status.state === "error") {
+            break;
+          }
+        } catch {
+          setConnected(false);
+        }
+        agentAttempts += 1;
+        await sleep(500);
+      }
+      if (cancelled) return;
+
+      if (!agentReady) {
+        if (import.meta.env.DEV) {
+          console.debug(
+            "[milaidy] Agent did not reach running/paused state during startup.",
+          );
+        }
+      }
+
+      setOnboardingLoading(false);
 
       // Load conversations — if none exist, create one and request a greeting
       let greetConvId: string | null = null;
@@ -3096,30 +3343,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         });
       });
 
-      // Load status
-      try {
-        const status = await client.getStatus();
-        setAgentStatus(status);
-        setConnected(true);
-
-        // Keep runtime available by default when the app opens.
-        const canAutoStartOverHttp =
-          window.location.protocol === "http:" || window.location.protocol === "https:";
-        if (
-          canAutoStartOverHttp &&
-          (status.state === "not_started" || status.state === "stopped")
-        ) {
-          try {
-            const started = await client.startAgent();
-            setAgentStatus(started);
-          } catch {
-            /* ignore */
-          }
-        }
-      } catch {
-        setConnected(false);
-      }
-
       // Load wallet addresses for header
       try {
         setWalletAddresses(await client.getWalletAddresses());
@@ -3171,7 +3394,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    initApp();
+    void initApp();
 
     // Popstate listener
     const handlePopState = () => {
@@ -3181,6 +3404,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     window.addEventListener("popstate", handlePopState);
 
     return () => {
+      cancelled = true;
       window.removeEventListener("popstate", handlePopState);
       if (cloudPollInterval.current) clearInterval(cloudPollInterval.current);
       if (cloudLoginPollTimer.current) clearInterval(cloudLoginPollTimer.current);
@@ -3217,7 +3441,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const value: AppContextValue = {
     // State
     tab, currentTheme, connected, agentStatus, onboardingComplete, onboardingLoading,
-    authRequired, actionNotice,
+    startupPhase, authRequired, actionNotice, lifecycleBusy, lifecycleAction,
     pairingEnabled, pairingExpiresAt, pairingCodeInput, pairingError, pairingBusy,
     chatInput, chatSending, chatFirstTokenReceived, conversations, activeConversationId, conversationMessages,
     autonomousEvents, autonomousLatestEventId, unreadConversations,

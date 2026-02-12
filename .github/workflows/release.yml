@@ -155,7 +155,7 @@ jobs:
         working-directory: apps/app
 
       - name: Install Electron dependencies
-        run: npm ci --no-audit --no-fund
+        run: npm install --no-audit --no-fund
         working-directory: apps/app/electron
 
       - name: Build Electron app

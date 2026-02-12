@@ -43,7 +43,7 @@ describe("AgentWeb Electron API fallback", () => {
     await agent.getStatus();
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://127.0.0.1:2138/api/status",
+      "http://localhost:2138/api/status",
       expect.any(Object),
     );
   });

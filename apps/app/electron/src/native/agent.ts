@@ -81,17 +81,7 @@ export class AgentManager {
 
       console.log(`[Agent] Resolved milaidy dist: ${milaidyDist} (packaged: ${app.isPackaged})`);
 
-      // 1. Resolve runtime bootstrap entry
-      const elizaModule = await dynamicImport(path.join(milaidyDist, "eliza.js"));
-      const startEliza = (
-        elizaModule.startEliza ?? (elizaModule.default as Record<string, unknown>)?.startEliza
-      ) as ((opts: { headless: boolean }) => Promise<Record<string, unknown> | null>) | undefined;
-
-      if (typeof startEliza !== "function") {
-        throw new Error("eliza.js does not export startEliza");
-      }
-
-      // 2. Start API server immediately so the UI can bootstrap while runtime starts.
+      // 1. Start API server immediately so the UI can bootstrap while runtime starts.
       //    (or MILAIDY_PORT if set)
       const apiPort = Number(process.env.MILAIDY_PORT) || 2138;
       const serverModule = await dynamicImport(
@@ -102,6 +92,7 @@ export class AgentManager {
       });
 
       let actualPort: number | null = null;
+      let startEliza: ((opts: { headless: boolean }) => Promise<Record<string, unknown> | null>) | null = null;
       // `startApiServer()` returns an `updateRuntime()` helper that broadcasts
       // status updates and restores conversation state after a hot restart.
       // Keep it around so our onRestart hook can call it.
@@ -128,6 +119,11 @@ export class AgentManager {
                   stopErr instanceof Error ? stopErr.message : stopErr,
                 );
               }
+            }
+
+            if (!startEliza) {
+              console.error("[Agent] HTTP restart failed: runtime bootstrap not initialized");
+              return null;
             }
 
             // 2) Start new runtime (picks up latest config/env from disk)
@@ -174,7 +170,18 @@ export class AgentManager {
       };
       this.sendToRenderer("agent:status", this.status);
 
-      // 3. Start Eliza runtime in headless mode (can take time on cold boot).
+      // 2. Resolve runtime bootstrap entry (may be slow on cold boot).
+      const elizaModule = await dynamicImport(path.join(milaidyDist, "eliza.js"));
+      const resolvedStartEliza = (
+        elizaModule.startEliza ?? (elizaModule.default as Record<string, unknown>)?.startEliza
+      ) as ((opts: { headless: boolean }) => Promise<Record<string, unknown> | null>) | undefined;
+
+      if (typeof resolvedStartEliza !== "function") {
+        throw new Error("eliza.js does not export startEliza");
+      }
+      startEliza = resolvedStartEliza;
+
+      // 3. Start Eliza runtime in headless mode.
       const runtimeResult = await startEliza({ headless: true });
       if (!runtimeResult) {
         throw new Error("startEliza returned null — runtime failed to initialize");

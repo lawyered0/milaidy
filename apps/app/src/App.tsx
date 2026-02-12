@@ -19,7 +19,6 @@ import { CustomActionEditor } from "./components/CustomActionEditor.js";
 import { AppsPageView } from "./components/AppsPageView.js";
 import { AdvancedPageView } from "./components/AdvancedPageView.js";
 import { CharacterView } from "./components/CharacterView.js";
-import { TriggersView } from "./components/TriggersView.js";
 import { ConnectorsPageView } from "./components/ConnectorsPageView.js";
 import { InventoryView } from "./components/InventoryView.js";
 import { KnowledgeView } from "./components/KnowledgeView.js";
@@ -34,7 +33,6 @@ function ViewRouter() {
     case "chat": return <ChatView />;
     case "apps": return <AppsPageView />;
     case "character": return <CharacterView />;
-    case "triggers": return <TriggersView />;
     case "wallets": return <InventoryView />;
     case "knowledge": return <KnowledgeView />;
     case "connectors": return <ConnectorsPageView />;
@@ -42,6 +40,7 @@ function ViewRouter() {
     case "plugins":
     case "skills":
     case "actions":
+    case "triggers":
     case "fine-tuning":
     case "trajectories":
     case "runtime":
@@ -55,7 +54,14 @@ function ViewRouter() {
 }
 
 export function App() {
-  const { onboardingLoading, authRequired, onboardingComplete, tab, actionNotice } = useApp();
+  const {
+    onboardingLoading,
+    startupPhase,
+    authRequired,
+    onboardingComplete,
+    tab,
+    actionNotice,
+  } = useApp();
   const contextMenu = useContextMenu();
 
   const [customActionsPanelOpen, setCustomActionsPanelOpen] = useState(false);
@@ -76,7 +82,7 @@ export function App() {
   }, []);
 
   if (onboardingLoading) {
-    return <LoadingScreen />;
+    return <LoadingScreen phase={startupPhase} />;
   }
 
   if (authRequired) return <PairingView />;
@@ -88,6 +94,7 @@ export function App() {
     tab === "plugins" ||
     tab === "skills" ||
     tab === "actions" ||
+    tab === "triggers" ||
     tab === "fine-tuning" ||
     tab === "trajectories" ||
     tab === "runtime" ||

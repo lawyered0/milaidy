@@ -4,6 +4,7 @@
  * Sub-tabs:
  *   - Plugins: Feature/connector plugin management
  *   - Skills: Custom agent skills
+ *   - Triggers: Automation trigger management
  *   - Fine-Tuning: Dataset and model training workflows
  *   - Trajectories: LLM call viewer and analysis
  *   - Runtime: Runtime object inspection
@@ -22,12 +23,14 @@ import { TrajectoryDetailView } from "./TrajectoryDetailView";
 import { RuntimeView } from "./RuntimeView";
 import { DatabasePageView } from "./DatabasePageView";
 import { LogsPageView } from "./LogsPageView";
+import { TriggersView } from "./TriggersView";
 import type { Tab } from "../navigation";
 
 type SubTab =
   | "plugins"
   | "skills"
   | "actions"
+  | "triggers"
   | "fine-tuning"
   | "trajectories"
   | "runtime"
@@ -38,6 +41,7 @@ const SUB_TABS: Array<{ id: SubTab; label: string; description: string }> = [
   { id: "plugins", label: "Plugins", description: "Features and connectors" },
   { id: "skills", label: "Skills", description: "Custom agent skills" },
   { id: "actions", label: "Actions", description: "Custom agent actions" },
+  { id: "triggers", label: "Triggers", description: "Scheduled and event-based automations" },
   { id: "fine-tuning", label: "Fine-Tuning", description: "Dataset and model training workflows" },
   { id: "trajectories", label: "Trajectories", description: "LLM call history and analysis" },
   { id: "runtime", label: "Runtime", description: "Deep runtime object introspection and load order" },
@@ -50,6 +54,7 @@ function mapTabToSubTab(tab: Tab): SubTab {
     case "plugins": return "plugins";
     case "skills": return "skills";
     case "actions": return "actions";
+    case "triggers": return "triggers";
     case "fine-tuning": return "fine-tuning";
     case "trajectories": return "trajectories";
     case "runtime": return "runtime";
@@ -76,6 +81,9 @@ export function AdvancedPageView() {
         break;
       case "actions":
         setTab("actions");
+        break;
+      case "triggers":
+        setTab("triggers");
         break;
       case "fine-tuning":
         setTab("fine-tuning");
@@ -105,6 +113,8 @@ export function AdvancedPageView() {
         return <SkillsView />;
       case "actions":
         return <CustomActionsView />;
+      case "triggers":
+        return <TriggersView />;
       case "fine-tuning":
         return <FineTuningView />;
       case "trajectories":

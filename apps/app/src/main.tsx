@@ -69,9 +69,7 @@ function dispatchShareTarget(payload: ShareTargetPayload): void {
 /**
  * Initialize the agent plugin.
  *
- * On Electron, the main process has already started the runtime and injected
- * the API port into window.__MILAIDY_API_BASE__. On web/mobile, Agent.start()
- * hits the API server's /api/agent/start endpoint via the web fallback.
+ * Used for web/mobile plugin fallback status checks.
  */
 async function initializeAgent(): Promise<void> {
   try {
@@ -111,14 +109,12 @@ async function initializePlatform(): Promise<void> {
   if (isElectron) {
     // Electron-specific initialization
     await initializeElectron();
+  } else {
+    // On Electron the main process owns runtime startup; avoid an extra early
+    // plugin status probe that can race backend boot and spam fetch errors.
+    await initializeAgent();
   }
 
-  // Start the agent plugin (Electron starts via IPC to main process,
-  // web/mobile use the HTTP fallback to the API server)
-  await initializeAgent();
-
-  // Log platform info
-  console.log(`[Milaidy] Platform: ${platform}, Native: ${isNative}`);
 }
 
 /**
@@ -276,6 +272,15 @@ async function initializeElectron(): Promise<void> {
   document.body.classList.add("electron");
 
   try {
+    const version = await Desktop.getVersion();
+    const desktopNativeReady =
+      typeof version.electron === "string" &&
+      version.electron !== "N/A" &&
+      version.electron !== "unknown";
+    if (!desktopNativeReady) {
+      return;
+    }
+
     // Global command palette shortcut
     await Desktop.registerShortcut({
       id: "command-palette",
@@ -318,8 +323,7 @@ async function initializeElectron(): Promise<void> {
         }),
       );
     });
-  } catch (err) {
-    console.warn("[Milaidy] Electron native integrations not fully available:", err);
+  } catch {
   }
 }
 

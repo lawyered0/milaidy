@@ -12,6 +12,7 @@ import type { Dirent } from "node:fs";
 import { existsSync, symlinkSync } from "node:fs";
 import fs from "node:fs/promises";
 import { createRequire } from "node:module";
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import * as readline from "node:readline";
@@ -65,6 +66,13 @@ import {
 import { diagnoseNoAIProvider } from "../services/version-compat.js";
 import { CORE_PLUGINS, OPTIONAL_CORE_PLUGINS } from "./core-plugins.js";
 import { MilaidyEmbeddingManager } from "./embedding-manager.js";
+import {
+  detectEmbeddingPreset,
+  detectEmbeddingTier,
+  EMBEDDING_PRESETS,
+  type EmbeddingPreset,
+  type EmbeddingTier,
+} from "./embedding-presets.js";
 import { createMilaidyPlugin } from "./milaidy-plugin.js";
 import {
   createPhettaCompanionPlugin,
@@ -651,6 +659,20 @@ async function resolvePlugins(
         // This works cross-platform including .app bundles where we can't
         // modify the app's node_modules.
         mod = await importFromPath(installRecord.installPath, pluginName);
+      } else if (pluginName.startsWith("@milaidy/plugin-")) {
+        // Local Milaidy plugin — resolve from the compiled dist directory.
+        // These are built by tsdown into dist/plugins/<name>/ and are not
+        // published to npm.  import.meta.url points to dist/runtime/eliza.js
+        // (unbundled) or dist/eliza.js (bundled), so we resolve relative to
+        // the dist root via the parent of the current file's directory.
+        const shortName = pluginName.replace("@milaidy/plugin-", "");
+        const thisDir = path.dirname(fileURLToPath(import.meta.url));
+        // Walk up until we find the dist directory that contains plugins/
+        const distRoot = thisDir.endsWith("runtime")
+          ? path.resolve(thisDir, "..")
+          : thisDir;
+        const distDir = path.resolve(distRoot, "plugins", shortName);
+        mod = await importFromPath(distDir, pluginName);
       } else {
         // Built-in/npm plugin — import by package name from node_modules.
         mod = (await import(pluginName)) as PluginModuleShape;
@@ -689,7 +711,7 @@ async function resolvePlugins(
           `[milaidy] Failed to load core plugin ${pluginName}: ${msg}`,
         );
       } else {
-        logger.warn(`[milaidy] Could not load plugin ${pluginName}: ${msg}`);
+        logger.info(`[milaidy] Could not load plugin ${pluginName}: ${msg}`);
       }
     }
   }
@@ -700,7 +722,7 @@ async function resolvePlugins(
       (failedPlugins.length > 0 ? `, ${failedPlugins.length} failed` : ""),
   );
   if (failedPlugins.length > 0) {
-    logger.debug(
+    logger.info(
       `[milaidy] Failed plugins: ${failedPlugins.map((f) => `${f.name} (${f.error})`).join(", ")}`,
     );
   }
@@ -1137,6 +1159,30 @@ import { pickRandomNames } from "./onboarding-names.js";
 
 import { STYLE_PRESETS } from "../onboarding-presets.js";
 
+const EMBEDDING_TIER_ORDER: readonly EmbeddingTier[] = [
+  "fallback",
+  "standard",
+  "performance",
+];
+
+function getAvailableEmbeddingTiers(
+  detectedTier: EmbeddingTier,
+): EmbeddingTier[] {
+  if (detectedTier === "performance") return [...EMBEDDING_TIER_ORDER];
+  if (detectedTier === "standard") return ["fallback", "standard"];
+  return ["fallback"];
+}
+
+function formatEmbeddingDownloadSize(downloadSizeMB: number): string {
+  return downloadSizeMB >= 1000
+    ? `${(downloadSizeMB / 1000).toFixed(1)}GB`
+    : `${downloadSizeMB}MB`;
+}
+
+function formatEmbeddingPresetSummary(preset: EmbeddingPreset): string {
+  return `${preset.model} (${preset.dimensions} dims, ${formatEmbeddingDownloadSize(preset.downloadSizeMB)}, ${preset.contextSize} token context)`;
+}
+
 /**
  * Detect whether this is the first run (no agent name configured)
  * and run the onboarding flow:
@@ -1286,6 +1332,8 @@ async function runFirstTimeSetup(
     (p) => p.catchphrase === styleChoice,
   );
 
+  let chosenEmbeddingPreset: EmbeddingPreset | undefined;
+
   // ── Step 4: Model provider ───────────────────────────────────────────────
   // Skip provider selection in cloud mode — Eliza Cloud handles inference.
   // Check whether an API key is already set in the environment (from .env or
@@ -1433,6 +1481,49 @@ async function runFirstTimeSetup(
     }
   }
 
+  // ── Step 4b: Embedding model preset ────────────────────────────────────
+  if (runMode !== "cloud") {
+    const detectedTier = detectEmbeddingTier();
+    const detectedPreset = EMBEDDING_PRESETS[detectedTier];
+    const availableTiers = getAvailableEmbeddingTiers(detectedTier);
+    const availablePresets = availableTiers.map(
+      (tier) => EMBEDDING_PRESETS[tier],
+    );
+    const optionPresets = [
+      detectedPreset,
+      ...availablePresets.filter((preset) => preset.tier !== detectedTier),
+    ];
+
+    const cpuModel = os.cpus()[0]?.model ?? "Unknown CPU";
+    const ramGB = Math.round(os.totalmem() / 1024 ** 3);
+
+    clack.log.message(
+      `${name}: I detected your hardware — [${cpuModel}, ${ramGB}GB RAM]`,
+    );
+    clack.log.message(
+      `Recommended embedding model: ${detectedPreset.label}\n  → ${formatEmbeddingPresetSummary(detectedPreset)}`,
+    );
+
+    const embeddingTierChoice = await clack.select({
+      message: `${name}: Which embedding model should I use for local memory?`,
+      options: optionPresets.map((preset) => ({
+        value: preset.tier,
+        label:
+          preset.tier === detectedTier
+            ? `${preset.label} (recommended)`
+            : preset.label,
+        hint: preset.description,
+      })),
+    });
+
+    if (clack.isCancel(embeddingTierChoice)) cancelOnboarding();
+
+    chosenEmbeddingPreset = EMBEDDING_PRESETS[embeddingTierChoice];
+    clack.log.success(
+      `Embedding preset selected: ${chosenEmbeddingPreset.label}`,
+    );
+  }
+
   // ── Step 5: Wallet setup ───────────────────────────────────────────────
   // Offer to generate or import wallets for EVM and Solana. Keys are
   // stored in config.env and process.env, making them available to
@@ -1547,7 +1638,7 @@ async function runFirstTimeSetup(
     }
   }
 
-  // ── Step 7: Persist agent name + style + provider to config ─────────────
+  // ── Step 7: Persist agent + style + provider + embedding config ─────────
   // Save the agent name and chosen personality template into config so that
   // the same character data is used regardless of whether the user onboarded
   // via CLI or GUI.  This ensures full parity between onboarding surfaces.
@@ -1604,6 +1695,16 @@ async function runFirstTimeSetup(
     envBucket.SKILLSMP_API_KEY = process.env.SKILLSMP_API_KEY;
   }
 
+  if (chosenEmbeddingPreset) {
+    updated.embedding = {
+      ...updated.embedding,
+      model: chosenEmbeddingPreset.model,
+      modelRepo: chosenEmbeddingPreset.modelRepo,
+      dimensions: chosenEmbeddingPreset.dimensions,
+      gpuLayers: chosenEmbeddingPreset.gpuLayers,
+    };
+  }
+
   try {
     saveMilaidyConfig(updated);
   } catch (err) {
@@ -1649,7 +1750,9 @@ export async function bootElizaRuntime(
   opts: BootElizaRuntimeOptions = {},
 ): Promise<AgentRuntime> {
   if (opts.requireConfig && !configFileExists()) {
-    throw new Error("No config found. Run `milaidy start` first to set up.");
+    throw new Error(
+      "No config found. Run `milaidy start` once to complete setup.",
+    );
   }
 
   const runtime = await startEliza({ headless: true });
@@ -2102,16 +2205,20 @@ export async function startEliza(
   //     The upstream plugin still provides TEXT_TOKENIZER_ENCODE/DECODE;
   //     we only replace its embedding with Metal GPU + idle unloading.
   //     Uses `let` so hot-reload can swap to a fresh manager instance.
+  const defaultEmbeddingPreset = detectEmbeddingPreset();
   let embeddingManager = new MilaidyEmbeddingManager({
     model: config.embedding?.model,
     modelRepo: config.embedding?.modelRepo,
     dimensions: config.embedding?.dimensions,
-    gpuLayers:
-      config.embedding?.gpuLayers ??
-      (process.platform === "darwin" ? "auto" : 0),
+    gpuLayers: config.embedding?.gpuLayers,
     idleTimeoutMs: (config.embedding?.idleTimeoutMinutes ?? 30) * 60 * 1000,
   });
-  const embeddingDimensions = config.embedding?.dimensions ?? 768;
+  const embeddingDimensions =
+    config.embedding?.dimensions ?? defaultEmbeddingPreset.dimensions;
+  const embeddingModel =
+    config.embedding?.model ?? defaultEmbeddingPreset.model;
+  const embeddingGpuLayers =
+    config.embedding?.gpuLayers ?? defaultEmbeddingPreset.gpuLayers;
   runtime.registerModel(
     ModelType.TEXT_EMBEDDING,
     async (_runtime, params) => {
@@ -2129,9 +2236,9 @@ export async function startEliza(
   );
   logger.info(
     "[milaidy] Embedding handler registered (priority 100, " +
-      `model=${config.embedding?.model ?? "nomic-embed-text-v1.5.Q5_K_M.gguf"}, ` +
+      `model=${embeddingModel}, ` +
       `dims=${embeddingDimensions}, ` +
-      `gpu=${config.embedding?.gpuLayers ?? (process.platform === "darwin" ? "auto" : 0)})`,
+      `gpu=${embeddingGpuLayers})`,
   );
 
   // 8. Initialize the runtime (registers remaining plugins, starts services)
@@ -2440,17 +2547,18 @@ export async function startEliza(
 
           // Re-create embedding manager with fresh config and register
           // at priority 100 (same as initial startup).
+          const freshDefaultEmbeddingPreset = detectEmbeddingPreset();
           const freshEmbeddingManager = new MilaidyEmbeddingManager({
             model: freshConfig.embedding?.model,
             modelRepo: freshConfig.embedding?.modelRepo,
             dimensions: freshConfig.embedding?.dimensions,
-            gpuLayers:
-              freshConfig.embedding?.gpuLayers ??
-              (process.platform === "darwin" ? "auto" : 0),
+            gpuLayers: freshConfig.embedding?.gpuLayers,
             idleTimeoutMs:
               (freshConfig.embedding?.idleTimeoutMinutes ?? 30) * 60 * 1000,
           });
-          const freshEmbeddingDims = freshConfig.embedding?.dimensions ?? 768;
+          const freshEmbeddingDims =
+            freshConfig.embedding?.dimensions ??
+            freshDefaultEmbeddingPreset.dimensions;
           newRuntime.registerModel(
             ModelType.TEXT_EMBEDDING,
             async (_rt, params) => {

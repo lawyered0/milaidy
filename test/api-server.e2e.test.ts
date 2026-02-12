@@ -265,6 +265,151 @@ function createRuntimeForStreamTests(options: {
   return runtimeSubset as AgentRuntime;
 }
 
+function createRuntimeForAutonomySurfaceTests(options: {
+  eventService: TestAgentEventService;
+  loopRunning?: boolean;
+}): AgentRuntime {
+  const memoriesByRoom = new Map<string, Array<Record<string, unknown>>>();
+  let tasks: Task[] = [
+    {
+      id: "00000000-0000-0000-0000-00000000a001" as UUID,
+      name: "Autonomy surface task",
+      description: "Validate workbench task visibility",
+      tags: ["workbench-task"],
+      metadata: {
+        isCompleted: false,
+        updatedAt: Date.now(),
+        workbench: { kind: "task" },
+      },
+    } as Task,
+    {
+      id: "00000000-0000-0000-0000-00000000a002" as UUID,
+      name: "TRIGGER_DISPATCH",
+      description: "Autonomy surface trigger",
+      tags: ["queue", "repeat", "trigger"],
+      metadata: {
+        updatedAt: Date.now(),
+        updateInterval: 60_000,
+        trigger: {
+          triggerId: "00000000-0000-0000-0000-00000000a111",
+          displayName: "Autonomy surface trigger",
+          instructions: "Emit a proactive autonomy update",
+          triggerType: "interval",
+          enabled: true,
+          wakeMode: "inject_now",
+          createdBy: "test",
+          intervalMs: 60_000,
+          runCount: 0,
+          nextRunAtMs: Date.now() + 60_000,
+        },
+      },
+    } as Task,
+  ];
+
+  const runtimeSubset: Pick<
+    AgentRuntime,
+    | "agentId"
+    | "character"
+    | "messageService"
+    | "getService"
+    | "ensureConnection"
+    | "getWorld"
+    | "updateWorld"
+    | "createMemory"
+    | "getMemories"
+    | "getRoomsByWorld"
+    | "getTasks"
+    | "getTask"
+    | "deleteTask"
+    | "getCache"
+    | "setCache"
+  > = {
+    agentId: "autonomy-surface-agent",
+    character: { name: "AutonomySurfaceAgent" } as AgentRuntime["character"],
+    messageService: {
+      handleMessage: async (
+        _runtime: AgentRuntime,
+        message: Record<string, unknown>,
+      ) => {
+        const prompt =
+          typeof (message.content as Record<string, unknown> | undefined)
+            ?.text === "string"
+            ? String(
+                (message.content as Record<string, unknown> | undefined)?.text,
+              )
+            : "autonomy";
+        return {
+          didRespond: true,
+          responseContent: { text: `Autonomy says: ${prompt}` },
+          responseMessages: [
+            {
+              id: crypto.randomUUID(),
+              entityId: "autonomy-surface-agent",
+              roomId: message.roomId as string,
+              createdAt: Date.now(),
+              content: {
+                text: `Autonomy says: ${prompt}`,
+              },
+            },
+          ],
+          mode: "power",
+        };
+      },
+    } as AgentRuntime["messageService"],
+    getService: (serviceType: string) => {
+      if (serviceType === "AGENT_EVENT") {
+        return options.eventService;
+      }
+      if (serviceType === "AUTONOMY") {
+        return {
+          enableAutonomy: async () => {},
+          disableAutonomy: async () => {},
+          isLoopRunning: () => options.loopRunning ?? true,
+        } as never;
+      }
+      return null;
+    },
+    ensureConnection: async () => {},
+    getWorld: async () => null,
+    updateWorld: async () => {},
+    createMemory: async (memory: Record<string, unknown>) => {
+      const roomId = String(memory.roomId ?? "");
+      if (!roomId) return;
+      const current = memoriesByRoom.get(roomId) ?? [];
+      current.push({
+        ...memory,
+        createdAt:
+          typeof memory.createdAt === "number" ? memory.createdAt : Date.now(),
+      });
+      memoriesByRoom.set(roomId, current);
+    },
+    getMemories: async (query: { roomId?: string; count?: number }) => {
+      const roomId = String(query.roomId ?? "");
+      const current = memoriesByRoom.get(roomId) ?? [];
+      const count = Math.max(1, query.count ?? current.length);
+      return current.slice(-count) as unknown as Awaited<
+        ReturnType<AgentRuntime["getMemories"]>
+      >;
+    },
+    getRoomsByWorld: async () => [],
+    getTasks: async (query?: { tags?: string[] }) => {
+      if (!query?.tags || query.tags.length === 0) return tasks;
+      return tasks.filter((task) =>
+        query.tags?.every((tag) => task.tags?.includes(tag)),
+      );
+    },
+    getTask: async (taskId: UUID) =>
+      tasks.find((task) => task.id === taskId) ?? null,
+    deleteTask: async (taskId: UUID) => {
+      tasks = tasks.filter((task) => task.id !== taskId);
+    },
+    getCache: async () => null,
+    setCache: async () => {},
+  };
+
+  return runtimeSubset as AgentRuntime;
+}
+
 function createRuntimeForWorkbenchCrudTests(options?: {
   loopRunning?: boolean;
 }): AgentRuntime {
@@ -1190,6 +1335,173 @@ describe("API Server E2E (no runtime)", () => {
 
         const message = await waitForAgentEvent;
         expect(message.type).toBe("agent_event");
+      } finally {
+        ws.close();
+        await streamServer.close();
+      }
+    });
+
+    it("routes proactive autonomy output to active chat and exposes matching overview/event surfaces", async () => {
+      const eventService = new TestAgentEventService();
+      const runtime = createRuntimeForAutonomySurfaceTests({
+        eventService,
+        loopRunning: true,
+      });
+      const streamServer = await startApiServer({ port: 0, runtime });
+      const ws = new WebSocket(`ws://127.0.0.1:${streamServer.port}/ws`);
+      try {
+        await waitForWsMessage(ws, (message) => message.type === "status");
+
+        const createConversation = await req(
+          streamServer.port,
+          "POST",
+          "/api/conversations",
+          {
+            title: "Autonomy routing test",
+          },
+        );
+        expect(createConversation.status).toBe(200);
+        const conversation = createConversation.data.conversation as {
+          id?: string;
+        };
+        const conversationId = conversation.id ?? "";
+        expect(conversationId.length).toBeGreaterThan(0);
+
+        ws.send(
+          JSON.stringify({
+            type: "active-conversation",
+            conversationId,
+          }),
+        );
+
+        const waitForThought = waitForWsMessage(
+          ws,
+          (message) =>
+            message.type === "agent_event" &&
+            ((message.payload as Record<string, unknown>)?.text as string) ===
+              "autonomy-thought",
+        );
+        const waitForAction = waitForWsMessage(
+          ws,
+          (message) =>
+            message.type === "agent_event" &&
+            ((message.payload as Record<string, unknown>)?.text as string) ===
+              "autonomy-action",
+        );
+        const waitForProactive = waitForWsMessage(
+          ws,
+          (message) =>
+            message.type === "proactive-message" &&
+            message.conversationId === conversationId,
+          6000,
+        );
+
+        eventService.emit({
+          runId: "run-autonomy-surface",
+          seq: 1,
+          stream: "assistant",
+          ts: Date.now() - 5,
+          data: { text: "autonomy-thought" },
+          agentId: "autonomy-surface-agent",
+        });
+        eventService.emit({
+          runId: "run-autonomy-surface",
+          seq: 2,
+          stream: "provider",
+          ts: Date.now() - 1,
+          data: { text: "autonomy-action" },
+          agentId: "autonomy-surface-agent",
+        });
+
+        await runtime.messageService?.handleMessage?.(
+          runtime,
+          {
+            id: crypto.randomUUID(),
+            roomId: "00000000-0000-0000-0000-00000000a999",
+            entityId: "autonomy-surface-agent",
+            content: {
+              text: "trigger follow-up",
+              source: "trigger-dispatch",
+            },
+          } as never,
+          async () => [],
+        );
+
+        await waitForThought;
+        await waitForAction;
+        const proactive = await waitForProactive;
+        const proactiveMessage = proactive.message as Record<string, unknown>;
+        expect(proactiveMessage.source).toBe("trigger-dispatch");
+        expect(String(proactiveMessage.text ?? "")).toContain("Autonomy says:");
+
+        const messagesResponse = await req(
+          streamServer.port,
+          "GET",
+          `/api/conversations/${encodeURIComponent(conversationId)}/messages`,
+        );
+        expect(messagesResponse.status).toBe(200);
+        const messages = messagesResponse.data.messages as Array<
+          Record<string, unknown>
+        >;
+        const routed = messages.find(
+          (message) =>
+            message.role === "assistant" &&
+            message.source === "trigger-dispatch",
+        );
+        expect(routed).toBeDefined();
+        expect(String(routed?.text ?? "")).toContain("Autonomy says:");
+
+        const replayResponse = await req(
+          streamServer.port,
+          "GET",
+          "/api/agent/events?limit=50",
+        );
+        expect(replayResponse.status).toBe(200);
+        const replayEvents = replayResponse.data.events as Array<
+          Record<string, unknown>
+        >;
+        const replayPayloads = replayEvents
+          .filter((event) => event.type === "agent_event")
+          .map((event) => event.payload as Record<string, unknown>);
+        expect(
+          replayPayloads.some((payload) => payload.text === "autonomy-thought"),
+        ).toBe(true);
+        expect(
+          replayPayloads.some((payload) => payload.text === "autonomy-action"),
+        ).toBe(true);
+
+        const overviewResponse = await req(
+          streamServer.port,
+          "GET",
+          "/api/workbench/overview",
+        );
+        expect(overviewResponse.status).toBe(200);
+        const autonomy = (
+          overviewResponse.data as {
+            autonomy?: {
+              enabled?: boolean;
+              thinking?: boolean;
+              lastEventAt?: unknown;
+            };
+          }
+        ).autonomy;
+        expect(autonomy?.enabled).toBe(true);
+        expect(autonomy?.thinking).toBe(true);
+        expect(typeof autonomy?.lastEventAt).toBe("number");
+        const tasks = (overviewResponse.data.tasks ?? []) as Array<
+          Record<string, unknown>
+        >;
+        const triggers = (overviewResponse.data.triggers ?? []) as Array<
+          Record<string, unknown>
+        >;
+        expect(
+          tasks.some((task) => task.name === "Autonomy surface task"),
+        ).toBe(true);
+        expect(
+          triggers.some(
+            (trigger) => trigger.displayName === "Autonomy surface trigger",
+          ),
+        ).toBe(true);
       } finally {
         ws.close();
         await streamServer.close();

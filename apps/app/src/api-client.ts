@@ -1504,12 +1504,13 @@ export class MilaidyClient {
   private static resolveElectronLocalFallbackBase(): string {
     if (typeof window === "undefined") return "";
     const proto = window.location.protocol;
-    if (proto === "capacitor-electron:") {
-      return "http://127.0.0.1:2138";
-    }
+    // In capacitor-electron mode the main process injects the live API base
+    // once the embedded agent has bound a port. Avoid eager localhost probes
+    // to prevent noisy ERR_CONNECTION_REFUSED logs during startup.
+    if (proto === "capacitor-electron:") return "";
     // Legacy Electron file:// mode fallback.
     if (proto === "file:" && /\bElectron\b/i.test(window.navigator.userAgent)) {
-      return "http://127.0.0.1:2138";
+      return "http://localhost:2138";
     }
     return "";
   }
@@ -1536,11 +1537,15 @@ export class MilaidyClient {
    * ensures we pick up the injected value even if it wasn't set at construction.
    */
   private get baseUrl(): string {
-    if (!this._baseUrl && !this._explicitBase && typeof window !== "undefined") {
+    if (!this._explicitBase && typeof window !== "undefined") {
       const injected = window.__MILAIDY_API_BASE__;
-      if (injected) {
+      // In Electron the API base can be injected after initial render. Always
+      // prefer the injected value when present so the client can switch away
+      // from the localhost fallback once the main process publishes the real
+      // endpoint.
+      if (injected && injected !== this._baseUrl) {
         this._baseUrl = injected;
-      } else {
+      } else if (!this._baseUrl) {
         this._baseUrl = MilaidyClient.resolveElectronLocalFallbackBase();
       }
     }

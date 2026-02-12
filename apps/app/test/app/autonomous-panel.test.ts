@@ -103,7 +103,7 @@ describe("AutonomousPanel", () => {
     const liveState = makeContext({
       agentStatus: makeStatus("running"),
       autonomousEvents: [
-        makeEvent("evt-1", "assistant", { text: "Thinking about priorities" }),
+        makeEvent("evt-1", "evaluator", { text: "Thinking about priorities" }),
         makeEvent("evt-2", "action", { text: "Called resolve_priority action" }),
       ],
     });
@@ -133,6 +133,7 @@ describe("AutonomousPanel", () => {
     expect(panelText).toContain("Event Stream ( 4 )");
     expect(panelText).toContain("Switching to execution mode");
     expect(panelText).toContain("provider event");
+    expect(panelText).toContain("Action provider event");
   });
 
   it("renders tasks, triggers, and todos from workbench context", async () => {

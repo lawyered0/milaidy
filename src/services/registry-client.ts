@@ -405,10 +405,76 @@ function resolveAppOverride(
   };
 }
 
+function buildDiscoveredEntry(
+  packageDir: string,
+  dirName: string,
+  packageJson: LocalPackageJson,
+  manifest: LocalPluginManifest | null,
+): RegistryPluginInfo | null {
+  if (!packageJson?.name || packageJson.name.length === 0) return null;
+
+  const packageAppMeta = toLocalAppMeta(
+    packageJson.elizaos?.app,
+    toDisplayNameFromDirName(dirName),
+  );
+  const manifestAppMeta = toLocalAppMeta(
+    manifest?.app,
+    toDisplayNameFromDirName(dirName),
+  );
+  const mergedMeta = mergeAppMeta(manifestAppMeta, packageAppMeta);
+  const overriddenMeta = resolveAppOverride(packageJson.name, mergedMeta);
+
+  const kind =
+    packageJson.elizaos?.kind === "app" || manifest?.kind === "app"
+      ? "app"
+      : overriddenMeta
+        ? "app"
+        : undefined;
+
+  const repo = parseRepositoryMetadata(
+    packageJson.repository ?? manifest?.repository,
+  );
+  const description = packageJson.description ?? manifest?.description ?? "";
+  const homepage =
+    packageJson.homepage ??
+    manifest?.homepage ??
+    overriddenMeta?.launchUrl ??
+    null;
+  const version = packageJson.version ?? manifest?.version ?? null;
+
+  return {
+    name: packageJson.name,
+    gitRepo: repo.gitRepo,
+    gitUrl: repo.gitUrl,
+    description,
+    homepage,
+    topics: [],
+    stars: 0,
+    language: "TypeScript",
+    npm: {
+      package: packageJson.name,
+      v0Version: null,
+      v1Version: null,
+      v2Version: version,
+    },
+    git: {
+      v0Branch: null,
+      v1Branch: null,
+      v2Branch: "main",
+    },
+    supports: { v0: false, v1: false, v2: true },
+    localPath: packageDir,
+    kind,
+    appMeta: overriddenMeta ?? undefined,
+  };
+}
+
 async function discoverLocalWorkspaceApps(): Promise<
   Map<string, RegistryPluginInfo>
 > {
   const discovered = new Map<string, RegistryPluginInfo>();
+
+  // 1. Scan workspace plugins/ directories for app-* folders
   for (const workspaceRoot of resolveWorkspaceRoots()) {
     const pluginsDir = path.join(workspaceRoot, "plugins");
     let entries: Array<import("node:fs").Dirent>;
@@ -428,68 +494,82 @@ async function discoverLocalWorkspaceApps(): Promise<
       const packageJson = await readJsonFile<LocalPackageJson>(
         path.join(packageDir, "package.json"),
       );
-      if (!packageJson?.name || packageJson.name.length === 0) continue;
+      if (!packageJson) continue;
 
       const manifest = await readJsonFile<LocalPluginManifest>(
         path.join(packageDir, "elizaos.plugin.json"),
       );
-
-      const packageAppMeta = toLocalAppMeta(
-        packageJson.elizaos?.app,
-        toDisplayNameFromDirName(entry.name),
+      const info = buildDiscoveredEntry(
+        packageDir,
+        entry.name,
+        packageJson,
+        manifest,
       );
-      const manifestAppMeta = toLocalAppMeta(
-        manifest?.app,
-        toDisplayNameFromDirName(entry.name),
-      );
-      const mergedMeta = mergeAppMeta(manifestAppMeta, packageAppMeta);
-      const overriddenMeta = resolveAppOverride(packageJson.name, mergedMeta);
-
-      const kind =
-        packageJson.elizaos?.kind === "app" || manifest?.kind === "app"
-          ? "app"
-          : overriddenMeta
-            ? "app"
-            : undefined;
-
-      const repo = parseRepositoryMetadata(
-        packageJson.repository ?? manifest?.repository,
-      );
-      const description =
-        packageJson.description ?? manifest?.description ?? "";
-      const homepage =
-        packageJson.homepage ??
-        manifest?.homepage ??
-        overriddenMeta?.launchUrl ??
-        null;
-      const version = packageJson.version ?? manifest?.version ?? null;
-
-      discovered.set(packageJson.name, {
-        name: packageJson.name,
-        gitRepo: repo.gitRepo,
-        gitUrl: repo.gitUrl,
-        description,
-        homepage,
-        topics: [],
-        stars: 0,
-        language: "TypeScript",
-        npm: {
-          package: packageJson.name,
-          v0Version: null,
-          v1Version: null,
-          v2Version: version,
-        },
-        git: {
-          v0Branch: null,
-          v1Branch: null,
-          v2Branch: "main",
-        },
-        supports: { v0: false, v1: false, v2: true },
-        localPath: packageDir,
-        kind,
-        appMeta: overriddenMeta ?? undefined,
-      });
+      if (info) discovered.set(info.name, info);
     }
+  }
+
+  // 2. Scan user-installed plugins (~/.milaidy/plugins/installed/) for kind: "app"
+  const stateDir =
+    process.env.MILAIDY_STATE_DIR?.trim() ||
+    path.join(os.homedir(), ".milaidy");
+  const installedBase = path.join(stateDir, "plugins", "installed");
+  try {
+    const installedEntries = await fs.readdir(installedBase, {
+      withFileTypes: true,
+    });
+    for (const entry of installedEntries) {
+      if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
+      const installDir = path.join(installedBase, entry.name);
+      // Installed plugins nest inside node_modules — find the actual package
+      const nmDir = path.join(installDir, "node_modules");
+      const pkgDirs: string[] = [];
+      try {
+        const nmEntries = await fs.readdir(nmDir, { withFileTypes: true });
+        for (const nm of nmEntries) {
+          if (nm.name.startsWith("@")) {
+            // Scoped package — read one level deeper
+            const scopeDir = path.join(nmDir, nm.name);
+            try {
+              const scopeEntries = await fs.readdir(scopeDir, {
+                withFileTypes: true,
+              });
+              for (const se of scopeEntries) {
+                pkgDirs.push(path.join(scopeDir, se.name));
+              }
+            } catch {
+              /* skip */
+            }
+          } else if (nm.isDirectory() || nm.isSymbolicLink()) {
+            pkgDirs.push(path.join(nmDir, nm.name));
+          }
+        }
+      } catch {
+        continue;
+      }
+
+      for (const pkgDir of pkgDirs) {
+        const pkgJson = await readJsonFile<LocalPackageJson>(
+          path.join(pkgDir, "package.json"),
+        );
+        if (!pkgJson?.name) continue;
+        // Only include if this is an app-kind plugin
+        if (pkgJson.elizaos?.kind !== "app") continue;
+        // Skip if already discovered from workspace
+        if (discovered.has(pkgJson.name)) continue;
+
+        const manifest = await readJsonFile<LocalPluginManifest>(
+          path.join(pkgDir, "elizaos.plugin.json"),
+        );
+        const dirName = pkgJson.name
+          .replace(/^@[^/]+\//, "")
+          .replace(/^plugin-/, "app-");
+        const info = buildDiscoveredEntry(pkgDir, dirName, pkgJson, manifest);
+        if (info) discovered.set(info.name, info);
+      }
+    }
+  } catch {
+    // installed dir may not exist
   }
 
   return discovered;

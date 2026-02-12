@@ -52,4 +52,14 @@ export default defineConfig([
     inlineOnly: false,
     external: nativeExternals,
   },
+  {
+    entry: "src/plugins/telegram-enhanced/index.ts",
+    outDir: "dist/plugins/telegram-enhanced",
+    env,
+    fixedExtension: false,
+    platform: "node",
+    unbundle: true,
+    inlineOnly: false,
+    external: nativeExternals,
+  },
 ]);

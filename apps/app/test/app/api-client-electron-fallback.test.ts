@@ -19,7 +19,7 @@ describe("MilaidyClient Electron API fallback", () => {
     (window.location as { protocol?: string }).protocol = originalProtocol;
   });
 
-  it("uses localhost fallback on capacitor-electron protocol when API base is not injected", async () => {
+  it("does not probe localhost on capacitor-electron protocol before API base is injected", async () => {
     (window as { __MILAIDY_API_BASE__?: string }).__MILAIDY_API_BASE__ =
       undefined;
     (window.location as { protocol?: string }).protocol = "capacitor-electron:";
@@ -41,13 +41,12 @@ describe("MilaidyClient Electron API fallback", () => {
     });
 
     const client = new MilaidyClient();
-    expect(client.apiAvailable).toBe(true);
-    await client.getStatus();
-
-    expect(fetchMock).toHaveBeenCalledWith(
-      "http://127.0.0.1:2138/api/status",
-      expect.any(Object),
+    expect(client.apiAvailable).toBe(false);
+    await expect(client.getStatus()).rejects.toThrow(
+      "API not available (no HTTP origin)",
     );
+
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("prefers injected API base over fallback", async () => {
@@ -76,6 +75,42 @@ describe("MilaidyClient Electron API fallback", () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:9999/api/status",
+      expect.any(Object),
+    );
+  });
+
+  it("starts unavailable on capacitor-electron and switches to injected API base when injected later", async () => {
+    (window as { __MILAIDY_API_BASE__?: string }).__MILAIDY_API_BASE__ =
+      undefined;
+    (window.location as { protocol?: string }).protocol = "capacitor-electron:";
+
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        state: "running",
+        agentName: "Milaidy",
+        model: "test",
+        uptime: 1,
+        startedAt: Date.now(),
+      }),
+    }));
+    Object.defineProperty(globalThis, "fetch", {
+      value: fetchMock,
+      writable: true,
+      configurable: true,
+    });
+
+    const client = new MilaidyClient();
+    await expect(client.getStatus()).rejects.toThrow(
+      "API not available (no HTTP origin)",
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    (window as { __MILAIDY_API_BASE__?: string }).__MILAIDY_API_BASE__ =
+      "http://127.0.0.1:4444";
+    await client.getStatus();
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      "http://127.0.0.1:4444/api/status",
       expect.any(Object),
     );
   });

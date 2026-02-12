@@ -21,9 +21,23 @@ function getEventText(event: StreamEventEnvelope): string {
 function getEventTone(event: StreamEventEnvelope): string {
   if (event.type === "heartbeat_event") return "text-accent";
   if (event.stream === "error") return "text-danger";
-  if (event.stream === "action" || event.stream === "tool") return "text-ok";
+  if (
+    event.stream === "action" ||
+    event.stream === "tool" ||
+    event.stream === "provider"
+  ) {
+    return "text-ok";
+  }
   if (event.stream === "assistant") return "text-accent";
   return "text-muted";
+}
+
+function isThoughtStream(stream: string | undefined): boolean {
+  return stream === "assistant" || stream === "evaluator";
+}
+
+function isActionStream(stream: string | undefined): boolean {
+  return stream === "action" || stream === "tool" || stream === "provider";
 }
 
 export function AutonomousPanel() {
@@ -44,7 +58,11 @@ export function AutonomousPanel() {
 
   const events = useMemo(() => autonomousEvents.slice(-120).reverse(), [autonomousEvents]);
   const latestThought = useMemo(
-    () => autonomousEvents.slice().reverse().find((event) => event.stream === "assistant"),
+    () =>
+      autonomousEvents
+        .slice()
+        .reverse()
+        .find((event) => isThoughtStream(event.stream)),
     [autonomousEvents],
   );
   const latestAction = useMemo(
@@ -52,7 +70,7 @@ export function AutonomousPanel() {
       autonomousEvents
         .slice()
         .reverse()
-        .find((event) => event.stream === "action" || event.stream === "tool"),
+        .find((event) => isActionStream(event.stream)),
     [autonomousEvents],
   );
 

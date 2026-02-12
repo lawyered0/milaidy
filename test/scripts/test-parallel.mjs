@@ -19,6 +19,9 @@ try {
 } catch {
   // @playwright/test not available — playwright tests will be skipped
 }
+const shouldRunPlaywright =
+  Boolean(playwrightCli) &&
+  (process.env.MILAIDY_RUN_PLAYWRIGHT === "1" || process.env.CI !== "true");
 
 /**
  * Each entry describes a test suite to run in parallel.
@@ -43,12 +46,17 @@ const runs = [
     maxWorkers: 1,
   },
   // Only include playwright tests if @playwright/test is installed
-  ...(playwrightCli
+  ...(shouldRunPlaywright
     ? [
         {
           name: "e2e:playwright",
           cmd: "node",
-          args: [playwrightCli, "test"],
+          args: [
+            playwrightCli,
+            "test",
+            "--config",
+            "playwright.electron.config.ts",
+          ],
           cwd: appDir,
         },
       ]

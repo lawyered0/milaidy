@@ -53,3 +53,4 @@ temp_capture_*.jpg
 knowledge/
 scripts/knowledge-loop.mjs
 test/contracts/
+apps/app/test-results/

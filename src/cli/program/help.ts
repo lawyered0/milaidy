@@ -7,7 +7,8 @@ import { replaceCliName, resolveCliName } from "../cli-name.js";
 const CLI_NAME = resolveCliName();
 
 const EXAMPLES = [
-  ["milaidy start", "Start the agent runtime."],
+  ["milaidy", "Start Milaidy in the interactive TUI."],
+  ["milaidy start", "Start the classic runtime/chat loop."],
   ["milaidy dashboard", "Open the Control UI in your browser."],
   [
     "milaidy setup",

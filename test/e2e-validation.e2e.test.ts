@@ -49,7 +49,9 @@ dotenv.config({ path: path.resolve(packageRoot, "..", "eliza", ".env") });
 const hasOpenAI = Boolean(process.env.OPENAI_API_KEY);
 const hasAnthropic = Boolean(process.env.ANTHROPIC_API_KEY);
 const hasGroq = Boolean(process.env.GROQ_API_KEY);
-const hasModelProvider = hasOpenAI || hasAnthropic || hasGroq;
+const liveModelTestsEnabled = process.env.MILAIDY_LIVE_TEST === "1";
+const hasModelProvider =
+  liveModelTestsEnabled && (hasOpenAI || hasAnthropic || hasGroq);
 
 // ---------------------------------------------------------------------------
 // Plugin helpers
@@ -209,6 +211,71 @@ async function handleMessageAndCollectText(
     responseText = result.responseContent.text;
   }
   return responseText;
+}
+
+const modelProviderUnavailablePattern =
+  /exceeded your current quota|insufficient[_\s-]?quota|billing details|credit balance|rate limit|status code: 429|too many requests|invalid api key|unauthorized|authentication/i;
+
+let cachedModelProviderUnavailableReason: string | null = null;
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+function isModelProviderUnavailableError(message: string): boolean {
+  return modelProviderUnavailablePattern.test(message);
+}
+
+async function getGeneratedText(result: unknown): Promise<string> {
+  if (typeof result === "string") return result.trim();
+  if (!result || typeof result !== "object") {
+    return String(result ?? "").trim();
+  }
+  const textValue = (result as { text?: unknown }).text;
+  if (
+    textValue &&
+    typeof textValue === "object" &&
+    typeof (textValue as PromiseLike<unknown>).then === "function"
+  ) {
+    return String(await (textValue as PromiseLike<unknown>)).trim();
+  }
+  return String(textValue ?? "").trim();
+}
+
+async function shouldSkipDueModelProviderUnavailable(
+  runtime: AgentRuntime,
+  testName: string,
+): Promise<boolean> {
+  if (cachedModelProviderUnavailableReason) {
+    logger.warn(
+      `[e2e-validation] Skipping "${testName}" due to provider limit: ${cachedModelProviderUnavailableReason}`,
+    );
+    return true;
+  }
+
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      const probe = await runtime.generateText("Reply with exactly: ok", {
+        maxTokens: 32,
+      });
+      const text = await getGeneratedText(probe);
+      if (text.length > 0) return false;
+    } catch (err) {
+      const message = errorMessage(err);
+      if (isModelProviderUnavailableError(message)) {
+        cachedModelProviderUnavailableReason = message;
+        logger.warn(
+          `[e2e-validation] Skipping "${testName}" due to provider limit: ${message}`,
+        );
+        return true;
+      }
+    }
+    await new Promise((resolve) => {
+      setTimeout(resolve, 250 * attempt);
+    });
+  }
+
+  return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -1213,6 +1280,9 @@ describe("Runtime Integration (with model provider)", () => {
     ];
 
     const sqlPlugin = await loadPlugin("@elizaos/plugin-sql");
+    const localEmbeddingPlugin = await loadPlugin(
+      "@elizaos/plugin-local-embedding",
+    );
     const plugins: Plugin[] = [];
     for (const n of corePluginNames) {
       const p = await loadPlugin(n);
@@ -1239,6 +1309,13 @@ describe("Runtime Integration (with model provider)", () => {
     });
 
     if (sqlPlugin) await runtime.registerPlugin(sqlPlugin);
+    if (localEmbeddingPlugin) {
+      await runtime.registerPlugin(localEmbeddingPlugin);
+    } else {
+      logger.warn(
+        "[e2e-validation] @elizaos/plugin-local-embedding failed to load; runtime may use remote embeddings",
+      );
+    }
     await runtime.initialize();
     const autonomySvc = runtime.getService<AutonomyServiceLike>("AUTONOMY");
     autonomySvc?.setLoopInterval(5 * 60_000);
@@ -1343,6 +1420,14 @@ describe("Runtime Integration (with model provider)", () => {
       }
 
       if (text.length === 0) {
+        if (
+          await shouldSkipDueModelProviderUnavailable(
+            activeRuntime,
+            "generates text response",
+          )
+        ) {
+          return;
+        }
         throw new Error(
           lastError
             ? `generateText produced empty output after ${maxAttempts} attempts (last error: ${lastError})`
@@ -1370,6 +1455,16 @@ describe("Runtime Integration (with model provider)", () => {
         },
       });
       const resp = await handleMessageAndCollectText(activeRuntime, msg);
+      if (resp.length === 0) {
+        if (
+          await shouldSkipDueModelProviderUnavailable(
+            activeRuntime,
+            "handleMessage produces response",
+          )
+        ) {
+          return;
+        }
+      }
       expect(resp.length).toBeGreaterThan(0);
     },
     120_000,
@@ -1397,6 +1492,16 @@ describe("Runtime Integration (with model provider)", () => {
           content: { text, source: "test", channelType: ChannelType.DM },
         });
         lastResponse = await handleMessageAndCollectText(activeRuntime, msg);
+        if (lastResponse.length === 0) {
+          if (
+            await shouldSkipDueModelProviderUnavailable(
+              activeRuntime,
+              "context integrity maintained across 5 sequential messages",
+            )
+          ) {
+            return;
+          }
+        }
         expect(lastResponse.length).toBeGreaterThan(0);
       }
 
@@ -1428,6 +1533,16 @@ describe("Runtime Integration (with model provider)", () => {
 
       for (const r of results) {
         expect(r.status).toBe(200);
+        if (String(r.data.text ?? "").length === 0) {
+          if (
+            await shouldSkipDueModelProviderUnavailable(
+              activeRuntime,
+              "3 parallel chat requests complete without crashes",
+            )
+          ) {
+            return;
+          }
+        }
         expect((r.data.text as string).length).toBeGreaterThan(0);
       }
     },
