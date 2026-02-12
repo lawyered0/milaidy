@@ -1,6 +1,6 @@
 /** Sandbox capability API routes: status, exec, browser, screen, audio, computer use. */
 
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import { readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { platform, tmpdir } from "node:os";
@@ -12,6 +12,10 @@ interface SandboxRouteState {
   sandboxManager: SandboxManager | null;
   signingService?: RemoteSigningService | null;
 }
+
+const MAX_COMPUTER_INPUT_LENGTH = 4096;
+const MAX_KEYPRESS_LENGTH = 128;
+const SAFE_KEYPRESS_PATTERN = /^[A-Za-z0-9+_.,: -]+$/;
 
 // ── Route handler ────────────────────────────────────────────────────────────
 
@@ -170,18 +174,24 @@ export async function handleSandboxRoute(
   // Returns base64-encoded screenshot for easy consumption by agents
   if (method === "POST" && pathname === "/api/sandbox/screen/screenshot") {
     const body = await readBody(req);
-    let region:
-      | { x?: number; y?: number; width?: number; height?: number }
-      | undefined;
-    if (body) {
+    let regionInput: unknown;
+    if (body?.trim()) {
       try {
-        region = JSON.parse(body);
+        regionInput = JSON.parse(body);
       } catch {
-        /* use full screen */
+        sendJson(res, 400, { error: "Invalid JSON body" });
+        return true;
       }
     }
+
+    const region = resolveScreenshotRegion(regionInput);
+    if (region.error) {
+      sendJson(res, 400, { error: region.error });
+      return true;
+    }
+
     try {
-      const screenshot = captureScreenshot(region);
+      const screenshot = captureScreenshot(region.region);
       const base64 = screenshot.toString("base64");
       sendJson(res, 200, {
         format: "png",
@@ -271,14 +281,25 @@ export async function handleSandboxRoute(
       sendJson(res, 400, { error: "Missing request body" });
       return true;
     }
+
+    let parsed: unknown;
     try {
-      const { x, y, button } = JSON.parse(body) as {
-        x: number;
-        y: number;
-        button?: string;
-      };
-      performClick(x, y, button ?? "left");
-      sendJson(res, 200, { success: true, x, y, button: button ?? "left" });
+      parsed = JSON.parse(body);
+    } catch {
+      sendJson(res, 400, { error: "Invalid JSON body" });
+      return true;
+    }
+
+    const clickPayload = resolveClickPayload(parsed);
+    if (clickPayload.error) {
+      sendJson(res, 400, { error: clickPayload.error });
+      return true;
+    }
+
+    try {
+      const { x, y, button } = clickPayload;
+      performClick(x, y, button);
+      sendJson(res, 200, { success: true, x, y, button });
     } catch (err) {
       sendJson(res, 500, {
         error: `Click failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -294,8 +315,23 @@ export async function handleSandboxRoute(
       sendJson(res, 400, { error: "Missing request body" });
       return true;
     }
+
+    let parsed: unknown;
     try {
-      const { text } = JSON.parse(body) as { text: string };
+      parsed = JSON.parse(body);
+    } catch {
+      sendJson(res, 400, { error: "Invalid JSON body" });
+      return true;
+    }
+
+    const typePayload = resolveTypePayload(parsed);
+    if (typePayload.error) {
+      sendJson(res, 400, { error: typePayload.error });
+      return true;
+    }
+
+    try {
+      const { text } = typePayload;
       performType(text);
       sendJson(res, 200, { success: true, length: text.length });
     } catch (err) {
@@ -313,8 +349,23 @@ export async function handleSandboxRoute(
       sendJson(res, 400, { error: "Missing request body" });
       return true;
     }
+
+    let parsed: unknown;
     try {
-      const { keys } = JSON.parse(body) as { keys: string };
+      parsed = JSON.parse(body);
+    } catch {
+      sendJson(res, 400, { error: "Invalid JSON body" });
+      return true;
+    }
+
+    const keypressPayload = resolveKeypressPayload(parsed);
+    if (keypressPayload.error) {
+      sendJson(res, 400, { error: keypressPayload.error });
+      return true;
+    }
+
+    try {
+      const { keys } = keypressPayload;
       performKeypress(keys);
       sendJson(res, 200, { success: true, keys });
     } catch (err) {
@@ -428,64 +479,197 @@ export async function handleSandboxRoute(
   return true;
 }
 
+function asObject(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function parseFiniteInteger(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  if (!Number.isInteger(value)) return null;
+  return value;
+}
+
+function resolveScreenshotRegion(input: unknown): {
+  region?: { x: number; y: number; width: number; height: number };
+  error?: string;
+} {
+  if (input === undefined || input === null) return {};
+  const obj = asObject(input);
+  if (!obj) return { error: "Screenshot region payload must be a JSON object" };
+
+  const hasRegionField =
+    "x" in obj || "y" in obj || "width" in obj || "height" in obj;
+  if (!hasRegionField) return {};
+
+  const x = parseFiniteInteger(obj.x);
+  const y = parseFiniteInteger(obj.y);
+  const width = parseFiniteInteger(obj.width);
+  const height = parseFiniteInteger(obj.height);
+
+  if (x === null || y === null || width === null || height === null) {
+    return {
+      error: "Region requires integer x, y, width, and height values",
+    };
+  }
+  if (width <= 0 || height <= 0) {
+    return { error: "Region width and height must be greater than 0" };
+  }
+
+  return {
+    region: { x, y, width, height },
+  };
+}
+
+function resolveClickPayload(input: unknown): {
+  x: number;
+  y: number;
+  button: "left" | "right";
+  error?: string;
+} {
+  const obj = asObject(input);
+  if (!obj) {
+    return {
+      x: 0,
+      y: 0,
+      button: "left",
+      error: "Click payload must be a JSON object",
+    };
+  }
+
+  const x = parseFiniteInteger(obj.x);
+  const y = parseFiniteInteger(obj.y);
+  if (x === null || y === null) {
+    return {
+      x: 0,
+      y: 0,
+      button: "left",
+      error: "Click payload requires integer x and y coordinates",
+    };
+  }
+
+  const rawButton = obj.button;
+  let button: "left" | "right" = "left";
+  if (rawButton !== undefined) {
+    if (rawButton !== "left" && rawButton !== "right") {
+      return {
+        x,
+        y,
+        button,
+        error: "button must be either 'left' or 'right'",
+      };
+    }
+    button = rawButton;
+  }
+
+  return { x, y, button };
+}
+
+function resolveTypePayload(input: unknown): { text: string; error?: string } {
+  const obj = asObject(input);
+  if (!obj) return { text: "", error: "Type payload must be a JSON object" };
+  if (typeof obj.text !== "string") {
+    return { text: "", error: "Type payload requires a string 'text' field" };
+  }
+  if (obj.text.length === 0) {
+    return { text: "", error: "text cannot be empty" };
+  }
+  if (obj.text.length > MAX_COMPUTER_INPUT_LENGTH) {
+    return {
+      text: "",
+      error: `text exceeds maximum length (${MAX_COMPUTER_INPUT_LENGTH})`,
+    };
+  }
+  return { text: obj.text };
+}
+
+function resolveKeypressPayload(input: unknown): {
+  keys: string;
+  error?: string;
+} {
+  const obj = asObject(input);
+  if (!obj) {
+    return { keys: "", error: "Keypress payload must be a JSON object" };
+  }
+  if (typeof obj.keys !== "string") {
+    return {
+      keys: "",
+      error: "Keypress payload requires a string 'keys' field",
+    };
+  }
+
+  const keys = obj.keys.trim();
+  if (!keys) return { keys: "", error: "keys cannot be empty" };
+  if (keys.length > MAX_KEYPRESS_LENGTH) {
+    return {
+      keys: "",
+      error: `keys exceeds maximum length (${MAX_KEYPRESS_LENGTH})`,
+    };
+  }
+  if (!SAFE_KEYPRESS_PATTERN.test(keys)) {
+    return {
+      keys: "",
+      error:
+        "keys contains unsupported characters; allowed: letters, numbers, space, +, _, ., ,, :, -",
+    };
+  }
+
+  return { keys };
+}
+
+function runCommand(command: string, args: string[], timeout: number): void {
+  execFileSync(command, args, {
+    timeout,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+}
+
 function captureScreenshot(region?: {
-  x?: number;
-  y?: number;
-  width?: number;
-  height?: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }): Buffer {
   const os = platform();
   const tmpFile = join(tmpdir(), `sandbox-screenshot-${Date.now()}.png`);
 
   try {
     if (os === "darwin") {
-      if (
-        region &&
-        region.x !== undefined &&
-        region.y !== undefined &&
-        region.width &&
-        region.height
-      ) {
-        execSync(
-          `screencapture -R${region.x},${region.y},${region.width},${region.height} -x ${tmpFile}`,
-          { timeout: 10000, stdio: ["ignore", "pipe", "pipe"] },
+      if (region) {
+        runCommand(
+          "screencapture",
+          [
+            `-R${region.x},${region.y},${region.width},${region.height}`,
+            "-x",
+            tmpFile,
+          ],
+          10000,
         );
       } else {
-        execSync(`screencapture -x ${tmpFile}`, {
-          timeout: 10000,
-          stdio: ["ignore", "pipe", "pipe"],
-        });
+        runCommand("screencapture", ["-x", tmpFile], 10000);
       }
     } else if (os === "linux") {
       // Try tools in preference order
       if (commandExists("import")) {
-        if (
-          region &&
-          region.x !== undefined &&
-          region.y !== undefined &&
-          region.width &&
-          region.height
-        ) {
-          execSync(
-            `import -window root -crop ${region.width}x${region.height}+${region.x}+${region.y} ${tmpFile}`,
-            { timeout: 10000, stdio: ["ignore", "pipe", "pipe"] },
+        if (region) {
+          runCommand(
+            "import",
+            [
+              "-window",
+              "root",
+              "-crop",
+              `${region.width}x${region.height}+${region.x}+${region.y}`,
+              tmpFile,
+            ],
+            10000,
           );
         } else {
-          execSync(`import -window root ${tmpFile}`, {
-            timeout: 10000,
-            stdio: ["ignore", "pipe", "pipe"],
-          });
+          runCommand("import", ["-window", "root", tmpFile], 10000);
         }
       } else if (commandExists("scrot")) {
-        execSync(`scrot ${tmpFile}`, {
-          timeout: 10000,
-          stdio: ["ignore", "pipe", "pipe"],
-        });
+        runCommand("scrot", [tmpFile], 10000);
       } else if (commandExists("gnome-screenshot")) {
-        execSync(`gnome-screenshot -f ${tmpFile}`, {
-          timeout: 10000,
-          stdio: ["ignore", "pipe", "pipe"],
-        });
+        runCommand("gnome-screenshot", ["-f", tmpFile], 10000);
       } else {
         throw new Error(
           "No screenshot tool available. Install ImageMagick, scrot, or gnome-screenshot.",
@@ -716,31 +900,34 @@ async function playAudio(data: Buffer, format: string): Promise<void> {
   }
 }
 
-function performClick(x: number, y: number, button: string): void {
+function toAppleScriptStringLiteral(value: string): string {
+  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+
+function performClick(x: number, y: number, button: "left" | "right"): void {
   const os = platform();
 
   if (os === "darwin") {
     // Use cliclick on macOS (brew install cliclick)
     if (commandExists("cliclick")) {
       const btn = button === "right" ? "rc" : "c";
-      execSync(`cliclick ${btn}:${x},${y}`, {
-        timeout: 5000,
-        stdio: ["ignore", "pipe", "pipe"],
-      });
+      runCommand("cliclick", [`${btn}:${x},${y}`], 5000);
     } else {
       // AppleScript fallback
-      execSync(
-        `osascript -e 'tell application "System Events" to click at {${x}, ${y}}'`,
-        { timeout: 5000, stdio: ["ignore", "pipe", "pipe"] },
+      runCommand(
+        "osascript",
+        ["-e", `tell application "System Events" to click at {${x}, ${y}}`],
+        5000,
       );
     }
   } else if (os === "linux") {
     if (commandExists("xdotool")) {
       const btn = button === "right" ? "3" : "1";
-      execSync(`xdotool mousemove ${x} ${y} click ${btn}`, {
-        timeout: 5000,
-        stdio: ["ignore", "pipe", "pipe"],
-      });
+      runCommand(
+        "xdotool",
+        ["mousemove", String(x), String(y), "click", btn],
+        5000,
+      );
     } else {
       throw new Error("xdotool required for mouse control on Linux.");
     }
@@ -754,10 +941,7 @@ function performClick(x: number, y: number, button: string): void {
         ? `[Win32.Win32Mouse]::mouse_event(0x0008, 0, 0, 0, 0); [Win32.Win32Mouse]::mouse_event(0x0010, 0, 0, 0, 0)` // right down + up
         : `[Win32.Win32Mouse]::mouse_event(0x0002, 0, 0, 0, 0); [Win32.Win32Mouse]::mouse_event(0x0004, 0, 0, 0, 0)`, // left down + up
     ].join("; ");
-    execSync(`powershell -Command "${psScript}"`, {
-      timeout: 5000,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
+    runCommand("powershell", ["-Command", psScript], 5000);
   }
 }
 
@@ -766,36 +950,32 @@ function performType(text: string): void {
 
   if (os === "darwin") {
     if (commandExists("cliclick")) {
-      // Escape special chars for cliclick
-      const escaped = text.replace(/"/g, '\\"');
-      execSync(`cliclick t:"${escaped}"`, {
-        timeout: 10000,
-        stdio: ["ignore", "pipe", "pipe"],
-      });
+      runCommand("cliclick", [`t:${text}`], 10000);
     } else {
-      const escaped = text.replace(/"/g, '\\"').replace(/'/g, "'\\''");
-      execSync(
-        `osascript -e 'tell application "System Events" to keystroke "${escaped}"'`,
-        {
-          timeout: 10000,
-          stdio: ["ignore", "pipe", "pipe"],
-        },
+      runCommand(
+        "osascript",
+        [
+          "-e",
+          `tell application "System Events" to keystroke ${toAppleScriptStringLiteral(text)}`,
+        ],
+        10000,
       );
     }
   } else if (os === "linux") {
     if (commandExists("xdotool")) {
-      execSync(`xdotool type -- "${text.replace(/"/g, '\\"')}"`, {
-        timeout: 10000,
-        stdio: ["ignore", "pipe", "pipe"],
-      });
+      runCommand("xdotool", ["type", "--", text], 10000);
     } else {
       throw new Error("xdotool required for keyboard input on Linux.");
     }
   } else if (os === "win32") {
     const escaped = text.replace(/'/g, "''");
-    execSync(
-      `powershell -Command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('${escaped}')"`,
-      { timeout: 10000, stdio: ["ignore", "pipe", "pipe"] },
+    runCommand(
+      "powershell",
+      [
+        "-Command",
+        `Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('${escaped}')`,
+      ],
+      10000,
     );
   }
 }
@@ -805,10 +985,7 @@ function performKeypress(keys: string): void {
 
   if (os === "darwin") {
     if (commandExists("cliclick")) {
-      execSync(`cliclick kp:${keys}`, {
-        timeout: 5000,
-        stdio: ["ignore", "pipe", "pipe"],
-      });
+      runCommand("cliclick", [`kp:${keys}`], 5000);
     } else {
       const symbolicKeyCodes: Record<string, number> = {
         return: 36,
@@ -829,31 +1006,37 @@ function performKeypress(keys: string): void {
         (Number.isInteger(Number(keys.trim())) ? Number(keys.trim()) : null);
 
       if (numericCode !== null) {
-        execSync(
-          `osascript -e 'tell application "System Events" to key code ${numericCode}'`,
-          { timeout: 5000, stdio: ["ignore", "pipe", "pipe"] },
+        runCommand(
+          "osascript",
+          ["-e", `tell application "System Events" to key code ${numericCode}`],
+          5000,
         );
       } else {
-        const escaped = keys.replace(/"/g, '\\"').replace(/'/g, "'\\''");
-        execSync(
-          `osascript -e 'tell application "System Events" to keystroke "${escaped}"'`,
-          { timeout: 5000, stdio: ["ignore", "pipe", "pipe"] },
+        runCommand(
+          "osascript",
+          [
+            "-e",
+            `tell application "System Events" to keystroke ${toAppleScriptStringLiteral(keys)}`,
+          ],
+          5000,
         );
       }
     }
   } else if (os === "linux") {
     if (commandExists("xdotool")) {
-      execSync(`xdotool key ${keys}`, {
-        timeout: 5000,
-        stdio: ["ignore", "pipe", "pipe"],
-      });
+      runCommand("xdotool", ["key", keys], 5000);
     } else {
       throw new Error("xdotool required for key input on Linux.");
     }
   } else if (os === "win32") {
-    execSync(
-      `powershell -Command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('${keys}')"`,
-      { timeout: 5000, stdio: ["ignore", "pipe", "pipe"] },
+    const escaped = keys.replace(/'/g, "''");
+    runCommand(
+      "powershell",
+      [
+        "-Command",
+        `Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('${escaped}')`,
+      ],
+      5000,
     );
   }
 }

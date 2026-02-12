@@ -298,6 +298,23 @@ describe("handleSandboxRoute", () => {
       expect([200, 500]).toContain(res._status);
     });
 
+    it("POST /api/sandbox/screen/screenshot should reject invalid region types", async () => {
+      const req = createMockReq(
+        "POST",
+        JSON.stringify({ x: "1; rm -rf /", y: 0, width: 100, height: 100 }),
+      );
+      const res = createMockRes();
+      const handled = await handleSandboxRoute(
+        req,
+        res,
+        "/api/sandbox/screen/screenshot",
+        "POST",
+        { sandboxManager: mgr },
+      );
+      expect(handled).toBe(true);
+      expect(res._status).toBe(400);
+    });
+
     it("GET /api/sandbox/screen/windows should list windows", async () => {
       const req = createMockReq("GET");
       const res = createMockRes();
@@ -352,6 +369,23 @@ describe("handleSandboxRoute", () => {
       expect([200, 500]).toContain(res._status);
     });
 
+    it("POST /api/sandbox/computer/click should reject invalid coordinates", async () => {
+      const req = createMockReq(
+        "POST",
+        JSON.stringify({ x: "1; touch /tmp/pwned", y: 200 }),
+      );
+      const res = createMockRes();
+      const handled = await handleSandboxRoute(
+        req,
+        res,
+        "/api/sandbox/computer/click",
+        "POST",
+        { sandboxManager: mgr },
+      );
+      expect(handled).toBe(true);
+      expect(res._status).toBe(400);
+    });
+
     it("POST /api/sandbox/computer/type should handle request", async () => {
       const req = createMockReq("POST", JSON.stringify({ text: "hello" }));
       const res = createMockRes();
@@ -366,6 +400,20 @@ describe("handleSandboxRoute", () => {
       expect([200, 500]).toContain(res._status);
     });
 
+    it("POST /api/sandbox/computer/type should reject non-string text", async () => {
+      const req = createMockReq("POST", JSON.stringify({ text: 123 }));
+      const res = createMockRes();
+      const handled = await handleSandboxRoute(
+        req,
+        res,
+        "/api/sandbox/computer/type",
+        "POST",
+        { sandboxManager: mgr },
+      );
+      expect(handled).toBe(true);
+      expect(res._status).toBe(400);
+    });
+
     it("POST /api/sandbox/computer/keypress should handle request", async () => {
       const req = createMockReq("POST", JSON.stringify({ keys: "Return" }));
       const res = createMockRes();
@@ -378,6 +426,23 @@ describe("handleSandboxRoute", () => {
       );
       expect(handled).toBe(true);
       expect([200, 500]).toContain(res._status);
+    });
+
+    it("POST /api/sandbox/computer/keypress should reject unsafe characters", async () => {
+      const req = createMockReq(
+        "POST",
+        JSON.stringify({ keys: "Return; $(touch /tmp/pwned)" }),
+      );
+      const res = createMockRes();
+      const handled = await handleSandboxRoute(
+        req,
+        res,
+        "/api/sandbox/computer/keypress",
+        "POST",
+        { sandboxManager: mgr },
+      );
+      expect(handled).toBe(true);
+      expect(res._status).toBe(400);
     });
   });
 
