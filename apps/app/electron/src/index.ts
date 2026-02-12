@@ -5,6 +5,7 @@ import { app, MenuItem } from 'electron';
 import electronIsDev from 'electron-is-dev';
 import unhandled from 'electron-unhandled';
 import { autoUpdater } from 'electron-updater';
+import { File as NodeFile } from 'node:buffer';
 import path from 'node:path';
 
 import { ElectronCapacitorApp, setupContentSecurityPolicy, setupReloadWatcher } from './setup';
@@ -12,6 +13,17 @@ import { initializeNativeModules, registerAllIPC, disposeNativeModules, getAgent
 
 // Graceful handling of unhandled errors.
 unhandled();
+
+// Allow overriding Electron userData during automated E2E runs.
+const userDataOverride = process.env.MILAIDY_ELECTRON_USER_DATA_DIR?.trim();
+if (userDataOverride) {
+  app.setPath('userData', userDataOverride);
+}
+
+// Electron 26 (Node 18) can miss global File, which breaks undici-based deps.
+if (typeof (globalThis as { File?: unknown }).File === 'undefined' && typeof NodeFile === 'function') {
+  (globalThis as { File?: typeof NodeFile }).File = NodeFile;
+}
 
 // Define our menu templates (these are optional)
 const trayMenuTemplate: (MenuItemConstructorOptions | MenuItem)[] = [new MenuItem({ label: 'Quit App', role: 'quit' })];
@@ -97,6 +109,17 @@ function revealMainWindow(): void {
   mainWindow.focus();
 }
 
+function normalizeApiBase(raw: string | undefined): string | null {
+  if (!raw) return null;
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+    return parsed.origin;
+  } catch {
+    return null;
+  }
+}
+
 app.on('open-file', (event, filePath) => {
   event.preventDefault();
   dispatchShareToRenderer({
@@ -152,15 +175,20 @@ if (electronIsDev) {
 
   // Start the embedded agent runtime and pass the API port to the renderer.
   // The UI's api-client reads window.__MILAIDY_API_BASE__ to know where to connect.
+  const externalApiBase = normalizeApiBase(process.env.MILAIDY_ELECTRON_TEST_API_BASE);
+  if (!externalApiBase && process.env.MILAIDY_ELECTRON_TEST_API_BASE) {
+    console.warn('[Milaidy] Ignoring invalid MILAIDY_ELECTRON_TEST_API_BASE value');
+  }
+  const skipEmbeddedAgent = process.env.MILAIDY_ELECTRON_SKIP_EMBEDDED_AGENT === '1' || Boolean(externalApiBase);
   const agentManager = getAgentManager();
   agentManager.setMainWindow(mainWindow);
-  let injectedPort: number | null = null;
-  const injectApiEndpoint = (port: number | null): void => {
-    if (!port || port === injectedPort || mainWindow.isDestroyed()) return;
-    injectedPort = port;
+  let injectedApiBase: string | null = null;
+  const injectApiBase = (base: string | null): void => {
+    if (!base || base === injectedApiBase || mainWindow.isDestroyed()) return;
+    injectedApiBase = base;
     const apiToken = process.env.MILAIDY_API_TOKEN;
     const tokenSnippet = apiToken ? `window.__MILAIDY_API_TOKEN__ = ${JSON.stringify(apiToken)};` : "";
-    const baseSnippet = `window.__MILAIDY_API_BASE__ = "http://localhost:${port}";`;
+    const baseSnippet = `window.__MILAIDY_API_BASE__ = ${JSON.stringify(base)};`;
     const inject = `${baseSnippet}${tokenSnippet}`;
 
     // Inject now if possible (no-op if the page isn't ready yet).
@@ -170,37 +198,54 @@ if (electronIsDev) {
       })
       .catch(() => { /* did-finish-load hook below handles first successful injection */ });
   };
+  const injectApiEndpoint = (port: number | null): void => {
+    if (!port) return;
+    injectApiBase(`http://localhost:${port}`);
+  };
 
   // Always inject on renderer reload/navigation once we know the port.
   mainWindow.webContents.on('did-finish-load', () => {
-    injectApiEndpoint(agentManager.getPort());
+    if (externalApiBase) {
+      injectApiBase(externalApiBase);
+    } else {
+      injectApiEndpoint(agentManager.getPort());
+    }
     flushPendingSharePayloads();
   });
 
-  // Start in background and inject API base as soon as the port is available,
-  // without waiting for the full runtime/plugin initialization path.
-  const startPromise = agentManager.start();
-  void (async () => {
-    const startedAt = Date.now();
-    const timeoutMs = 30_000;
-    while (Date.now() - startedAt < timeoutMs) {
-      const port = agentManager.getPort();
-      if (port) {
-        injectApiEndpoint(port);
-        return;
+  if (externalApiBase) {
+    console.info(`[Milaidy] Using external API base for renderer: ${externalApiBase}`);
+    injectApiBase(externalApiBase);
+  } else if (!skipEmbeddedAgent) {
+    // Start in background and inject API base as soon as the port is available,
+    // without waiting for the full runtime/plugin initialization path.
+    const startPromise = agentManager.start();
+    void (async () => {
+      const startedAt = Date.now();
+      const timeoutMs = 30_000;
+      while (Date.now() - startedAt < timeoutMs) {
+        const port = agentManager.getPort();
+        if (port) {
+          injectApiEndpoint(port);
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 100));
       }
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-  })();
+    })();
 
-  startPromise.catch((err) => {
-    console.error('[Milaidy] Agent startup failed:', err);
-  });
+    startPromise.catch((err) => {
+      console.error('[Milaidy] Agent startup failed:', err);
+    });
+  } else {
+    console.info('[Milaidy] Embedded agent startup disabled by configuration');
+  }
 
   // Check for updates if we are in a packaged app.
-  autoUpdater.checkForUpdatesAndNotify().catch((err: Error) => {
-    console.warn('[Milaidy] Update check failed (non-fatal):', err.message);
-  });
+  if (process.env.MILAIDY_ELECTRON_DISABLE_AUTO_UPDATER !== '1') {
+    autoUpdater.checkForUpdatesAndNotify().catch((err: Error) => {
+      console.warn('[Milaidy] Update check failed (non-fatal):', err.message);
+    });
+  }
 })();
 
 // Handle when all of our windows are close (platforms have their own expectations).

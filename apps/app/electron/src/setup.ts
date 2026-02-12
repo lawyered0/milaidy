@@ -280,7 +280,8 @@ export class ElectronCapacitorApp {
     this.MainWindow.webContents.on('dom-ready', () => {
       showWindow();
       setTimeout(() => {
-        if (electronIsDev && !this.MainWindow.isDestroyed()) {
+        const devtoolsDisabled = process.env.MILAIDY_ELECTRON_DISABLE_DEVTOOLS === '1';
+        if (electronIsDev && !devtoolsDisabled && !this.MainWindow.isDestroyed()) {
           this.MainWindow.webContents.openDevTools();
         }
         CapElectronEventEmitter.emit('CAPELECTRON_DeeplinkListenerInitialized', '');

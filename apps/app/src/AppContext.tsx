@@ -3078,18 +3078,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     let unbindAgentEvents: (() => void) | null = null;
     let unbindHeartbeatEvents: (() => void) | null = null;
     let unbindProactiveMessages: (() => void) | null = null;
+    let cancelled = false;
 
     const initApp = async () => {
-      const MAX_RETRIES = 20;
       const BASE_DELAY_MS = 250;
       const MAX_DELAY_MS = 1000;
-      const AGENT_READY_TIMEOUT_MS = 180_000;
-      let serverReady = false;
+      const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
       let onboardingNeedsOptions = false;
       let requiresAuth = false;
       setStartupPhase("starting-backend");
 
-      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      // Keep the splash screen up until the backend is reachable.
+      let backendAttempts = 0;
+      while (!cancelled) {
         try {
           const auth = await client.getAuthStatus();
           if (auth.required && !client.hasToken()) {
@@ -3097,26 +3098,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
             setPairingEnabled(auth.pairingEnabled);
             setPairingExpiresAt(auth.expiresAt);
             requiresAuth = true;
-            serverReady = true;
             break;
           }
           const { complete } = await client.getOnboardingStatus();
           setOnboardingComplete(complete);
-          if (!complete) {
-            onboardingNeedsOptions = true;
-          }
-          serverReady = true;
+          onboardingNeedsOptions = !complete;
           break;
         } catch {
-          if (attempt < MAX_RETRIES) {
-            const delay = Math.min(BASE_DELAY_MS * 2 ** attempt, MAX_DELAY_MS);
-            await new Promise((r) => setTimeout(r, delay));
+          backendAttempts += 1;
+          if (backendAttempts === 1 || backendAttempts % 20 === 0) {
+            console.info("[milaidy] Waiting for backend to become reachable...");
           }
+          const delay = Math.min(BASE_DELAY_MS * 2 ** Math.min(backendAttempts, 2), MAX_DELAY_MS);
+          await sleep(delay);
         }
       }
-      if (!serverReady) {
-        console.warn("[milaidy] Could not reach server after retries.");
-        setOnboardingLoading(false);
+      if (cancelled) {
         return;
       }
 
@@ -3127,22 +3124,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       setStartupPhase("initializing-agent");
 
-      // Fetch onboarding options in the background so we can render quickly.
+      // On fresh installs, unblock to onboarding as soon as options are available.
       if (onboardingNeedsOptions) {
-        void (async () => {
+        let optionsLoaded = false;
+        let optionsAttempts = 0;
+        while (!cancelled && !optionsLoaded) {
           try {
             const options = await client.getOnboardingOptions();
             setOnboardingOptions(options);
+            optionsLoaded = true;
           } catch {
-            /* ignore */
+            optionsAttempts += 1;
+            if (optionsAttempts === 1 || optionsAttempts % 20 === 0) {
+              console.info("[milaidy] Waiting for onboarding options...");
+            }
+            await sleep(500);
           }
-        })();
+        }
+        if (!cancelled) {
+          setOnboardingLoading(false);
+        }
+        return;
       }
 
-      // Wait for the runtime to be ready before unblocking the UI.
+      // Existing installs: keep loading until the runtime reports ready.
       let agentReady = false;
-      const waitStartedAt = Date.now();
-      while (Date.now() - waitStartedAt < AGENT_READY_TIMEOUT_MS) {
+      let agentAttempts = 0;
+      while (!cancelled) {
         try {
           let status = await client.getStatus();
           setAgentStatus(status);
@@ -3168,12 +3176,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
         } catch {
           setConnected(false);
         }
-        await new Promise((r) => setTimeout(r, 500));
+        agentAttempts += 1;
+        if (agentAttempts === 1 || agentAttempts % 40 === 0) {
+          console.info("[milaidy] Waiting for agent runtime to initialize...");
+        }
+        await sleep(500);
       }
+      if (cancelled) return;
 
       if (!agentReady) {
         console.warn(
-          "[milaidy] Agent did not reach running state before startup timeout.",
+          "[milaidy] Agent did not reach running/paused state during startup.",
         );
       }
 
@@ -3360,7 +3373,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    initApp();
+    void initApp();
 
     // Popstate listener
     const handlePopState = () => {
@@ -3370,6 +3383,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     window.addEventListener("popstate", handlePopState);
 
     return () => {
+      cancelled = true;
       window.removeEventListener("popstate", handlePopState);
       if (cloudPollInterval.current) clearInterval(cloudPollInterval.current);
       if (cloudLoginPollTimer.current) clearInterval(cloudLoginPollTimer.current);
