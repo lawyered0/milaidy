@@ -28,11 +28,10 @@ import {
   resolveDefaultSessionStorePath,
 } from "@elizaos/core";
 import { emoteAction } from "../actions/emote.js";
+import { installPluginAction } from "../actions/install-plugin.js";
 import { mediaActions } from "../actions/media.js";
 import { restartAction } from "../actions/restart.js";
-import { installPluginAction } from "../actions/install-plugin.js";
 import { terminalAction } from "../actions/terminal.js";
-import { loadCustomActions, setCustomActionsRuntime } from "./custom-actions.js";
 import { EMOTE_CATALOG } from "../emotes/catalog.js";
 import { createAdminTrustProvider } from "../providers/admin-trust.js";
 import {
@@ -46,6 +45,10 @@ import {
 import { createSimpleModeProvider } from "../providers/simple-mode.js";
 import { DEFAULT_AGENT_WORKSPACE_DIR } from "../providers/workspace.js";
 import { createWorkspaceProvider } from "../providers/workspace-provider.js";
+import {
+  loadCustomActions,
+  setCustomActionsRuntime,
+} from "./custom-actions.js";
 
 // TrajectoryLoggerService is provided by @elizaos/plugin-trajectory-logger
 // We just need a type interface to call startTrajectory/endTrajectory
@@ -302,7 +305,13 @@ export function createMilaidyPlugin(config?: MilaidyPluginConfig): Plugin {
       }
 
       const lines = customActions.map((a) => {
-        const params = a.parameters?.map((p) => `${p.name}${(p as { required?: boolean }).required ? " (required)" : ""}`).join(", ") || "none";
+        const params =
+          a.parameters
+            ?.map(
+              (p) =>
+                `${p.name}${(p as { required?: boolean }).required ? " (required)" : ""}`,
+            )
+            .join(", ") || "none";
         return `- **${a.name}**: ${a.description} [params: ${params}]`;
       });
 

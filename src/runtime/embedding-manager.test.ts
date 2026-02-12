@@ -168,7 +168,14 @@ describe("MilaidyEmbeddingManager", () => {
     // Use again — resets the idle clock
     await mgr.generateEmbedding("second call");
     const stats2 = mgr.getStats();
-    expect(stats2.lastUsedAt).toBeGreaterThan(stats1.lastUsedAt!);
+    const firstLastUsedAt = stats1.lastUsedAt;
+    const secondLastUsedAt = stats2.lastUsedAt;
+    expect(firstLastUsedAt).not.toBeNull();
+    expect(secondLastUsedAt).not.toBeNull();
+    if (firstLastUsedAt == null || secondLastUsedAt == null) {
+      throw new Error("Expected lastUsedAt values to be populated");
+    }
+    expect(secondLastUsedAt).toBeGreaterThan(firstLastUsedAt);
 
     // Model should still be loaded
     expect(mgr.isLoaded()).toBe(true);
@@ -223,10 +230,12 @@ describe("MilaidyEmbeddingManager", () => {
       gpuLayers: 42,
     });
     // Create model file for custom name
-    fs.writeFileSync(
-      path.join(cfg.modelsDir!, "custom-model.gguf"),
-      "fake-data",
-    );
+    const modelsDir = cfg.modelsDir;
+    expect(modelsDir).toBeDefined();
+    if (!modelsDir) {
+      throw new Error("Expected modelsDir to be defined");
+    }
+    fs.writeFileSync(path.join(modelsDir, "custom-model.gguf"), "fake-data");
 
     const mgr = new MilaidyEmbeddingManager(cfg);
     const before = mgr.getStats();
@@ -302,7 +311,10 @@ describe("MilaidyEmbeddingManager", () => {
       // Metadata should be updated
       const meta = readEmbeddingMeta();
       expect(meta).not.toBeNull();
-      expect(meta!.dimensions).toBe(768);
+      if (!meta) {
+        throw new Error("Expected embedding metadata to exist");
+      }
+      expect(meta.dimensions).toBe(768);
 
       await mgr.dispose();
     });

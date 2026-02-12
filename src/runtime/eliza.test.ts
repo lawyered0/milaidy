@@ -324,7 +324,6 @@ describe("collectPluginNames", () => {
     expect(names.has("@elizaos/plugin-elizacloud")).toBe(true);
     expect(names.has("@elizaos/plugin-vision")).toBe(false);
   });
-
 });
 
 // ---------------------------------------------------------------------------

@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { smartChunkTelegramText, type TelegramChunk } from "./chunking.js";
+import { smartChunkTelegramText } from "./chunking.js";
 
 describe("smartChunkTelegramText", () => {
   // --- Empty / falsy input ---
@@ -74,7 +74,8 @@ describe("smartChunkTelegramText", () => {
   });
 
   it("handles code blocks without crashing", () => {
-    const text = "Here is code:\n```javascript\nconsole.log('hello');\n```\nEnd.";
+    const text =
+      "Here is code:\n```javascript\nconsole.log('hello');\n```\nEnd.";
     const chunks = smartChunkTelegramText(text);
     expect(chunks.length).toBeGreaterThanOrEqual(1);
     expect(chunks[0].html).toBeTruthy();

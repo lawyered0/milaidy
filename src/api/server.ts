@@ -32,8 +32,10 @@ import {
   saveMilaidyConfig,
 } from "../config/config.js";
 import { resolveModelsCacheDir, resolveStateDir } from "../config/paths.js";
-import type { ConnectorConfig, CustomActionDef } from "../config/types.milaidy.js";
-import { buildTestHandler, registerCustomActionLive } from "../runtime/custom-actions.js";
+import type {
+  ConnectorConfig,
+  CustomActionDef,
+} from "../config/types.milaidy.js";
 import { CharacterSchema } from "../config/zod-schema.js";
 import { EMOTE_BY_ID, EMOTE_CATALOG } from "../emotes/catalog.js";
 import { resolveDefaultAgentWorkspaceDir } from "../providers/workspace.js";
@@ -41,6 +43,10 @@ import {
   CORE_PLUGINS,
   OPTIONAL_CORE_PLUGINS,
 } from "../runtime/core-plugins.js";
+import {
+  buildTestHandler,
+  registerCustomActionLive,
+} from "../runtime/custom-actions.js";
 import { createPiCredentialProvider } from "../runtime/pi-credentials.js";
 import {
   AgentExportError,
@@ -929,7 +935,9 @@ function discoverInstalledPlugins(
                 label: key,
                 description: "",
                 required: false,
-                sensitive: key.toLowerCase().includes("key") || key.toLowerCase().includes("secret"),
+                sensitive:
+                  key.toLowerCase().includes("key") ||
+                  key.toLowerCase().includes("secret"),
                 type: "string" as const,
                 default: defaults[key] ?? undefined,
                 isSet: Boolean(process.env[key]?.trim()),
@@ -949,7 +957,8 @@ function discoverInstalledPlugins(
       name,
       description,
       enabled: false, // Will be updated against the runtime below
-      configured: pluginConfigKeys.length === 0 || pluginParameters.some((p) => p.isSet),
+      configured:
+        pluginConfigKeys.length === 0 || pluginParameters.some((p) => p.isSet),
       envKey: pluginConfigKeys[0] ?? null,
       category,
       source: "store",
@@ -3629,7 +3638,9 @@ function patchMessageServiceForAutonomy(state: ServerState): void {
     handleMessage: (
       rt: import("@elizaos/core").IAgentRuntime,
       message: import("@elizaos/core").Memory,
-      callback?: (content: Content) => Promise<import("@elizaos/core").Memory[]>,
+      callback?: (
+        content: Content,
+      ) => Promise<import("@elizaos/core").Memory[]>,
       options?: import("@elizaos/core").MessageProcessingOptions,
     ) => Promise<import("@elizaos/core").MessageProcessingResult>;
     __milaidyAutonomyPatched?: boolean;
@@ -5340,25 +5351,26 @@ async function handleRequest(
 
     // Resolve enabled state from config and loaded state from runtime.
     // "enabled" = user wants it active (config). "isActive" = actually loaded.
-    const configEntries =
-      (freshConfig.plugins as Record<string, unknown> | undefined)?.entries as
-        | Record<string, { enabled?: boolean }>
-        | undefined;
+    const configEntries = (
+      freshConfig.plugins as Record<string, unknown> | undefined
+    )?.entries as Record<string, { enabled?: boolean }> | undefined;
     const loadedNames = state.runtime
       ? state.runtime.plugins.map((p) => p.name)
       : [];
     for (const plugin of allPlugins) {
       const suffix = `plugin-${plugin.id}`;
       const packageName = `@elizaos/plugin-${plugin.id}`;
-      const isLoaded = loadedNames.length > 0 && loadedNames.some((name) => {
-        return (
-          name === plugin.id ||
-          name === suffix ||
-          name === packageName ||
-          name.endsWith(`/${suffix}`) ||
-          name.includes(plugin.id)
-        );
-      });
+      const isLoaded =
+        loadedNames.length > 0 &&
+        loadedNames.some((name) => {
+          return (
+            name === plugin.id ||
+            name === suffix ||
+            name === packageName ||
+            name.endsWith(`/${suffix}`) ||
+            name.includes(plugin.id)
+          );
+        });
       plugin.isActive = isLoaded;
       // Set enabled from config if available, otherwise from runtime
       const configEntry = configEntries?.[plugin.id];
@@ -8180,7 +8192,9 @@ async function handleRequest(
     // If a runtime is active, restart so plugin loading honors the new
     // shellEnabled flag and shell tools are loaded/unloaded consistently.
     if (state.runtime && ctx?.onRestart) {
-      scheduleRuntimeRestart(`Shell access ${enabled ? "enabled" : "disabled"}`);
+      scheduleRuntimeRestart(
+        `Shell access ${enabled ? "enabled" : "disabled"}`,
+      );
     }
 
     json(res, {
@@ -10037,7 +10051,8 @@ async function handleRequest(
     if (!body) return;
 
     const name = typeof body.name === "string" ? body.name.trim() : "";
-    const description = typeof body.description === "string" ? body.description.trim() : "";
+    const description =
+      typeof body.description === "string" ? body.description.trim() : "";
 
     if (!name || !description) {
       error(res, "name and description are required", 400);
@@ -10047,20 +10062,33 @@ async function handleRequest(
     const handler = body.handler as CustomActionDef["handler"] | undefined;
     const validHandlerTypes = new Set(["http", "shell", "code"]);
     if (!handler || !handler.type || !validHandlerTypes.has(handler.type)) {
-      error(res, "handler with valid type (http, shell, code) is required", 400);
+      error(
+        res,
+        "handler with valid type (http, shell, code) is required",
+        400,
+      );
       return;
     }
 
     // Validate type-specific required fields
-    if (handler.type === "http" && (typeof handler.url !== "string" || !handler.url.trim())) {
+    if (
+      handler.type === "http" &&
+      (typeof handler.url !== "string" || !handler.url.trim())
+    ) {
       error(res, "HTTP handler requires a url", 400);
       return;
     }
-    if (handler.type === "shell" && (typeof handler.command !== "string" || !handler.command.trim())) {
+    if (
+      handler.type === "shell" &&
+      (typeof handler.command !== "string" || !handler.command.trim())
+    ) {
       error(res, "Shell handler requires a command", 400);
       return;
     }
-    if (handler.type === "code" && (typeof handler.code !== "string" || !handler.code.trim())) {
+    if (
+      handler.type === "code" &&
+      (typeof handler.code !== "string" || !handler.code.trim())
+    ) {
       error(res, "Code handler requires code", 400);
       return;
     }
@@ -10070,9 +10098,15 @@ async function handleRequest(
       id: crypto.randomUUID(),
       name: name.toUpperCase().replace(/\s+/g, "_"),
       description,
-      similes: Array.isArray(body.similes) ? body.similes.filter((s): s is string => typeof s === "string") : [],
+      similes: Array.isArray(body.similes)
+        ? body.similes.filter((s): s is string => typeof s === "string")
+        : [],
       parameters: Array.isArray(body.parameters)
-        ? (body.parameters as Array<{ name: string; description: string; required: boolean }>)
+        ? (body.parameters as Array<{
+            name: string;
+            description: string;
+            required: boolean;
+          }>)
         : [],
       handler,
       enabled: body.enabled !== false,
@@ -10118,11 +10152,11 @@ async function handleRequest(
         "",
         "- name: string (UPPER_SNAKE_CASE action name)",
         "- description: string (clear description of what the action does)",
-        "- handlerType: \"http\" | \"shell\" | \"code\"",
+        '- handlerType: "http" | "shell" | "code"',
         "- handler: object with type-specific fields:",
-        "  For http: { type: \"http\", method: \"GET\"|\"POST\"|etc, url: string, headers?: object, bodyTemplate?: string }",
-        "  For shell: { type: \"shell\", command: string }",
-        "  For code: { type: \"code\", code: string }",
+        '  For http: { type: "http", method: "GET"|"POST"|etc, url: string, headers?: object, bodyTemplate?: string }',
+        '  For shell: { type: "shell", command: string }',
+        '  For code: { type: "code", code: string }',
         "- parameters: array of { name: string, description: string, required: boolean }",
         "",
         "Use {{paramName}} placeholders in URLs, body templates, and shell commands.",
@@ -10137,7 +10171,8 @@ async function handleRequest(
       });
 
       // Parse the JSON from the LLM response
-      const text = typeof llmResponse === "string" ? llmResponse : String(llmResponse);
+      const text =
+        typeof llmResponse === "string" ? llmResponse : String(llmResponse);
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         error(res, "Failed to generate action definition", 500);
@@ -10147,17 +10182,26 @@ async function handleRequest(
       const generated = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
       json(res, { ok: true, generated });
     } catch (err) {
-      error(res, `Generation failed: ${err instanceof Error ? err.message : String(err)}`, 500);
+      error(
+        res,
+        `Generation failed: ${err instanceof Error ? err.message : String(err)}`,
+        500,
+      );
     }
     return;
   }
 
   const customActionMatch = pathname.match(/^\/api\/custom-actions\/([^/]+)$/);
-  const customActionTestMatch = pathname.match(/^\/api\/custom-actions\/([^/]+)\/test$/);
+  const customActionTestMatch = pathname.match(
+    /^\/api\/custom-actions\/([^/]+)\/test$/,
+  );
 
   if (method === "POST" && customActionTestMatch) {
     const actionId = decodeURIComponent(customActionTestMatch[1]);
-    const body = await readJsonBody<{ params?: Record<string, string> }>(req, res);
+    const body = await readJsonBody<{ params?: Record<string, string> }>(
+      req,
+      res,
+    );
     if (!body) return;
 
     const config = loadMilaidyConfig();
@@ -10172,7 +10216,11 @@ async function handleRequest(
     try {
       const handler = buildTestHandler(def);
       const result = await handler(testParams);
-      json(res, { ok: result.ok, output: result.output, durationMs: Date.now() - start });
+      json(res, {
+        ok: result.ok,
+        output: result.output,
+        durationMs: Date.now() - start,
+      });
     } catch (err) {
       json(res, {
         ok: false,
@@ -10213,12 +10261,23 @@ async function handleRequest(
 
     const updated: CustomActionDef = {
       ...existing,
-      name: typeof body.name === "string" ? body.name.trim().toUpperCase().replace(/\s+/g, "_") : existing.name,
-      description: typeof body.description === "string" ? body.description.trim() : existing.description,
-      similes: Array.isArray(body.similes) ? body.similes.filter((s): s is string => typeof s === "string") : existing.similes,
-      parameters: Array.isArray(body.parameters) ? (body.parameters as CustomActionDef["parameters"]) : existing.parameters,
+      name:
+        typeof body.name === "string"
+          ? body.name.trim().toUpperCase().replace(/\s+/g, "_")
+          : existing.name,
+      description:
+        typeof body.description === "string"
+          ? body.description.trim()
+          : existing.description,
+      similes: Array.isArray(body.similes)
+        ? body.similes.filter((s): s is string => typeof s === "string")
+        : existing.similes,
+      parameters: Array.isArray(body.parameters)
+        ? (body.parameters as CustomActionDef["parameters"])
+        : existing.parameters,
       handler: newHandler,
-      enabled: typeof body.enabled === "boolean" ? body.enabled : existing.enabled,
+      enabled:
+        typeof body.enabled === "boolean" ? body.enabled : existing.enabled,
       updatedAt: new Date().toISOString(),
     };
 
@@ -10265,11 +10324,7 @@ async function handleRequest(
 // the entire server dependency graph into lightweight consumers (e.g. the
 // headless `startEliza()` path).
 // ---------------------------------------------------------------------------
-import {
-  captureEarlyLogs,
-  flushEarlyLogs,
-  type EarlyLogEntry,
-} from "./early-logs";
+import { captureEarlyLogs, flushEarlyLogs } from "./early-logs";
 export { captureEarlyLogs };
 
 // ---------------------------------------------------------------------------

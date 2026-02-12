@@ -8,8 +8,11 @@
  */
 
 import type { Action, HandlerOptions, IAgentRuntime } from "@elizaos/core";
-import type { CustomActionDef, CustomActionHandler } from "../config/types.milaidy.js";
 import { loadMilaidyConfig } from "../config/config.js";
+import type {
+  CustomActionDef,
+  CustomActionHandler,
+} from "../config/types.milaidy.js";
 
 /** Cached runtime reference for hot-registration of new actions. */
 let _runtime: IAgentRuntime | null = null;
@@ -58,7 +61,9 @@ function isBlockedUrl(url: string): boolean {
 
     // Allow requests to our own API (terminal/run endpoint etc.)
     if (
-      (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1") &&
+      (hostname === "localhost" ||
+        hostname === "127.0.0.1" ||
+        hostname === "::1") &&
       parsed.port === String(API_PORT)
     ) {
       return false;
@@ -82,10 +87,10 @@ function isBlockedUrl(url: string): boolean {
     const parts = hostname.split(".");
     if (parts.length === 4 && parts.every((p) => /^\d+$/.test(p))) {
       const [a, b] = parts.map(Number);
-      if (a === 10) return true;                         // 10.0.0.0/8
-      if (a === 172 && b >= 16 && b <= 31) return true;  // 172.16.0.0/12
-      if (a === 192 && b === 168) return true;            // 192.168.0.0/16
-      if (a === 169 && b === 254) return true;            // link-local
+      if (a === 10) return true; // 10.0.0.0/8
+      if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
+      if (a === 192 && b === 168) return true; // 192.168.0.0/16
+      if (a === 169 && b === 254) return true; // link-local
     }
 
     return false;
@@ -101,9 +106,14 @@ function isBlockedUrl(url: string): boolean {
 function buildHandler(
   handler: CustomActionHandler,
   paramDefs: CustomActionDef["parameters"],
-): (params: Record<string, string>) => Promise<{ ok: boolean; output: string }> {
+): (
+  params: Record<string, string>,
+) => Promise<{ ok: boolean; output: string }> {
   if (!VALID_HANDLER_TYPES.has(handler.type)) {
-    return async () => ({ ok: false, output: `Unsupported handler type: ${handler.type}` });
+    return async () => ({
+      ok: false,
+      output: `Unsupported handler type: ${handler.type}`,
+    });
   }
 
   switch (handler.type) {
@@ -123,7 +133,11 @@ function buildHandler(
 
         // SSRF guard — block requests to internal/private networks
         if (isBlockedUrl(url)) {
-          return { ok: false, output: "Blocked: cannot make requests to internal network addresses" };
+          return {
+            ok: false,
+            output:
+              "Blocked: cannot make requests to internal network addresses",
+          };
         }
 
         if (!headers["Content-Type"] && body) {
@@ -162,7 +176,10 @@ function buildHandler(
         );
 
         if (!response.ok) {
-          return { ok: false, output: `Terminal request failed: HTTP ${response.status}` };
+          return {
+            ok: false,
+            output: `Terminal request failed: HTTP ${response.status}`,
+          };
         }
 
         return { ok: true, output: `Executed: ${command}` };
@@ -263,6 +280,8 @@ export function loadCustomActions(): Action[] {
  */
 export function buildTestHandler(
   def: CustomActionDef,
-): (params: Record<string, string>) => Promise<{ ok: boolean; output: string }> {
+): (
+  params: Record<string, string>,
+) => Promise<{ ok: boolean; output: string }> {
   return buildHandler(def.handler, def.parameters);
 }

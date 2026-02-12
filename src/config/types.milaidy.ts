@@ -659,6 +659,21 @@ export type MediaConfig = {
   vision?: VisionConfig;
 };
 
+// --- Local embedding runtime config ---
+
+export type EmbeddingConfig = {
+  /** GGUF model filename (default handled by runtime). */
+  model?: string;
+  /** Optional Hugging Face repo/source for model resolution. */
+  modelRepo?: string;
+  /** Embedding vector dimension (default: 768). */
+  dimensions?: number;
+  /** GPU layers for node-llama-cpp ("auto" on macOS by default). */
+  gpuLayers?: number | "auto";
+  /** Minutes of inactivity before unloading model from memory (default: 30). */
+  idleTimeoutMinutes?: number;
+};
+
 // --- Update/release channel types ---
 
 export type ReleaseChannel = "stable" | "beta" | "nightly";
@@ -676,7 +691,13 @@ export type UpdateConfig = {
 // --- Custom Actions types ---
 
 export type CustomActionHandler =
-  | { type: "http"; method: string; url: string; headers?: Record<string, string>; bodyTemplate?: string }
+  | {
+      type: "http";
+      method: string;
+      url: string;
+      headers?: Record<string, string>;
+      bodyTemplate?: string;
+    }
   | { type: "shell"; command: string }
   | { type: "code"; code: string };
 
@@ -783,6 +804,8 @@ export type MilaidyConfig = {
   talk?: TalkConfig;
   gateway?: GatewayConfig;
   memory?: MemoryConfig;
+  /** Local embedding runtime overrides (node-llama-cpp). */
+  embedding?: EmbeddingConfig;
   /** Database provider and connection configuration (local-only feature). */
   database?: DatabaseConfig;
   /** ElizaCloud integration for remote agent provisioning and inference. */

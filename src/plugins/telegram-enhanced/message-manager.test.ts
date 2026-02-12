@@ -5,7 +5,7 @@
  * message chunking with inline buttons, and draft streaming integration.
  */
 
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock @elizaos/core logger before importing the module under test
 vi.mock("@elizaos/core", () => ({
@@ -43,9 +43,7 @@ vi.mock("@elizaos/plugin-telegram", () => {
 });
 
 // Now import the module under test (after mocks are set up)
-const { EnhancedTelegramMessageManager } = await import(
-  "./message-manager.js"
-);
+const { EnhancedTelegramMessageManager } = await import("./message-manager.js");
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -98,10 +96,7 @@ describe("EnhancedTelegramMessageManager", () => {
 
       await manager.handleMessage(ctx);
 
-      expect(ctx.telegram.sendChatAction).toHaveBeenCalledWith(
-        123,
-        "typing",
-      );
+      expect(ctx.telegram.sendChatAction).toHaveBeenCalledWith(123, "typing");
     });
 
     it("clears typing interval after processing completes", async () => {
@@ -200,9 +195,7 @@ describe("EnhancedTelegramMessageManager", () => {
         Object.getPrototypeOf(Object.getPrototypeOf(manager)),
         "handleMessage",
       ).mockRejectedValue(new Error("LLM timeout"));
-      ctx.telegram.sendMessage.mockRejectedValue(
-        new Error("network error"),
-      );
+      ctx.telegram.sendMessage.mockRejectedValue(new Error("network error"));
 
       // Should not throw even when fallback send fails
       await expect(manager.handleMessage(ctx)).resolves.not.toThrow();
@@ -279,10 +272,12 @@ describe("EnhancedTelegramMessageManager", () => {
     it("delegates to parent for messages with attachments", async () => {
       vi.useRealTimers();
       const ctx = createMockCtx();
-      const parentSpy = vi.spyOn(
-        Object.getPrototypeOf(Object.getPrototypeOf(manager)),
-        "sendMessageInChunks",
-      ).mockResolvedValue([{ message_id: 200 }]);
+      const parentSpy = vi
+        .spyOn(
+          Object.getPrototypeOf(Object.getPrototypeOf(manager)),
+          "sendMessageInChunks",
+        )
+        .mockResolvedValue([{ message_id: 200 }]);
 
       const content = {
         text: "Check this out",
@@ -298,10 +293,7 @@ describe("EnhancedTelegramMessageManager", () => {
     it("returns empty array when chat is missing", async () => {
       const ctx = createMockCtx({ chat: undefined });
 
-      const result = await manager.sendMessageInChunks(
-        ctx,
-        { text: "Hello" },
-      );
+      const result = await manager.sendMessageInChunks(ctx, { text: "Hello" });
 
       expect(result).toEqual([]);
     });
@@ -335,9 +327,7 @@ describe("EnhancedTelegramMessageManager", () => {
       ctx.telegram.editMessageText = undefined;
       const content = {
         text: "Check this link",
-        buttons: [
-          { text: "Visit Site", url: "https://example.com" },
-        ],
+        buttons: [{ text: "Visit Site", url: "https://example.com" }],
       };
 
       await manager.sendMessageInChunks(ctx, content);
