@@ -182,6 +182,7 @@
     "drizzle-orm": "0.45.1",
     "@elizaos/computeruse": "next",
     "@elizaos/core": "next",
+    "pdfjs-dist": "5.4.624",
     "@elizaos/plugin-sql": "$@elizaos/plugin-sql"
   },
   "pnpm": {
@@ -198,5 +199,8 @@
     "esbuild",
     "protobufjs",
     "sharp"
-  ]
+  ],
+  "patchedDependencies": {
+    "@elizaos/plugin-pdf@2.0.0-alpha.4": "patches/@elizaos%2Fplugin-pdf@2.0.0-alpha.4.patch"
+  }
 }

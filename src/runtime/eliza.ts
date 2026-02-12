@@ -155,31 +155,6 @@ const CHANNEL_ENV_MAP: Readonly<
 export { CORE_PLUGINS, OPTIONAL_CORE_PLUGINS };
 
 /**
- * Security blocklist for plugins that are temporarily disabled due to known
- * high-severity vulnerabilities in their dependency chain.
- *
- * Keep entries minimal and remove them once patched upstream versions ship.
- */
-const SECURITY_BLOCKED_PLUGINS: Readonly<Record<string, string>> = {
-  "@elizaos/plugin-pdf":
-    "Temporarily disabled: vulnerable pdfjs-dist chain (GHSA-wgrm-67xf-hhpq).",
-};
-
-export function getSecurityBlockedPluginReason(
-  pluginName: string,
-): string | null {
-  return SECURITY_BLOCKED_PLUGINS[pluginName] ?? null;
-}
-
-function applySecurityPluginBlocklist(pluginsToLoad: Set<string>): void {
-  for (const [pluginName, reason] of Object.entries(SECURITY_BLOCKED_PLUGINS)) {
-    if (pluginsToLoad.delete(pluginName)) {
-      logger.warn(`[milaidy] Blocking plugin ${pluginName}: ${reason}`);
-    }
-  }
-}
-
-/**
  * Optional plugins that require native binaries or specific config.
  * These are only loaded when explicitly enabled via features config,
  * NOT by default — they crash if their prerequisites are missing.
@@ -268,6 +243,8 @@ function extractPlugin(mod: PluginModuleShape): Plugin | null {
  */
 /** @internal Exported for testing. */
 export function collectPluginNames(config: MilaidyConfig): Set<string> {
+  const shellPluginDisabled = config.features?.shellEnabled === false;
+
   // Check for explicit allow list first
   const allowList = config.plugins?.allow;
   const hasExplicitAllowList = allowList && allowList.length > 0;
@@ -279,6 +256,9 @@ export function collectPluginNames(config: MilaidyConfig): Set<string> {
     // Core plugins are always loaded regardless of allow list.
     for (const core of CORE_PLUGINS) {
       names.add(core);
+    }
+    if (shellPluginDisabled) {
+      names.delete("@elizaos/plugin-shell");
     }
 
     const cloudActive = config.cloud?.enabled || Boolean(config.cloud?.apiKey);
@@ -296,16 +276,17 @@ export function collectPluginNames(config: MilaidyConfig): Set<string> {
         names.delete(p);
       }
     }
-    applySecurityPluginBlocklist(names);
     return names;
   }
 
   // Otherwise, proceed with auto-detection
   const pluginsToLoad = new Set<string>(CORE_PLUGINS);
+  if (shellPluginDisabled) {
+    pluginsToLoad.delete("@elizaos/plugin-shell");
+  }
 
   // Allow list is additive — extra plugins on top of auto-detection,
   // not an exclusive whitelist that blocks everything else.
-  const allowList = config.plugins?.allow;
   if (allowList && allowList.length > 0) {
     for (const name of allowList) {
       pluginsToLoad.add(name);
@@ -403,7 +384,6 @@ export function collectPluginNames(config: MilaidyConfig): Set<string> {
     }
   }
 
-  applySecurityPluginBlocklist(pluginsToLoad);
   return pluginsToLoad;
 }
 

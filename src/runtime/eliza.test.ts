@@ -19,7 +19,6 @@ import {
   buildCharacterFromConfig,
   CUSTOM_PLUGINS_DIRNAME,
   collectPluginNames,
-  getSecurityBlockedPluginReason,
   mergeDropInPlugins,
   resolvePackageEntry,
   resolvePrimaryModel,
@@ -326,19 +325,6 @@ describe("collectPluginNames", () => {
     expect(names.has("@elizaos/plugin-vision")).toBe(false);
   });
 
-  it("blocks @elizaos/plugin-pdf even when explicitly allow-listed", () => {
-    const config = {
-      plugins: { allow: ["@elizaos/plugin-pdf"] },
-    } as unknown as MilaidyConfig;
-    const names = collectPluginNames(config);
-    expect(names.has("@elizaos/plugin-pdf")).toBe(false);
-    expect(names.has("@elizaos/plugin-sql")).toBe(true);
-  });
-
-  it("provides a security block reason for @elizaos/plugin-pdf", () => {
-    const reason = getSecurityBlockedPluginReason("@elizaos/plugin-pdf");
-    expect(reason).toContain("pdfjs-dist");
-  });
 });
 
 // ---------------------------------------------------------------------------
