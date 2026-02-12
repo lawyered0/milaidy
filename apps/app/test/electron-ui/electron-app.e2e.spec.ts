@@ -1,0 +1,172 @@
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
+import { _electron as electron, expect, test, type ElectronApplication, type Page } from "@playwright/test";
+
+import { startMockApiServer, type MockApiServer } from "./mock-api";
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(here, "../../../..");
+const electronAppDir = path.join(repoRoot, "apps", "app", "electron");
+const webDistIndex = path.join(repoRoot, "apps", "app", "dist", "index.html");
+const electronEntry = path.join(electronAppDir, "build", "src", "index.js");
+
+function isIgnorableConsoleError(message: string): boolean {
+  const patterns = [
+    "Electron Security Warning",
+    "DevTools failed to load source map",
+  ];
+  return patterns.some((pattern) => message.includes(pattern));
+}
+
+async function ensureBuildArtifacts(): Promise<void> {
+  await fs.access(webDistIndex);
+  await fs.access(electronEntry);
+}
+
+async function clickOnboardingNext(page: Page): Promise<void> {
+  await page.getByRole("button", { name: /^next$/i }).click();
+}
+
+test("electron app startup: onboarding -> chat -> all pages", async () => {
+  await ensureBuildArtifacts();
+
+  const userDataDir = await fs.mkdtemp(path.join(os.tmpdir(), "milaidy-electron-e2e-"));
+  let api: MockApiServer | null = null;
+  let app: ElectronApplication | null = null;
+
+  const consoleErrors: string[] = [];
+  const pageErrors: string[] = [];
+
+  try {
+    api = await startMockApiServer({ onboardingComplete: false, port: 2138 });
+
+    const electronRequire = createRequire(path.join(electronAppDir, "package.json"));
+    const electronExecutable = electronRequire("electron") as string;
+
+    app = await electron.launch({
+      executablePath: electronExecutable,
+      cwd: electronAppDir,
+      args: [electronAppDir],
+      env: {
+        ...process.env,
+        MILAIDY_ELECTRON_SKIP_EMBEDDED_AGENT: "1",
+        MILAIDY_ELECTRON_TEST_API_BASE: api.baseUrl,
+        MILAIDY_ELECTRON_DISABLE_AUTO_UPDATER: "1",
+        MILAIDY_ELECTRON_DISABLE_DEVTOOLS: "1",
+        MILAIDY_ELECTRON_USER_DATA_DIR: userDataDir,
+      },
+    });
+
+    const page = await app.firstWindow();
+    page.on("console", (msg) => {
+      if (msg.type() !== "error") return;
+      const text = msg.text();
+      if (isIgnorableConsoleError(text)) return;
+      consoleErrors.push(text);
+    });
+    page.on("pageerror", (error) => {
+      pageErrors.push(String(error));
+    });
+
+    await expect(page.getByText(/starting backend|initializing agent/i)).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText(/welcome to milaidy/i)).toBeVisible({ timeout: 60_000 });
+
+    await clickOnboardingNext(page); // welcome -> name
+    await page.getByRole("button", { name: "Milaidy", exact: true }).click();
+    await clickOnboardingNext(page); // name -> avatar
+
+    await clickOnboardingNext(page); // avatar -> style
+    await page.getByRole("button", { name: /chaotic/i }).click();
+    await clickOnboardingNext(page); // style -> theme
+
+    await page.getByRole("button", { name: /milady/i }).first().click();
+    await clickOnboardingNext(page); // theme -> runMode
+
+    await page.getByRole("button", { name: /local \(raw\)/i }).click();
+    await clickOnboardingNext(page); // runMode -> llm provider
+
+    await page.getByRole("button", { name: /ollama/i }).first().click();
+    await clickOnboardingNext(page); // llm provider -> inventory setup
+    await clickOnboardingNext(page); // inventory setup -> connectors
+    await clickOnboardingNext(page); // connectors -> permissions
+    await clickOnboardingNext(page); // permissions -> finish
+
+    await expect(page.getByPlaceholder("Type a message...")).toBeVisible({ timeout: 45_000 });
+    await expect(page).toHaveURL(/\/chat$/);
+
+    const topNav = page.locator("nav");
+
+    await topNav.getByRole("button", { name: "Character", exact: true }).click();
+    await expect(page).toHaveURL(/\/character$/);
+    await expect(page.getByText("Identity & Personality")).toBeVisible();
+
+    await topNav.getByRole("button", { name: "Wallets", exact: true }).click();
+    await expect(page).toHaveURL(/\/wallets$/);
+    await expect(page.getByRole("button", { name: "Tokens", exact: true })).toBeVisible();
+
+    await topNav.getByRole("button", { name: "Knowledge", exact: true }).click();
+    await expect(page).toHaveURL(/\/knowledge$/);
+    await expect(page.getByText("Knowledge Base")).toBeVisible();
+
+    await topNav.getByRole("button", { name: "Social", exact: true }).click();
+    await expect(page).toHaveURL(/\/connectors$/);
+    await expect(page.getByPlaceholder("Search connectors...")).toBeVisible();
+
+    await topNav.getByRole("button", { name: "Apps", exact: true }).click();
+    await expect(page).toHaveURL(/\/apps$/);
+    await expect(page.getByPlaceholder("Search apps...")).toBeVisible();
+
+    await topNav.getByRole("button", { name: "Settings", exact: true }).click();
+    await expect(page).toHaveURL(/\/settings$/);
+    await expect(page.getByText("Settings")).toBeVisible();
+
+    await topNav.getByRole("button", { name: "Advanced", exact: true }).click();
+    await expect(page).toHaveURL(/\/advanced$/);
+
+    await page.getByRole("button", { name: "Plugins", exact: true }).click();
+    await expect(page).toHaveURL(/\/plugins$/);
+    await expect(page.getByPlaceholder("Search plugins...")).toBeVisible();
+
+    await page.getByRole("button", { name: "Skills", exact: true }).click();
+    await expect(page).toHaveURL(/\/skills$/);
+    await expect(page.getByPlaceholder("Filter skills...")).toBeVisible();
+
+    await page.getByRole("button", { name: "Actions", exact: true }).click();
+    await expect(page).toHaveURL(/\/actions$/);
+    await expect(page.getByText("Custom Actions")).toBeVisible();
+
+    await page.getByRole("button", { name: "Triggers", exact: true }).click();
+    await expect(page).toHaveURL(/\/triggers$/);
+    await expect(page.getByText("Trigger Health")).toBeVisible();
+
+    await page.getByRole("button", { name: "Fine-Tuning", exact: true }).click();
+    await expect(page).toHaveURL(/\/fine-tuning$/);
+    await expect(page.getByText("Fine-Tuning")).toBeVisible();
+
+    await page.getByRole("button", { name: "Trajectories", exact: true }).click();
+    await expect(page).toHaveURL(/\/trajectories$/);
+    await expect(page.getByText("All statuses")).toBeVisible();
+
+    await page.getByRole("button", { name: "Runtime", exact: true }).click();
+    await expect(page).toHaveURL(/\/runtime$/);
+    await expect(page.getByText("Runtime Debug")).toBeVisible();
+
+    await page.getByRole("button", { name: "Databases", exact: true }).click();
+    await expect(page).toHaveURL(/\/database$/);
+    await expect(page.getByText("Databases")).toBeVisible();
+
+    await page.getByRole("button", { name: "Logs", exact: true }).click();
+    await expect(page).toHaveURL(/\/logs$/);
+    await expect(page.getByText("Logs")).toBeVisible();
+
+    expect(pageErrors, `Page errors:\n${pageErrors.join("\n")}`).toEqual([]);
+    expect(consoleErrors, `Console errors:\n${consoleErrors.join("\n")}`).toEqual([]);
+  } finally {
+    await app?.close();
+    await api?.close();
+    await fs.rm(userDataDir, { recursive: true, force: true });
+  }
+});
