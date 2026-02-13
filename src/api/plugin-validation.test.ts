@@ -255,6 +255,26 @@ describe("validatePluginConfig", () => {
       );
       expect(result.valid).toBe(true);
     });
+
+    it("rejects undeclared keys even when all declared fields are valid", () => {
+      const result = validatePluginConfig(
+        "discord",
+        "connector",
+        "DISCORD_API_TOKEN",
+        ["DISCORD_API_TOKEN", "DISCORD_APPLICATION_ID", "CHANNEL_IDS"],
+        {
+          DISCORD_API_TOKEN: "MTE1MDY2NjQwOTA3MTQzODg5MA.token",
+          DISCORD_APPLICATION_ID: "1150666409071438890",
+          UNDECLARED_KEY: "x",
+        },
+        discordParams,
+      );
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContainEqual({
+        field: "UNDECLARED_KEY",
+        message: "UNDECLARED_KEY is not a declared config key for this plugin",
+      });
+    });
   });
 
   // ---------------------------------------------------------------------------
