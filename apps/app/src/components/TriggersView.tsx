@@ -5,6 +5,7 @@ import type {
   TriggerSummary,
   UpdateTriggerRequest,
 } from "../api-client";
+import { parsePositiveInteger } from "../../../src/utils/number-parsing.js";
 
 type TriggerType = "interval" | "once" | "cron";
 type TriggerWakeMode = "inject_now" | "next_autonomy_cycle";
@@ -52,13 +53,6 @@ function formatTimestamp(value?: number): string {
   return new Date(value).toLocaleString();
 }
 
-function parsePositiveNumber(value: string): number | undefined {
-  const trimmed = value.trim();
-  if (!trimmed || !/^\d+$/.test(trimmed)) return undefined;
-  const parsed = Number(trimmed);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
-}
-
 function scheduleLabel(t: TriggerSummary): string {
   if (t.triggerType === "interval") return `Every ${formatMs(t.intervalMs)}`;
   if (t.triggerType === "once") return t.scheduledAtIso ? `Once at ${new Date(t.scheduledAtIso).toLocaleString()}` : "Once";
@@ -81,8 +75,8 @@ function formFromTrigger(trigger: TriggerSummary): TriggerFormState {
 }
 
 function buildCreateRequest(form: TriggerFormState): CreateTriggerRequest {
-  const intervalMs = parsePositiveNumber(form.intervalMs);
-  const maxRuns = parsePositiveNumber(form.maxRuns);
+  const intervalMs = parsePositiveInteger(form.intervalMs);
+  const maxRuns = parsePositiveInteger(form.maxRuns);
   return {
     displayName: form.displayName.trim(),
     instructions: form.instructions.trim(),
@@ -104,7 +98,7 @@ function buildUpdateRequest(form: TriggerFormState): UpdateTriggerRequest {
 function validateForm(form: TriggerFormState): string | null {
   if (!form.displayName.trim()) return "Display name is required.";
   if (!form.instructions.trim()) return "Instructions are required.";
-  if (form.triggerType === "interval" && !parsePositiveNumber(form.intervalMs)) {
+  if (form.triggerType === "interval" && !parsePositiveInteger(form.intervalMs)) {
     return "Interval must be a positive number in milliseconds.";
   }
   if (form.triggerType === "once") {
@@ -122,7 +116,7 @@ function validateForm(form: TriggerFormState): string | null {
       if (!/^[\d,\-\*\/]+$/.test(cronParts[i])) return `Invalid cron ${ranges[i].n} field: "${cronParts[i]}"`;
     }
   }
-  if (form.maxRuns.trim() && !parsePositiveNumber(form.maxRuns)) return "Max runs must be a positive integer.";
+  if (form.maxRuns.trim() && !parsePositiveInteger(form.maxRuns)) return "Max runs must be a positive integer.";
   return null;
 }
 

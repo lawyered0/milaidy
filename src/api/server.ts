@@ -73,6 +73,7 @@ import {
   readTriggerConfig,
   taskToTriggerSummary,
 } from "../triggers/runtime.js";
+import { parseClampedInteger } from "../utils/number-parsing.js";
 import { type CloudRouteState, handleCloudRoute } from "./cloud-routes.js";
 import {
   extractAnthropicSystemAndLastUser,
@@ -1953,10 +1954,11 @@ async function generateChatResponse(
 }
 
 function parseBoundedLimit(rawLimit: string | null, fallback = 15): number {
-  if (!rawLimit) return fallback;
-  const parsed = Number.parseInt(rawLimit, 10);
-  if (!Number.isFinite(parsed)) return fallback;
-  return Math.min(Math.max(parsed, 1), 50);
+  return parseClampedInteger(rawLimit, {
+    min: 1,
+    max: 50,
+    fallback,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -6102,7 +6104,7 @@ async function handleRequest(
     try {
       const limitParam = url.searchParams.get("limit");
       const limit = limitParam
-        ? Math.min(Math.max(Number(limitParam), 1), 50)
+        ? parseClampedInteger(limitParam, { min: 1, max: 50, fallback: 15 })
         : 15;
       const results = await searchPlugins(query, limit);
       json(res, { query, count: results.length, results });
@@ -7305,7 +7307,9 @@ async function handleRequest(
     }
     try {
       const limitStr = url.searchParams.get("limit");
-      const limit = limitStr ? Math.min(Math.max(Number(limitStr), 1), 50) : 20;
+      const limit = limitStr
+        ? parseClampedInteger(limitStr, { min: 1, max: 50, fallback: 20 })
+        : 20;
       const results = await searchSkillsMarketplace(query, { limit });
       json(res, { ok: true, results });
     } catch (err) {
@@ -7516,10 +7520,11 @@ async function handleRequest(
 
   // ── GET /api/agent/events?after=evt-123&limit=200 ───────────────────────
   if (method === "GET" && pathname === "/api/agent/events") {
-    const limitRaw = Number(url.searchParams.get("limit") ?? "200");
-    const limit = Number.isFinite(limitRaw)
-      ? Math.min(Math.max(Math.trunc(limitRaw), 1), 1000)
-      : 200;
+    const limit = parseClampedInteger(url.searchParams.get("limit"), {
+      min: 1,
+      max: 1000,
+      fallback: 200,
+    });
     const afterEventId = url.searchParams.get("after");
     const autonomyEvents = state.eventBuffer.filter(
       (event) =>
@@ -11147,7 +11152,9 @@ async function handleRequest(
   if (method === "GET" && pathname === "/api/mcp/marketplace/search") {
     const query = url.searchParams.get("q") ?? "";
     const limitStr = url.searchParams.get("limit");
-    const limit = limitStr ? Math.min(Math.max(Number(limitStr), 1), 50) : 30;
+    const limit = limitStr
+      ? parseClampedInteger(limitStr, { min: 1, max: 50, fallback: 30 })
+      : 30;
     try {
       const result = await searchMcpMarketplace(query || undefined, limit);
       json(res, { ok: true, results: result.results });

@@ -9,6 +9,12 @@ export interface ParseClampedNumberOptions {
   fallback?: number;
 }
 
+export interface ParseClampedIntegerOptions {
+  min?: number;
+  max?: number;
+  fallback?: number;
+}
+
 function sanitizeNumericText(value: string | null | undefined): string {
   return value == null ? "" : value.trim();
 }
@@ -86,4 +92,34 @@ export function parseClampedFloat(
   const min = options.min ?? -Infinity;
   const max = options.max ?? Infinity;
   return Math.max(min, Math.min(max, parsed));
+}
+
+/**
+ * Parse an integer and optionally clamp it to the provided bounds.
+ */
+export function parseClampedInteger(
+  value: string | null | undefined,
+  options: ParseClampedIntegerOptions & { fallback: number },
+): number;
+export function parseClampedInteger(
+  value: string | null | undefined,
+  options?: ParseClampedIntegerOptions,
+): number | undefined;
+export function parseClampedInteger(
+  value: string | null | undefined,
+  options: ParseClampedIntegerOptions = {},
+): number | undefined {
+  const raw = sanitizeNumericText(value);
+  if (!raw) return normalizeFallback(options.fallback);
+
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed)) return normalizeFallback(options.fallback);
+
+  const min = options.min;
+  if (min !== undefined && parsed < min) return min;
+
+  const max = options.max;
+  if (max !== undefined && parsed > max) return max;
+
+  return parsed;
 }

@@ -27,7 +27,10 @@ import {
   stringToUuid,
   type UUID,
 } from "@elizaos/core";
-import { readRequestBody, writeJsonResponseSafe } from "../api/http-helpers.js";
+import {
+  readJsonBody as parseJsonBody,
+  writeJsonResponseSafe,
+} from "../api/http-helpers.js";
 import { loadMilaidyConfig, type MilaidyConfig } from "../config/config.js";
 import {
   ensureAgentWorkspace,
@@ -253,20 +256,6 @@ async function createBenchmarkRuntime(
 
 const MAX_BODY_BYTES = 10 * 1024 * 1024; // 10 MB
 
-async function readBody(
-  req: http.IncomingMessage,
-  maxBytes = MAX_BODY_BYTES,
-): Promise<string> {
-  const body = await readRequestBody(req, {
-    maxBytes,
-    tooLargeMessage: `Request body exceeds ${maxBytes} bytes`,
-    destroyOnTooLarge: true,
-    returnNullOnError: false,
-    returnNullOnTooLarge: false,
-  });
-  return body ?? "";
-}
-
 function extractTag(text: string, tag: string): string | undefined {
   const re = new RegExp(`<${tag}>(.*?)</${tag}>`, "s");
   const m = text.match(re);
@@ -361,13 +350,15 @@ async function main(): Promise<void> {
 
       // Reset session
       if (pathname === "/api/benchmark/reset" && req.method === "POST") {
-        let body: ResetRequest;
-        try {
-          body = JSON.parse(await readBody(req)) as ResetRequest;
-        } catch {
-          jsonResponse(res, 400, { error: "Invalid JSON in request body" });
-          return;
-        }
+        const body = await parseJsonBody<ResetRequest>(req, res, {
+          maxBytes: MAX_BODY_BYTES,
+          readErrorMessage: "Invalid JSON in request body",
+          readErrorStatus: 400,
+          parseErrorMessage: "Invalid JSON in request body",
+          parseErrorStatus: 400,
+          requireObject: true,
+        });
+        if (!body) return;
 
         // Create a fresh room for the new task
         currentRoomId = stringToUuid(
@@ -385,13 +376,15 @@ async function main(): Promise<void> {
 
       // Send message
       if (pathname === "/api/benchmark/message" && req.method === "POST") {
-        let body: MessageRequest;
-        try {
-          body = JSON.parse(await readBody(req)) as MessageRequest;
-        } catch {
-          jsonResponse(res, 400, { error: "Invalid JSON in request body" });
-          return;
-        }
+        const body = await parseJsonBody<MessageRequest>(req, res, {
+          maxBytes: MAX_BODY_BYTES,
+          readErrorMessage: "Invalid JSON in request body",
+          readErrorStatus: 400,
+          parseErrorMessage: "Invalid JSON in request body",
+          parseErrorStatus: 400,
+          requireObject: true,
+        });
+        if (!body) return;
 
         if (!body.text) {
           jsonResponse(res, 400, { error: "Missing 'text' field" });

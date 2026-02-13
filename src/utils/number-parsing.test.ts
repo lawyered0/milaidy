@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   parseClampedFloat,
+  parseClampedInteger,
   parsePositiveFloat,
   parsePositiveInteger,
 } from "./number-parsing";
@@ -36,5 +37,16 @@ describe("number-parsing helpers", () => {
     expect(parseClampedFloat("bad", { min: 0, max: 1, fallback: 0.2 })).toBe(
       0.2,
     );
+  });
+
+  it("parses and clamps integers", () => {
+    expect(parseClampedInteger("3", { min: 1, max: 5, fallback: 2 })).toBe(3);
+    expect(parseClampedInteger("9", { min: 1, max: 5, fallback: 2 })).toBe(5);
+    expect(parseClampedInteger("0", { min: 1, max: 5, fallback: 2 })).toBe(1);
+    expect(parseClampedInteger("12.8", { min: 1, max: 20, fallback: 2 })).toBe(
+      12,
+    );
+    expect(parseClampedInteger("bad", { min: 1, max: 5, fallback: 2 })).toBe(2);
+    expect(parseClampedInteger(null, { min: 1, max: 5, fallback: 2 })).toBe(2);
   });
 });
