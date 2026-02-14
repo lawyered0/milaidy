@@ -343,6 +343,18 @@ describe("handleSandboxRoute", () => {
       );
     });
 
+    it("POST /api/sandbox/audio/record should reject fractional duration", async () => {
+      const req = createMockReq("POST", JSON.stringify({ durationMs: 1000.7 }));
+      const res = createMockRes();
+      await handleSandboxRoute(req, res, "/api/sandbox/audio/record", "POST", {
+        sandboxManager: mgr,
+      });
+      expect(res._status).toBe(400);
+      expect(JSON.parse(res._body).error).toContain(
+        "durationMs must be an integer number of milliseconds",
+      );
+    });
+
     it("POST /api/sandbox/audio/record should reject oversized duration", async () => {
       const req = createMockReq("POST", JSON.stringify({ durationMs: 60000 }));
       const res = createMockRes();

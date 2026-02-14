@@ -272,6 +272,12 @@ export async function handleSandboxRoute(
           });
           return true;
         }
+        if (!Number.isInteger(durationValue)) {
+          sendJson(res, 400, {
+            error: "durationMs must be an integer number of milliseconds",
+          });
+          return true;
+        }
         if (
           durationValue < MIN_AUDIO_RECORD_DURATION_MS ||
           durationValue > MAX_AUDIO_RECORD_DURATION_MS
@@ -281,7 +287,7 @@ export async function handleSandboxRoute(
           });
           return true;
         }
-        durationMs = Math.floor(durationValue);
+        durationMs = durationValue;
       }
     }
     try {
