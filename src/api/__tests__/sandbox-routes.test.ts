@@ -309,6 +309,43 @@ describe("handleSandboxRoute", () => {
       expect([200, 500]).toContain(res._status);
     });
 
+    it("POST /api/sandbox/audio/record should reject non-finite duration", async () => {
+      const req = createMockReq("POST", '{"durationMs":null}');
+      const res = createMockRes();
+      await handleSandboxRoute(req, res, "/api/sandbox/audio/record", "POST", {
+        sandboxManager: mgr,
+      });
+      expect(res._status).toBe(400);
+      expect(JSON.parse(res._body).error).toContain(
+        "durationMs must be a finite number",
+      );
+    });
+
+    it("POST /api/sandbox/audio/record should reject string duration", async () => {
+      const req = createMockReq("POST", '{"durationMs":"1000"}');
+      const res = createMockRes();
+      await handleSandboxRoute(req, res, "/api/sandbox/audio/record", "POST", {
+        sandboxManager: mgr,
+      });
+      expect(res._status).toBe(400);
+      expect(JSON.parse(res._body).error).toContain(
+        "durationMs must be a finite number",
+      );
+    });
+
+    it("POST /api/sandbox/audio/record should reject oversized duration", async () => {
+      const req = createMockReq(
+        "POST",
+        JSON.stringify({ durationMs: 60000 }),
+      );
+      const res = createMockRes();
+      await handleSandboxRoute(req, res, "/api/sandbox/audio/record", "POST", {
+        sandboxManager: mgr,
+      });
+      expect(res._status).toBe(400);
+      expect(JSON.parse(res._body).error).toContain("durationMs must be between");
+    });
+
     it("POST /api/sandbox/audio/play should require data field", async () => {
       const req = createMockReq("POST", JSON.stringify({}));
       const res = createMockRes();
