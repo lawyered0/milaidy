@@ -56,6 +56,16 @@ interface KnowledgeServiceLike {
 
 const FRAGMENT_COUNT_BATCH_SIZE = 500;
 
+function hasUuidId(memory: Memory): memory is Memory & { id: UUID } {
+  return typeof memory.id === "string" && memory.id.length > 0;
+}
+
+function hasUuidIdAndCreatedAt(
+  memory: Memory,
+): memory is Memory & { id: UUID; createdAt: number } {
+  return hasUuidId(memory) && typeof memory.createdAt === "number";
+}
+
 async function countKnowledgeFragmentsForDocument(
   knowledgeService: KnowledgeServiceLike,
   roomId: UUID,
@@ -109,7 +119,7 @@ async function listKnowledgeFragmentsForDocument(
 
     for (const memory of knowledgeBatch) {
       const metadata = memory.metadata as Record<string, unknown> | undefined;
-      if (metadata?.documentId === documentId) {
+      if (metadata?.documentId === documentId && hasUuidId(memory)) {
         fragmentIds.push(memory.id);
       }
     }
@@ -655,6 +665,9 @@ export async function handleKnowledgeRoutes(
       });
 
       for (const fragment of matchingFragments) {
+        if (!hasUuidIdAndCreatedAt(fragment)) {
+          continue;
+        }
         const meta = fragment.metadata as Record<string, unknown> | undefined;
         allFragments.push({
           id: fragment.id,
