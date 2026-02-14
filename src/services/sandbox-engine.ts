@@ -1,6 +1,6 @@
 /** Cross-platform sandbox engine: Docker, Apple Container, auto-detect. */
 
-import { execSync, spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { arch, platform } from "node:os";
 
 export type SandboxEngineType = "docker" | "apple-container" | "auto";
@@ -69,8 +69,9 @@ function appendEnvArgs(args: string[], env: Record<string, string>) {
 
 function listContainersFromBinary(binary: string, prefix: string): string[] {
   try {
-    const output = execSync(
-      `${binary} ps -a --filter name=${prefix} --format "{{.ID}}"`,
+    const output = execFileSync(
+      binary,
+      ["ps", "-a", "--filter", `name=${prefix}`, "--format", "{{.ID}}"],
       {
         encoding: "utf-8",
         timeout: 10_000,
@@ -88,7 +89,7 @@ function listContainersFromBinary(binary: string, prefix: string): string[] {
 
 function checkHealthWithBinary(binary: string, id: string): Promise<boolean> {
   try {
-    const result = execSync(`${binary} exec ${id} echo "healthy"`, {
+    const result = execFileSync(binary, ["exec", id, "echo", "healthy"], {
       encoding: "utf-8",
       timeout: 5000,
       stdio: ["ignore", "pipe", "ignore"],
@@ -174,7 +175,7 @@ export class DockerEngine implements ISandboxEngine {
 
   isAvailable(): boolean {
     try {
-      execSync("docker info", { stdio: "ignore", timeout: 10000 });
+      execFileSync("docker", ["info"], { stdio: "ignore", timeout: 10000 });
       return true;
     } catch {
       return false;
@@ -184,7 +185,7 @@ export class DockerEngine implements ISandboxEngine {
   getInfo(): EngineInfo {
     let version = "unknown";
     try {
-      version = execSync("docker --version", {
+      version = execFileSync("docker", ["--version"], {
         encoding: "utf-8",
         timeout: 5000,
       }).trim();
@@ -232,7 +233,7 @@ export class DockerEngine implements ISandboxEngine {
 
     args.push(opts.image);
 
-    const output = execSync(`docker ${args.join(" ")}`, {
+    const output = execFileSync("docker", args, {
       encoding: "utf-8",
       timeout: 60000,
     }).trim();
@@ -259,7 +260,10 @@ export class DockerEngine implements ISandboxEngine {
 
   async stopContainer(id: string): Promise<void> {
     try {
-      execSync(`docker stop ${id}`, { timeout: 15000, stdio: "ignore" });
+      execFileSync("docker", ["stop", id], {
+        timeout: 15000,
+        stdio: "ignore",
+      });
     } catch {
       /* best effort */
     }
@@ -267,7 +271,10 @@ export class DockerEngine implements ISandboxEngine {
 
   async removeContainer(id: string): Promise<void> {
     try {
-      execSync(`docker rm -f ${id}`, { timeout: 10000, stdio: "ignore" });
+      execFileSync("docker", ["rm", "-f", id], {
+        timeout: 10000,
+        stdio: "ignore",
+      });
     } catch {
       /* best effort */
     }
@@ -275,7 +282,7 @@ export class DockerEngine implements ISandboxEngine {
 
   isContainerRunning(id: string): boolean {
     try {
-      const result = execSync(`docker inspect -f "{{.State.Running}}" ${id}`, {
+      const result = execFileSync("docker", ["inspect", "-f", "{{.State.Running}}", id], {
         encoding: "utf-8",
         timeout: 5000,
         stdio: ["ignore", "pipe", "ignore"],
@@ -288,7 +295,7 @@ export class DockerEngine implements ISandboxEngine {
 
   imageExists(image: string): boolean {
     try {
-      execSync(`docker image inspect ${image}`, {
+      execFileSync("docker", ["image", "inspect", image], {
         stdio: "ignore",
         timeout: 10000,
       });
@@ -299,7 +306,7 @@ export class DockerEngine implements ISandboxEngine {
   }
 
   async pullImage(image: string): Promise<void> {
-    execSync(`docker pull ${image}`, {
+    execFileSync("docker", ["pull", image], {
       stdio: ["ignore", "pipe", "pipe"],
       timeout: 300000,
     });
@@ -315,7 +322,7 @@ export class DockerEngine implements ISandboxEngine {
 
   private getDockerContext(): string {
     try {
-      return execSync("docker context show", {
+      return execFileSync("docker", ["context", "show"], {
         encoding: "utf-8",
         timeout: 5000,
         stdio: ["ignore", "pipe", "ignore"],
@@ -332,7 +339,7 @@ export class AppleContainerEngine implements ISandboxEngine {
   isAvailable(): boolean {
     if (platform() !== "darwin") return false;
     try {
-      execSync("which container", { stdio: "ignore", timeout: 5000 });
+      execFileSync("container", ["--version"], { stdio: "ignore", timeout: 5000 });
       return true;
     } catch {
       return false;
@@ -342,7 +349,7 @@ export class AppleContainerEngine implements ISandboxEngine {
   getInfo(): EngineInfo {
     let version = "unknown";
     try {
-      version = execSync("container --version 2>&1 || echo unknown", {
+      version = execFileSync("container", ["--version"], {
         encoding: "utf-8",
         timeout: 5000,
       }).trim();
@@ -429,7 +436,10 @@ export class AppleContainerEngine implements ISandboxEngine {
 
   async stopContainer(id: string): Promise<void> {
     try {
-      execSync(`container stop ${id}`, { timeout: 15000, stdio: "ignore" });
+      execFileSync("container", ["stop", id], {
+        timeout: 15000,
+        stdio: "ignore",
+      });
     } catch {
       /* best effort */
     }
@@ -438,7 +448,10 @@ export class AppleContainerEngine implements ISandboxEngine {
   async removeContainer(id: string): Promise<void> {
     // Apple Container uses --rm by default; explicit remove for safety
     try {
-      execSync(`container rm ${id}`, { timeout: 10000, stdio: "ignore" });
+      execFileSync("container", ["rm", id], {
+        timeout: 10000,
+        stdio: "ignore",
+      });
     } catch {
       /* best effort */
     }
@@ -446,7 +459,10 @@ export class AppleContainerEngine implements ISandboxEngine {
 
   isContainerRunning(id: string): boolean {
     try {
-      execSync(`container inspect ${id}`, { stdio: "ignore", timeout: 5000 });
+      execFileSync("container", ["inspect", id], {
+        stdio: "ignore",
+        timeout: 5000,
+      });
       return true;
     } catch {
       return false;
@@ -455,7 +471,7 @@ export class AppleContainerEngine implements ISandboxEngine {
 
   imageExists(image: string): boolean {
     try {
-      execSync(`container image inspect ${image}`, {
+      execFileSync("container", ["image", "inspect", image], {
         stdio: "ignore",
         timeout: 10000,
       });
@@ -466,7 +482,7 @@ export class AppleContainerEngine implements ISandboxEngine {
   }
 
   async pullImage(image: string): Promise<void> {
-    execSync(`container pull ${image}`, {
+    execFileSync("container", ["pull", image], {
       stdio: ["ignore", "pipe", "pipe"],
       timeout: 300000,
     });
