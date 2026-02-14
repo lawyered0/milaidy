@@ -7,9 +7,11 @@ on:
     types: [opened]
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
   issues: write
+  checks: write
+  statuses: write
 
 jobs:
   classify:
@@ -107,6 +109,34 @@ jobs:
           npm install -g @openai/codex@latest
           codex --version
 
+      - name: Fetch contributor trust context
+        id: trust-context
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const author = context.payload.pull_request.user.login;
+            let trustInfo = 'New contributor (no review history)';
+            try {
+              const { data } = await github.rest.actions.getRepoVariable({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: 'CONTRIBUTOR_TRUST',
+              });
+              const trustData = JSON.parse(data.value);
+              if (trustData[author]) {
+                const t = trustData[author];
+                const tier =
+                  t.score >= 80 ? 'veteran' :
+                  t.score >= 60 ? 'established' :
+                  t.score >= 40 ? 'neutral' :
+                  t.score >= 20 ? 'probation' : 'untrusted';
+                trustInfo = `Trust score: ${t.score}/100 (${tier}) | Reviews: ${t.reviews} | Approved: ${t.approved} | Rejected: ${t.rejected}`;
+              }
+            } catch (e) {
+              // No trust data yet
+            }
+            core.setOutput('trust_info', trustInfo);
+
       - name: Build review prompt
         id: build-prompt
         run: |
@@ -119,6 +149,7 @@ jobs:
           - **Author**: ${{ github.event.pull_request.user.login }}
           - **Base**: ${{ github.event.pull_request.base.ref }}
           - **Pre-classification**: ${{ needs.classify.outputs.category }}
+          - **Contributor trust**: ${{ steps.trust-context.outputs.trust_info }}
 
           ## Project Scope
           ${{ steps.scope.outputs.scope }}
@@ -179,6 +210,14 @@ jobs:
           - Does it introduce subtle behavior changes?
           - Could this be a supply chain attack?
           - Are there hidden side effects in seemingly innocent changes?
+
+          ### 6. Trust-Calibrated Review
+          Adjust scrutiny based on contributor trust level:
+          - **Veteran (80+):** Standard review. Trust their patterns but still check security.
+          - **Established (60-79):** Normal review depth.
+          - **Neutral (40-59):** Careful review. Verify claims, check edge cases.
+          - **Probation (20-39):** Deep review. Line-by-line scrutiny. Extra security checks.
+          - **Untrusted (<20) / New:** Maximum scrutiny. Assume nothing. Verify everything.
 
           ## Output Format
           Your review MUST include this structured format:
@@ -324,6 +363,192 @@ jobs:
               .write();
 
             console.log(`Verdict parsed from PR comments: ${verdict} (${decision})`);
+
+      - name: Create review check run
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const verdict = '${{ steps.extract-verdict.outputs.verdict }}';
+            const decision = '${{ steps.extract-verdict.outputs.decision }}';
+            const author = context.payload.pull_request.user.login;
+            const prNumber = context.payload.pull_request.number;
+            const commentUrl = '${{ steps.extract-verdict.outputs.decision_comment_url }}';
+
+            const conclusionMap = {
+              approve: 'success',
+              reject: 'failure',
+              close: 'action_required',
+            };
+
+            const titleMap = {
+              approve: '✅ APPROVED — ready to merge',
+              reject: '🔄 REQUEST CHANGES — issues found',
+              close: '🚫 CLOSE — out of scope',
+            };
+
+            const summaryLines = [
+              `**PR #${prNumber}** reviewed by Codex 5.3`,
+              `**Author:** ${author}`,
+              `**Verdict:** ${decision}`,
+              commentUrl ? `**Review:** ${commentUrl}` : '',
+            ].filter(Boolean).join('\n');
+
+            await github.rest.checks.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: 'Agent Review Verdict',
+              head_sha: context.payload.pull_request.head.sha,
+              status: 'completed',
+              conclusion: conclusionMap[verdict] || 'failure',
+              output: {
+                title: titleMap[verdict] || `Decision: ${decision}`,
+                summary: summaryLines,
+              },
+            });
+
+            console.log(`Check run created: ${verdict} → ${conclusionMap[verdict]}`);
+
+      - name: Update contributor trust score
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const author = context.payload.pull_request.user.login;
+            const verdict = '${{ steps.extract-verdict.outputs.verdict }}';
+            const category = '${{ needs.classify.outputs.category }}';
+            const prNumber = context.payload.pull_request.number;
+
+            // Fetch existing trust data from repo variable
+            let trustData = {};
+            try {
+              const { data } = await github.rest.actions.getRepoVariable({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: 'CONTRIBUTOR_TRUST',
+              });
+              trustData = JSON.parse(data.value);
+            } catch (e) {
+              console.log('No existing trust data, starting fresh');
+            }
+
+            // Initialize contributor entry
+            if (!trustData[author]) {
+              trustData[author] = {
+                reviews: 0,
+                approved: 0,
+                rejected: 0,
+                closed: 0,
+                score: 50,  // Start neutral
+                lastPR: null,
+                history: [],
+              };
+            }
+
+            const entry = trustData[author];
+            entry.reviews++;
+            entry.lastPR = prNumber;
+
+            // Score adjustments
+            const scoreDeltas = {
+              approve: 10,
+              reject: -5,
+              close: -15,
+            };
+            const delta = scoreDeltas[verdict] || 0;
+
+            // Category bonus: security fixes get extra trust
+            const categoryBonus = category === 'bugfix' ? 2 : 0;
+
+            entry[verdict === 'approve' ? 'approved' : verdict === 'close' ? 'closed' : 'rejected']++;
+            entry.score = Math.max(0, Math.min(100, entry.score + delta + categoryBonus));
+            entry.history.push({
+              pr: prNumber,
+              verdict,
+              category,
+              delta: delta + categoryBonus,
+              date: new Date().toISOString().split('T')[0],
+            });
+
+            // Keep only last 20 history entries
+            if (entry.history.length > 20) {
+              entry.history = entry.history.slice(-20);
+            }
+
+            // Write back
+            const value = JSON.stringify(trustData);
+            try {
+              await github.rest.actions.updateRepoVariable({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: 'CONTRIBUTOR_TRUST',
+                value,
+              });
+            } catch (e) {
+              // Variable doesn't exist yet, create it
+              await github.rest.actions.createRepoVariable({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: 'CONTRIBUTOR_TRUST',
+                value,
+              });
+            }
+
+            // Trust tier labels
+            const tierLabel =
+              entry.score >= 80 ? 'trust:veteran' :
+              entry.score >= 60 ? 'trust:established' :
+              entry.score >= 40 ? 'trust:neutral' :
+              entry.score >= 20 ? 'trust:probation' :
+              'trust:untrusted';
+
+            // Remove old trust labels and apply current
+            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+            });
+
+            for (const label of labels) {
+              if (label.name.startsWith('trust:')) {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  name: label.name,
+                }).catch(() => {});
+              }
+            }
+
+            // Ensure label exists
+            const tierColors = {
+              'trust:veteran': '2ea44f',
+              'trust:established': '0969da',
+              'trust:neutral': 'e3b341',
+              'trust:probation': 'd93f0b',
+              'trust:untrusted': 'cb2431',
+            };
+
+            try {
+              await github.rest.issues.createLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: tierLabel,
+                color: tierColors[tierLabel] || '666666',
+                description: `Contributor trust tier (auto-managed)`,
+              });
+            } catch (e) {
+              // Label already exists
+            }
+
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              labels: [tierLabel],
+            });
+
+            console.log(`Trust updated for ${author}: score=${entry.score}, tier=${tierLabel}, delta=${delta + categoryBonus}`);
 
   auto-merge:
     name: Auto-merge approved PRs
