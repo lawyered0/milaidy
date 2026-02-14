@@ -305,7 +305,7 @@ jobs:
 
           pr_number="${{ github.event.pull_request.number }}"
           echo "Waiting for required checks to pass for PR #${pr_number}"
-          if ! gh pr checks "$pr_number" \
+          if ! timeout 15m gh pr checks "$pr_number" \
             --required \
             --repo "$GH_REPO" \
             --watch \
