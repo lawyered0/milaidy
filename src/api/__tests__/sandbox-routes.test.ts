@@ -331,7 +331,7 @@ describe("handleSandboxRoute", () => {
       );
     });
 
-    it("POST /api/sandbox/audio/record should reject non-numeric duration", async () => {
+    it("POST /api/sandbox/audio/record should reject non-number duration", async () => {
       const req = createMockReq("POST", JSON.stringify({ durationMs: "1000" }));
       const res = createMockRes();
       await handleSandboxRoute(req, res, "/api/sandbox/audio/record", "POST", {
@@ -339,7 +339,7 @@ describe("handleSandboxRoute", () => {
       });
       expect(res._status).toBe(400);
       expect(JSON.parse(res._body).error).toContain(
-        "durationMs must be a finite number",
+        "durationMs must be a number",
       );
     });
 

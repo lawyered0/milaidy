@@ -260,12 +260,13 @@ export async function handleSandboxRoute(
         const durationValue = bodyValues.durationMs;
         if (typeof durationValue !== "number") {
           sendJson(res, 400, {
-            error: "durationMs must be a finite number",
+            error: "durationMs must be a number",
           });
           return true;
         }
-        // Defense in depth: JSON.parse only produces finite numbers, but this guard
-        // keeps behavior explicit against future parser/runtime changes.
+        // Defense in depth: JSON.parse produces finite numeric values, so this is
+        // currently redundant. Keep it as a guard for callers or parser paths
+        // that bypass JSON parsing in the future.
         if (!Number.isFinite(durationValue)) {
           sendJson(res, 400, {
             error: "durationMs must be a finite number",
