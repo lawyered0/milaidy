@@ -135,10 +135,11 @@ describe("SandboxEngine container exec command dispatch", () => {
   it("preserves escaped quotes inside double-quoted argument", async () => {
     const engine = new DockerEngine();
     const spawnMock = vi.mocked(spawn);
+    const escapedDoubleQuote = String.fromCharCode(92, 34);
 
     await engine.execInContainer({
       containerId: "cid-7",
-      command: String.raw`python -c "\"\""`,
+      command: `python -c "${escapedDoubleQuote}${escapedDoubleQuote}"`,
     });
 
     const [, args] = spawnMock.mock.calls.at(-1) ?? [];
