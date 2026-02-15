@@ -45,6 +45,10 @@ interface ApiResponse<T> {
   error?: string;
 }
 
+function isRedirectResponse(response: Response): boolean {
+  return response.status >= 300 && response.status < 400;
+}
+
 export class ElizaCloudClient {
   private baseUrl: string;
   private apiKey: string;
@@ -117,8 +121,15 @@ export class ElizaCloudClient {
         method: "message.send",
         params: { text, roomId, mode },
       }),
+      redirect: "manual",
       signal: AbortSignal.timeout(60_000),
     });
+
+    if (isRedirectResponse(response)) {
+      throw new Error(
+        "Bridge request was redirected; redirects are not allowed",
+      );
+    }
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => "");
@@ -152,7 +163,14 @@ export class ElizaCloudClient {
         method: "message.send",
         params: { text, roomId, mode },
       }),
+      redirect: "manual",
     });
+
+    if (isRedirectResponse(response)) {
+      throw new Error(
+        "Stream request was redirected; redirects are not allowed",
+      );
+    }
 
     if (!response.ok || !response.body) {
       throw new Error(`Stream request failed: HTTP ${response.status}`);
@@ -230,8 +248,10 @@ export class ElizaCloudClient {
           "X-Api-Key": this.apiKey,
         },
         body: JSON.stringify({ jsonrpc: "2.0", method: "heartbeat" }),
+        redirect: "manual",
         signal: AbortSignal.timeout(10_000),
       });
+      if (isRedirectResponse(response)) return false;
       return response.ok;
     } catch {
       return false;
@@ -250,8 +270,16 @@ export class ElizaCloudClient {
       method,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
+      redirect: "manual",
       signal: AbortSignal.timeout(30_000),
     });
+
+    if (isRedirectResponse(response)) {
+      return {
+        success: false,
+        error: "Cloud API request was redirected; redirects are not allowed",
+      };
+    }
 
     if (!response.ok) {
       const text = await response.text().catch(() => "");

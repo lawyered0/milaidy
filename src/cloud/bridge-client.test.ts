@@ -94,6 +94,7 @@ describe("Agent CRUD", () => {
     expect((opts?.headers as Record<string, string>)["X-Api-Key"]).toBe(
       "eliza_testkey",
     );
+    expect(opts?.redirect).toBe("manual");
   });
 
   it("listAgents returns empty array on empty response", async () => {
@@ -232,6 +233,18 @@ describe("sendMessage", () => {
     );
     await expect(client.sendMessage("a1", "Hi")).rejects.toThrow("HTTP 503");
   });
+
+  it("rejects redirect responses", async () => {
+    fetchMock.mockResolvedValue(
+      new Response("", {
+        status: 302,
+        headers: { location: "https://evil.example" },
+      }),
+    );
+    await expect(client.sendMessage("a1", "Hi")).rejects.toThrow("redirected");
+    const lastCall = fetchMock.mock.calls[fetchMock.mock.calls.length - 1];
+    expect(lastCall[1]?.redirect).toBe("manual");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -301,6 +314,21 @@ describe("sendMessageStream", () => {
     const gen = client.sendMessageStream("a1", "Hello");
     await expect(gen.next()).rejects.toThrow("Stream request failed: HTTP 502");
   });
+
+  it("rejects redirect responses", async () => {
+    fetchMock.mockResolvedValue(
+      new Response("", {
+        status: 307,
+        headers: { location: "https://evil.example" },
+      }),
+    );
+
+    const gen = client.sendMessageStream("a1", "Hello");
+    await expect(gen.next()).rejects.toThrow("redirected");
+
+    const lastCall = fetchMock.mock.calls[fetchMock.mock.calls.length - 1];
+    expect(lastCall[1]?.redirect).toBe("manual");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -335,6 +363,21 @@ describe("heartbeat", () => {
     // heartbeat catches fetch errors and returns false
     const alive = await client.heartbeat("a1");
     expect(alive).toBe(false);
+  });
+
+  it("returns false on redirect responses", async () => {
+    fetchMock.mockResolvedValue(
+      new Response("", {
+        status: 302,
+        headers: { location: "https://evil.example" },
+      }),
+    );
+
+    const alive = await client.heartbeat("a1");
+    expect(alive).toBe(false);
+
+    const lastCall = fetchMock.mock.calls[fetchMock.mock.calls.length - 1];
+    expect(lastCall[1]?.redirect).toBe("manual");
   });
 });
 
