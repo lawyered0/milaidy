@@ -204,12 +204,20 @@ function buildHandler(
         const fetchOpts: RequestInit = {
           method: handler.method || "GET",
           headers,
+          redirect: "manual",
         };
         if (body && handler.method !== "GET" && handler.method !== "HEAD") {
           fetchOpts.body = body;
         }
 
         const response = await fetch(url, fetchOpts);
+        if (response.status >= 300 && response.status < 400) {
+          return {
+            ok: false,
+            output:
+              "Blocked: redirects are not allowed for HTTP custom actions",
+          };
+        }
         const text = await response.text();
         return { ok: response.ok, output: text.slice(0, 4000) };
       };

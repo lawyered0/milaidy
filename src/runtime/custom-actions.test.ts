@@ -100,4 +100,29 @@ describe("custom action SSRF guard", () => {
     expect(result.output).toBe("ok");
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
+
+  it("blocks redirect responses and uses manual redirect mode", async () => {
+    vi.mocked(dnsLookup).mockResolvedValue([
+      { address: "93.184.216.34", family: 4 },
+    ]);
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: false,
+      status: 302,
+      statusText: "Found",
+      headers: new Headers({ location: "http://169.254.169.254/latest" }),
+      text: async () => "",
+    } as Response);
+
+    const handler = buildTestHandler(
+      makeHttpAction("https://example.com/redirect"),
+    );
+
+    const result = await handler({});
+    expect(result.ok).toBe(false);
+    expect(result.output).toContain("redirects are not allowed");
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "https://example.com/redirect",
+      expect.objectContaining({ redirect: "manual" }),
+    );
+  });
 });
