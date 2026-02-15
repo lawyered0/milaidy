@@ -1097,6 +1097,13 @@ async function handleQuery(
       "ALTER",
       "TRUNCATE",
       "CREATE",
+      "COPY",
+      "MERGE",
+      "CALL",
+      "DO",
+      "REFRESH",
+      "REINDEX",
+      "VACUUM",
       "GRANT",
       "REVOKE",
     ];
