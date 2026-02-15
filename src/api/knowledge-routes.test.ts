@@ -308,4 +308,33 @@ describe("knowledge routes", () => {
     });
     expect(addKnowledgeMock).toHaveBeenCalledTimes(1);
   });
+
+  test("blocks URL import when fetch responds with redirect", async () => {
+    vi.mocked(dnsLookup).mockResolvedValue([
+      { address: "93.184.216.34", family: 4 },
+    ]);
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: false,
+      status: 302,
+      statusText: "Found",
+      headers: new Headers({ location: "http://169.254.169.254/latest" }),
+      arrayBuffer: async () => new ArrayBuffer(0),
+    } as Response);
+
+    const result = await invoke({
+      method: "POST",
+      pathname: "/api/knowledge/documents/url",
+      body: { url: "https://example.com/redirect" },
+    });
+
+    expect(result.status).toBe(400);
+    expect((result.payload as { error?: string }).error).toContain(
+      "redirects are not allowed",
+    );
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "https://example.com/redirect",
+      expect.objectContaining({ redirect: "manual" }),
+    );
+    expect(addKnowledgeMock).not.toHaveBeenCalled();
+  });
 });

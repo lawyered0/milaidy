@@ -390,11 +390,16 @@ async function fetchUrlContent(
 
   // Regular URL fetch
   const response = await fetch(url, {
+    redirect: "manual",
     headers: {
       "User-Agent":
         "Mozilla/5.0 (compatible; Milaidy/1.0; +https://milaidy.ai)",
     },
   });
+
+  if (response.status >= 300 && response.status < 400) {
+    throw new Error("URL redirects are not allowed");
+  }
 
   if (!response.ok) {
     throw new Error(
@@ -642,8 +647,18 @@ export async function handleKnowledgeRoutes(
     }
 
     // Fetch and process the URL content
-    const { content, contentType, filename } =
-      await fetchUrlContent(urlToFetch);
+    let content: string;
+    let contentType: string;
+    let filename: string;
+    try {
+      ({ content, contentType, filename } = await fetchUrlContent(urlToFetch));
+    } catch (err) {
+      error(
+        res,
+        err instanceof Error ? err.message : "Failed to fetch URL content",
+      );
+      return true;
+    }
 
     const result = await knowledgeService.addKnowledge({
       agentId,
