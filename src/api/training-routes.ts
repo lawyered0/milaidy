@@ -10,6 +10,49 @@ export interface TrainingRouteContext extends RouteRequestContext {
   trainingService: TrainingService;
 }
 
+function normalizeHostLike(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/^\[|\]$/g, "");
+}
+
+function isLoopbackHost(host: string): boolean {
+  const normalized = normalizeHostLike(host);
+  if (!normalized) return false;
+  if (
+    normalized === "localhost" ||
+    normalized === "::1" ||
+    normalized === "::ffff:127.0.0.1"
+  ) {
+    return true;
+  }
+  if (normalized.startsWith("127.")) return true;
+  return false;
+}
+
+function resolveOllamaUrlRejection(rawUrl: string): string | null {
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return null;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return "ollamaUrl must be a valid URL";
+  }
+
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return "ollamaUrl must use http:// or https://";
+  }
+
+  if (!isLoopbackHost(parsed.hostname)) {
+    return "ollamaUrl must target a loopback host (localhost, 127.0.0.1, or ::1)";
+  }
+
+  return null;
+}
+
 export async function handleTrainingRoutes(
   ctx: TrainingRouteContext,
 ): Promise<boolean> {
@@ -169,6 +212,19 @@ export async function handleTrainingRoutes(
       ollamaUrl?: string;
     }>(req, res);
     if (!body) return true;
+
+    if (body.ollamaUrl !== undefined && typeof body.ollamaUrl !== "string") {
+      error(res, "ollamaUrl must be a string", 400);
+      return true;
+    }
+    if (typeof body.ollamaUrl === "string") {
+      const ollamaUrlRejection = resolveOllamaUrlRejection(body.ollamaUrl);
+      if (ollamaUrlRejection) {
+        error(res, ollamaUrlRejection, 400);
+        return true;
+      }
+    }
+
     try {
       const model = await trainingService.importModelToOllama(modelId, body);
       json(res, { model });

@@ -285,6 +285,40 @@ describe("training routes", () => {
     );
   });
 
+  test("rejects non-loopback ollamaUrl to prevent SSRF", async () => {
+    const result = await invoke({
+      method: "POST",
+      pathname: "/api/training/models/model-1/import-ollama",
+      body: {
+        modelName: "milaidy-ft-model",
+        baseModel: "qwen2.5:7b-instruct",
+        ollamaUrl: "http://169.254.169.254:11434",
+      },
+    });
+
+    expect(result.status).toBe(400);
+    expect(result.payload).toMatchObject({
+      error: expect.stringContaining("loopback host"),
+    });
+    expect(trainingService.importModelToOllama).not.toHaveBeenCalled();
+  });
+
+  test("rejects unsupported ollamaUrl protocols", async () => {
+    const result = await invoke({
+      method: "POST",
+      pathname: "/api/training/models/model-1/import-ollama",
+      body: {
+        ollamaUrl: "file:///etc/passwd",
+      },
+    });
+
+    expect(result.status).toBe(400);
+    expect(result.payload).toMatchObject({
+      error: "ollamaUrl must use http:// or https://",
+    });
+    expect(trainingService.importModelToOllama).not.toHaveBeenCalled();
+  });
+
   test("benchmarks model from endpoint", async () => {
     const result = await invoke({
       method: "POST",
