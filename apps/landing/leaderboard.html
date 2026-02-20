@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>milAIdy — Contributor Leaderboard</title>
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="Real-time leaderboard of contributors to the milAIdy repository.">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body { height: 100%; }
+
+    body {
+      font: 400 14px/1.65 "Hiragino Kaku Gothic Pro", Osaka, Meiryo, "MS PGothic", arial, helvetica, clean, sans-serif;
+      background-image: linear-gradient(#d9f0d6, #f4ffee, #f4ffee, white, white);
+      background-attachment: fixed;
+      color: #2f4d0c;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    ::selection { background: #b9d9b7; color: #2f4d0c; }
+
+    a { color: #2f4d0c; text-decoration: underline; }
+    a:hover { color: #5a7a3a; }
+
+    /* Header */
+    .header {
+      background: #2f4d0c;
+      color: #fff;
+      padding: 0 1em;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 42px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-logo {
+      font-weight: 700;
+      font-size: 16px;
+      letter-spacing: 0.02em;
+      text-decoration: none;
+      color: #fff;
+    }
+    .header nav { display: flex; gap: 1.2em; align-items: center; }
+    .header nav a { color: #fff; text-decoration: none; font-size: 13px; }
+    .header nav a:hover { color: #b9d9b7; }
+    .header nav a.active { color: #b9d9b7; font-weight: 700; }
+
+    /* Live indicator */
+    .live-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background: #4ade80;
+      border-radius: 50%;
+      margin-right: 5px;
+      animation: pulse 2s ease-in-out infinite;
+      vertical-align: middle;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.8); }
+    }
+
+    /* Main container */
+    .container {
+      max-width: 56em;
+      margin: 0 auto;
+      padding: 1.5em 1em 3em;
+    }
+
+    /* Page title row */
+    .page-title-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 1.2em;
+      flex-wrap: wrap;
+      gap: 0.5em;
+    }
+    .page-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #2f4d0c;
+    }
+    .page-subtitle {
+      font-size: 12px;
+      color: #5a7a3a;
+    }
+
+    /* Status bar */
+    .status-bar {
+      border: 1px solid #2f4d0c;
+      background: #2f4d0c;
+      color: #b9d9b7;
+      padding: 5px 10px;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.2em;
+      flex-wrap: wrap;
+      gap: 0.5em;
+    }
+    .status-bar .status-left { display: flex; align-items: center; gap: 1em; }
+    .status-bar .repo-link { color: #b9d9b7; text-decoration: underline; }
+    .status-bar .repo-link:hover { color: #fff; }
+    .refresh-btn {
+      background: none;
+      border: 1px solid #b9d9b7;
+      color: #b9d9b7;
+      padding: 2px 10px;
+      font-size: 11px;
+      cursor: pointer;
+      font-family: inherit;
+      letter-spacing: 0.05em;
+    }
+    .refresh-btn:hover { background: #b9d9b7; color: #2f4d0c; }
+    .refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Summary stats */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 1em;
+      margin-bottom: 1.2em;
+    }
+    .stat-box {
+      border: 1px solid #2f4d0c;
+      background: #fff;
+    }
+    .stat-box-header {
+      background: #b9d9b7;
+      color: #2f4d0c;
+      padding: 3px 8px;
+      font-weight: 700;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .stat-box-value {
+      padding: 8px;
+      font-size: 22px;
+      font-weight: 700;
+      color: #2f4d0c;
+      font-variant-numeric: tabular-nums;
+    }
+    .stat-box-label {
+      padding: 0 8px 8px;
+      font-size: 11px;
+      color: #5a7a3a;
+    }
+
+    /* Main leaderboard box */
+    .box {
+      border: 1px solid #2f4d0c;
+      background: #fff;
+      margin-bottom: 1.5em;
+    }
+    .box-header {
+      background: #b9d9b7;
+      color: #2f4d0c;
+      padding: 4px 8px;
+      font-weight: 700;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .box-header-dark {
+      background: #2f4d0c;
+      color: #fff;
+      padding: 4px 8px;
+      font-weight: 700;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* Leaderboard table */
+    .lb-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .lb-table th {
+      background: #f4ffee;
+      border: 1px solid #2f4d0c;
+      padding: 5px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      text-align: left;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #5a7a3a;
+    }
+    .lb-table th.right { text-align: right; }
+    .lb-table td {
+      border: 1px solid #d9f0d6;
+      padding: 0;
+      vertical-align: middle;
+    }
+    .lb-table tr:hover td { background: #f4ffee; }
+    .lb-table tr.top1 td { background: #fffbeb; }
+    .lb-table tr.top1:hover td { background: #fef3c7; }
+    .lb-table tr.top2 td { background: #f0fdf4; }
+    .lb-table tr.top3 td { background: #f8fff5; }
+
+    /* Row inner */
+    .row-inner {
+      display: flex;
+      align-items: center;
+      padding: 8px 10px;
+      gap: 10px;
+    }
+    .row-inner.right {
+      justify-content: flex-end;
+      padding: 8px 10px;
+    }
+    .row-inner.center {
+      justify-content: center;
+      padding: 8px 10px;
+    }
+
+    /* Rank badge */
+    .rank {
+      font-weight: 700;
+      font-size: 13px;
+      min-width: 28px;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+    .rank-1 { color: #b45309; font-size: 15px; }
+    .rank-2 { color: #6b7280; font-size: 14px; }
+    .rank-3 { color: #92400e; font-size: 14px; }
+    .rank-medal {
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    /* Avatar */
+    .avatar {
+      width: 32px;
+      height: 32px;
+      border: 1px solid #2f4d0c;
+      border-radius: 0;
+      object-fit: cover;
+      flex-shrink: 0;
+      background: #f4ffee;
+    }
+    .avatar-placeholder {
+      width: 32px;
+      height: 32px;
+      border: 1px solid #2f4d0c;
+      background: #b9d9b7;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 700;
+      color: #2f4d0c;
+    }
+
+    /* Username */
+    .username {
+      font-weight: 700;
+      font-size: 13px;
+      color: #2f4d0c;
+      text-decoration: none;
+    }
+    .username:hover { text-decoration: underline; color: #5a7a3a; }
+    .user-type {
+      font-size: 10px;
+      color: #5a7a3a;
+      background: #d9f0d6;
+      border: 1px solid #b9d9b7;
+      padding: 0 4px;
+      margin-left: 5px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      vertical-align: middle;
+    }
+
+    /* Numbers */
+    .commits-count {
+      font-weight: 700;
+      font-size: 14px;
+      color: #2f4d0c;
+      font-variant-numeric: tabular-nums;
+    }
+    .commits-label {
+      font-size: 10px;
+      color: #5a7a3a;
+    }
+
+    /* Bar chart cell */
+    .bar-cell {
+      padding: 8px 10px;
+      min-width: 100px;
+    }
+    .bar-track {
+      height: 8px;
+      background: #d9f0d6;
+      border: 1px solid #b9d9b7;
+      position: relative;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      background: #2f4d0c;
+      transition: width 0.6s ease;
+    }
+    .bar-fill.gold { background: #b45309; }
+    .bar-fill.silver { background: #9ca3af; }
+    .bar-fill.bronze { background: #92400e; }
+
+    /* Loading / error states */
+    .state-box {
+      padding: 3em 1em;
+      text-align: center;
+      color: #5a7a3a;
+      font-size: 13px;
+    }
+    .state-box .spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid #b9d9b7;
+      border-top-color: #2f4d0c;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 0.8em;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .state-box .error-icon { font-size: 24px; margin-bottom: 0.5em; }
+    .retry-link {
+      color: #2f4d0c;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: underline;
+      background: none;
+      border: none;
+      font-family: inherit;
+      font-size: 13px;
+      padding: 0;
+    }
+
+    /* Pagination */
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 10px;
+      border-top: 1px solid #d9f0d6;
+      font-size: 12px;
+      color: #5a7a3a;
+    }
+    .page-btns { display: flex; gap: 4px; }
+    .page-btn {
+      border: 1px solid #2f4d0c;
+      background: #fff;
+      color: #2f4d0c;
+      padding: 2px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .page-btn:hover:not(:disabled) { background: #2f4d0c; color: #fff; }
+    .page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Ticker */
+    .ticker {
+      border: 1px solid #2f4d0c;
+      background: #2f4d0c;
+      color: #b9d9b7;
+      font-size: 11px;
+      padding: 4px 0;
+      overflow: hidden;
+      white-space: nowrap;
+      margin-bottom: 1.2em;
+      position: relative;
+    }
+    .ticker-inner {
+      display: inline-block;
+      animation: ticker 30s linear infinite;
+      padding-left: 100%;
+    }
+    @keyframes ticker {
+      from { transform: translateX(0); }
+      to { transform: translateX(-100%); }
+    }
+    .ticker-item { margin-right: 3em; }
+    .ticker-sep { margin-right: 3em; opacity: 0.4; }
+
+    /* Next refresh countdown */
+    .next-refresh {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Footer */
+    .footer {
+      background: #2f4d0c;
+      color: #fff;
+      text-align: center;
+      padding: 0.8em 1em;
+      font-size: 12px;
+    }
+    .footer a { color: #b9d9b7; }
+    .footer a:hover { color: #fff; }
+
+    /* Responsive */
+    @media (max-width: 600px) {
+      .lb-table .hide-sm { display: none; }
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+      .page-title { font-size: 16px; }
+    }
+
+    /* Row entrance animation */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .lb-row-animate {
+      animation: fadeIn 0.3s ease forwards;
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <a class="header-logo" href="index.html">milaidy</a>
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="leaderboard.html" class="active"><span class="live-dot"></span>Leaderboard</a>
+    <a href="https://github.com/milady-ai/milaidy" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://discord.gg/milady" target="_blank" rel="noopener">Discord</a>
+  </nav>
+</div>
+
+<div class="container">
+
+  <div class="page-title-row">
+    <div>
+      <div class="page-title"><span class="live-dot"></span> Contributor Leaderboard</div>
+      <div class="page-subtitle">Real-time rankings from the GitHub API &middot; auto-refreshes every 60s</div>
+    </div>
+  </div>
+
+  <!-- Ticker -->
+  <div class="ticker" id="ticker">
+    <span class="ticker-inner" id="ticker-inner">Loading contributor data&hellip;</span>
+  </div>
+
+  <!-- Status bar -->
+  <div class="status-bar">
+    <div class="status-left">
+      <span>Repo: <a class="repo-link" href="https://github.com/milady-ai/milaidy" target="_blank" rel="noopener">milady-ai/milaidy</a></span>
+      <span id="last-updated">Fetching&hellip;</span>
+      <span>Next refresh: <span class="next-refresh" id="countdown">60s</span></span>
+    </div>
+    <button class="refresh-btn" id="refresh-btn" onclick="manualRefresh()">&#8635; Refresh</button>
+  </div>
+
+  <!-- Summary stats -->
+  <div class="stats-row" id="stats-row">
+    <div class="stat-box">
+      <div class="stat-box-header">Contributors</div>
+      <div class="stat-box-value" id="stat-contributors">&mdash;</div>
+      <div class="stat-box-label">total unique</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-box-header">Total Commits</div>
+      <div class="stat-box-value" id="stat-commits">&mdash;</div>
+      <div class="stat-box-label">across all contributors</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-box-header">Top Contributor</div>
+      <div class="stat-box-value" id="stat-top" style="font-size:14px; padding-top:10px;">&mdash;</div>
+      <div class="stat-box-label">&nbsp;</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-box-header">Most Active</div>
+      <div class="stat-box-value" id="stat-topcount">&mdash;</div>
+      <div class="stat-box-label">commits by #1</div>
+    </div>
+  </div>
+
+  <!-- Leaderboard box -->
+  <div class="box">
+    <div class="box-header-dark">
+      <span>&#9670; Contributor Rankings</span>
+      <span id="page-info" style="font-size:11px;font-weight:400;color:#b9d9b7;"></span>
+    </div>
+    <div id="leaderboard-body">
+      <div class="state-box">
+        <div class="spinner"></div><br>
+        Loading contributor data&hellip;
+      </div>
+    </div>
+    <div class="pagination" id="pagination" style="display:none;">
+      <span id="pagination-info"></span>
+      <div class="page-btns">
+        <button class="page-btn" id="btn-prev" onclick="changePage(-1)">&#8592; Prev</button>
+        <button class="page-btn" id="btn-next" onclick="changePage(1)">Next &#8594;</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- About box -->
+  <div class="box">
+    <div class="box-header">About This Leaderboard</div>
+    <div class="box-body" style="padding:1em; font-size:13px; color:#5a7a3a; line-height:1.7;">
+      <p>Rankings are based on total commit count pulled directly from the
+      <a href="https://docs.github.com/en/rest/repos/repos#list-repository-contributors" target="_blank" rel="noopener">GitHub Contributors API</a>.
+      Data refreshes automatically every 60 seconds.</p>
+      <p style="margin-top:0.6em;">
+        Want to climb the board? Check out
+        <a href="https://github.com/milady-ai/milaidy/blob/main/AGENTS.md" target="_blank" rel="noopener">AGENTS.md</a>
+        for contribution guidelines, then open a PR on
+        <a href="https://github.com/milady-ai/milaidy" target="_blank" rel="noopener">GitHub</a>.
+      </p>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  &copy; 2025 Milaidy &middot;
+  <a href="https://github.com/milady-ai/milaidy">GitHub</a> &middot;
+  <a href="https://github.com/milady-ai/milaidy/blob/main/LICENSE">MIT License</a>
+</div>
+
+<script>
+  const REPO = 'milady-ai/milaidy';
+  const API_BASE = 'https://api.github.com';
+  const PER_PAGE = 20;
+  const REFRESH_INTERVAL = 60; // seconds
+
+  let allContributors = [];
+  let currentPage = 1;
+  let countdownValue = REFRESH_INTERVAL;
+  let countdownTimer = null;
+  let refreshTimer = null;
+  let isLoading = false;
+
+  // ── Medal helpers ─────────────────────────────────────────────
+  function medal(rank) {
+    if (rank === 1) return '🥇';
+    if (rank === 2) return '🥈';
+    if (rank === 3) return '🥉';
+    return null;
+  }
+
+  function rankClass(rank) {
+    if (rank === 1) return 'top1';
+    if (rank === 2) return 'top2';
+    if (rank === 3) return 'top3';
+    return '';
+  }
+
+  function barClass(rank) {
+    if (rank === 1) return 'gold';
+    if (rank === 2) return 'silver';
+    if (rank === 3) return 'bronze';
+    return '';
+  }
+
+  // ── Fetch contributors ────────────────────────────────────────
+  async function fetchContributors() {
+    const results = [];
+    let page = 1;
+    while (true) {
+      const url = `${API_BASE}/repos/${REPO}/contributors?per_page=100&page=${page}&anon=false`;
+      const res = await fetch(url, {
+        headers: { Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }
+      });
+      if (!res.ok) {
+        if (res.status === 403) throw new Error('GitHub API rate limit exceeded. Try again in a minute.');
+        if (res.status === 404) throw new Error(`Repository "${REPO}" not found.`);
+        throw new Error(`GitHub API error: ${res.status}`);
+      }
+      const data = await res.json();
+      if (!Array.isArray(data) || data.length === 0) break;
+      results.push(...data);
+      // GitHub paginates at 100; if we got fewer we're done
+      if (data.length < 100) break;
+      page++;
+    }
+    return results;
+  }
+
+  // ── Format number with commas ─────────────────────────────────
+  function fmt(n) { return n.toLocaleString(); }
+
+  // ── Update ticker ─────────────────────────────────────────────
+  function updateTicker(contributors) {
+    if (!contributors.length) return;
+    const items = contributors.slice(0, 10).map((c, i) => {
+      const m = medal(i + 1);
+      return `<span class="ticker-item">${m ? m + ' ' : '#' + (i+1) + ' '}<strong>${c.login}</strong> &mdash; ${fmt(c.contributions)} commits</span><span class="ticker-sep">|</span>`;
+    }).join('');
+    // Duplicate for seamless loop
+    document.getElementById('ticker-inner').innerHTML = items + items;
+  }
+
+  // ── Render summary stats ──────────────────────────────────────
+  function renderStats(contributors) {
+    document.getElementById('stat-contributors').textContent = fmt(contributors.length);
+    const total = contributors.reduce((s, c) => s + c.contributions, 0);
+    document.getElementById('stat-commits').textContent = fmt(total);
+    if (contributors.length > 0) {
+      document.getElementById('stat-top').textContent = contributors[0].login;
+      document.getElementById('stat-topcount').textContent = fmt(contributors[0].contributions);
+    }
+  }
+
+  // ── Render leaderboard table ──────────────────────────────────
+  function renderLeaderboard() {
+    const body = document.getElementById('leaderboard-body');
+    const totalPages = Math.ceil(allContributors.length / PER_PAGE);
+    const start = (currentPage - 1) * PER_PAGE;
+    const slice = allContributors.slice(start, start + PER_PAGE);
+    const maxCommits = allContributors[0]?.contributions || 1;
+
+    if (slice.length === 0) {
+      body.innerHTML = '<div class="state-box"><div class="error-icon">😶</div><br>No contributors found.</div>';
+      return;
+    }
+
+    let html = `
+      <table class="lb-table">
+        <thead>
+          <tr>
+            <th style="width:50px;">Rank</th>
+            <th>Contributor</th>
+            <th class="right hide-sm">Commits</th>
+            <th class="hide-sm">Activity</th>
+            <th class="right hide-sm">Profile</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    slice.forEach((c, i) => {
+      const rank = start + i + 1;
+      const m = medal(rank);
+      const pct = Math.round((c.contributions / maxCommits) * 100);
+      const rc = rankClass(rank);
+      const bc = barClass(rank);
+      const delay = i * 40;
+
+      html += `
+        <tr class="${rc} lb-row-animate" style="animation-delay:${delay}ms">
+          <td>
+            <div class="row-inner center">
+              ${m
+                ? `<span class="rank-medal" title="#${rank}">${m}</span>`
+                : `<span class="rank">#${rank}</span>`
+              }
+            </div>
+          </td>
+          <td>
+            <div class="row-inner">
+              <img class="avatar" src="${c.avatar_url}&s=64" alt="${c.login}"
+                   onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+              <div class="avatar-placeholder" style="display:none;">${c.login[0].toUpperCase()}</div>
+              <div>
+                <a class="username" href="${c.html_url}" target="_blank" rel="noopener">${c.login}</a>
+                ${c.type === 'Bot' ? '<span class="user-type">bot</span>' : ''}
+              </div>
+            </div>
+          </td>
+          <td class="hide-sm">
+            <div class="row-inner right">
+              <div>
+                <div class="commits-count">${fmt(c.contributions)}</div>
+                <div class="commits-label">commits</div>
+              </div>
+            </div>
+          </td>
+          <td class="hide-sm">
+            <div class="bar-cell">
+              <div class="bar-track">
+                <div class="bar-fill ${bc}" style="width:${pct}%"></div>
+              </div>
+            </div>
+          </td>
+          <td class="hide-sm">
+            <div class="row-inner right">
+              <a href="${c.html_url}" target="_blank" rel="noopener"
+                 style="font-size:11px;color:#5a7a3a;text-decoration:none;border:1px solid #2f4d0c;padding:2px 7px;white-space:nowrap;">
+                View &#8599;
+              </a>
+            </div>
+          </td>
+        </tr>
+      `;
+    });
+
+    html += '</tbody></table>';
+    body.innerHTML = html;
+
+    // Pagination
+    document.getElementById('page-info').textContent =
+      `Page ${currentPage} / ${totalPages}`;
+    document.getElementById('pagination-info').textContent =
+      `Showing ${start + 1}–${Math.min(start + PER_PAGE, allContributors.length)} of ${fmt(allContributors.length)} contributors`;
+
+    const pagination = document.getElementById('pagination');
+    pagination.style.display = totalPages > 1 ? 'flex' : 'none';
+    document.getElementById('btn-prev').disabled = currentPage <= 1;
+    document.getElementById('btn-next').disabled = currentPage >= totalPages;
+  }
+
+  // ── Load data ─────────────────────────────────────────────────
+  async function loadData(showSpinner = true) {
+    if (isLoading) return;
+    isLoading = true;
+
+    const btn = document.getElementById('refresh-btn');
+    btn.disabled = true;
+
+    if (showSpinner) {
+      document.getElementById('leaderboard-body').innerHTML = `
+        <div class="state-box">
+          <div class="spinner"></div><br>
+          Loading contributor data&hellip;
+        </div>`;
+    }
+
+    try {
+      const contributors = await fetchContributors();
+      allContributors = contributors.sort((a, b) => b.contributions - a.contributions);
+
+      renderStats(allContributors);
+      renderLeaderboard();
+      updateTicker(allContributors);
+
+      const now = new Date();
+      document.getElementById('last-updated').textContent =
+        `Updated: ${now.toLocaleTimeString()}`;
+
+    } catch (err) {
+      document.getElementById('leaderboard-body').innerHTML = `
+        <div class="state-box">
+          <div class="error-icon">&#9888;</div><br>
+          <strong>Failed to load data</strong><br><br>
+          ${escHtml(err.message)}<br><br>
+          <button class="retry-link" onclick="loadData()">Retry</button>
+        </div>`;
+      document.getElementById('last-updated').textContent = 'Failed to load';
+    } finally {
+      isLoading = false;
+      btn.disabled = false;
+      resetCountdown();
+    }
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ── Countdown ─────────────────────────────────────────────────
+  function resetCountdown() {
+    countdownValue = REFRESH_INTERVAL;
+    clearInterval(countdownTimer);
+    clearTimeout(refreshTimer);
+    document.getElementById('countdown').textContent = `${countdownValue}s`;
+    countdownTimer = setInterval(() => {
+      countdownValue--;
+      document.getElementById('countdown').textContent = `${countdownValue}s`;
+      if (countdownValue <= 0) {
+        clearInterval(countdownTimer);
+      }
+    }, 1000);
+    refreshTimer = setTimeout(() => loadData(false), REFRESH_INTERVAL * 1000);
+  }
+
+  // ── Manual refresh ────────────────────────────────────────────
+  function manualRefresh() {
+    clearInterval(countdownTimer);
+    clearTimeout(refreshTimer);
+    loadData(false);
+  }
+
+  // ── Pagination ────────────────────────────────────────────────
+  function changePage(delta) {
+    const totalPages = Math.ceil(allContributors.length / PER_PAGE);
+    const next = currentPage + delta;
+    if (next < 1 || next > totalPages) return;
+    currentPage = next;
+    renderLeaderboard();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // ── Boot ──────────────────────────────────────────────────────
+  loadData();
+</script>
+
+</body>
+</html>
