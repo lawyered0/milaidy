@@ -236,6 +236,16 @@ describe("applyPluginAutoEnable — env vars", () => {
     expect(changes.some((c) => c.includes("REPOPROMPT_CLI_PATH"))).toBe(true);
   });
 
+  it("enables moltbook plugin when MOLTBOOK_API_KEY is set", () => {
+    const params = makeParams({
+      env: { MOLTBOOK_API_KEY: "moltbook_test_key" },
+    });
+    const { config, changes } = applyPluginAutoEnable(params);
+
+    expect(config.plugins?.allow).toContain("moltbook");
+    expect(changes.some((c) => c.includes("MOLTBOOK_API_KEY"))).toBe(true);
+  });
+
   it("enables pi-ai plugin when MILAIDY_USE_PI_AI is set", () => {
     const params = makeParams({
       env: { MILAIDY_USE_PI_AI: "1" },
@@ -368,6 +378,16 @@ describe("applyPluginAutoEnable — features", () => {
 
     expect(config.plugins?.allow).toContain("repoprompt");
     expect(changes.some((c) => c.includes("feature: repoprompt"))).toBe(true);
+  });
+
+  it("enables moltbook plugin when feature flag is enabled", () => {
+    const params = makeParams({
+      config: { features: { moltbook: true } },
+    });
+    const { config, changes } = applyPluginAutoEnable(params);
+
+    expect(config.plugins?.allow).toContain("moltbook");
+    expect(changes.some((c) => c.includes("feature: moltbook"))).toBe(true);
   });
 
   it("enables plugin when feature is an object with enabled not false", () => {
@@ -590,6 +610,12 @@ describe("AUTH_PROVIDER_PLUGINS", () => {
   it("maps CUA env keys to cua plugin", () => {
     expect(AUTH_PROVIDER_PLUGINS.CUA_API_KEY).toBe("@elizaos/plugin-cua");
     expect(AUTH_PROVIDER_PLUGINS.CUA_HOST).toBe("@elizaos/plugin-cua");
+  });
+
+  it("maps MOLTBOOK_API_KEY to moltbook plugin", () => {
+    expect(AUTH_PROVIDER_PLUGINS.MOLTBOOK_API_KEY).toBe(
+      "@elizaos/plugin-moltbook",
+    );
   });
 });
 

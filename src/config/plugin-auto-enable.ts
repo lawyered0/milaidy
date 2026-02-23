@@ -80,6 +80,7 @@ export const AUTH_PROVIDER_PLUGINS: Record<string, string> = {
   OBSIDIAN_VAULT_PATH: "@elizaos/plugin-obsidian",
   OBSIDAN_VAULT_PATH: "@elizaos/plugin-obsidian",
   REPOPROMPT_CLI_PATH: "@elizaos/plugin-repoprompt",
+  MOLTBOOK_API_KEY: "@elizaos/plugin-moltbook",
 };
 
 const FEATURE_PLUGINS: Record<string, string> = {
@@ -107,6 +108,7 @@ const FEATURE_PLUGINS: Record<string, string> = {
   vision: "@elizaos/plugin-vision",
   computeruse: "@elizaos/plugin-computeruse",
   repoprompt: "@elizaos/plugin-repoprompt",
+  moltbook: "@elizaos/plugin-moltbook",
 };
 
 function isConnectorConfigured(

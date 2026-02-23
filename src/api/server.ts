@@ -112,6 +112,7 @@ import {
   sweepExpiredEntries,
 } from "./memory-bounds";
 import { handleModelsRoutes } from "./models-routes";
+import { handleMoltbookRoutes } from "./moltbook-routes";
 import { handlePermissionRoutes } from "./permissions-routes";
 import {
   type PluginParamInfo,
@@ -10680,6 +10681,22 @@ async function handleRequest(
       );
       if (handled) return;
     }
+  }
+
+  // ── Moltbook API (/api/moltbook/*) ────────────────────────────────────
+  if (
+    await handleMoltbookRoutes({
+      req,
+      res,
+      method,
+      pathname,
+      runtime: state.runtime,
+      readJsonBody,
+      json,
+      error,
+    })
+  ) {
+    return;
   }
 
   // ── Coding Agent API (/api/coding-agents/*, /api/workspace/*, /api/issues/*) ──

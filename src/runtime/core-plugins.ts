@@ -34,6 +34,7 @@ export const OPTIONAL_CORE_PLUGINS: readonly string[] = [
   // "@elizaos/plugin-cli", // CLI interface
   "@elizaos/plugin-code", // code writing and file operations
   "@elizaos/plugin-repoprompt", // RepoPrompt CLI integration and workflow orchestration
+  "@elizaos/plugin-moltbook", // Moltbook social network integration and onboarding
   // "@elizaos/plugin-edge-tts", // text-to-speech
   // "@elizaos/plugin-mcp", // MCP protocol support
   // "@elizaos/plugin-computeruse", // computer use automation
