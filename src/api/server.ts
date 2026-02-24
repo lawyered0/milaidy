@@ -1702,6 +1702,7 @@ const MAX_BODY_BYTES = 1_048_576;
 const CHAT_MAX_BODY_BYTES = 20 * 1_048_576;
 const ELEVENLABS_FETCH_TIMEOUT_MS = 20_000;
 const ELEVENLABS_AUDIO_MAX_BYTES = 20 * 1_048_576;
+const ELEVENLABS_ERROR_BODY_MAX_BYTES = 64 * 1_024;
 
 type StreamableServerResponse = Pick<
   http.ServerResponse,
@@ -1896,6 +1897,88 @@ export async function streamResponseBodyWithByteLimit(
   }
 
   return totalBytes;
+}
+
+/**
+ * Read a web Response body as text while enforcing strict size and timeout limits.
+ */
+export async function readResponseTextWithByteLimit(
+  upstream: Response,
+  maxBytes: number,
+  timeoutMs?: number,
+): Promise<string> {
+  const declaredLength = responseContentLength(upstream.headers);
+  if (declaredLength !== null && declaredLength > maxBytes) {
+    throw new Error(
+      `Upstream response exceeds maximum size of ${maxBytes} bytes`,
+    );
+  }
+
+  if (!upstream.body) {
+    const bytes = new Uint8Array(await upstream.arrayBuffer());
+    if (bytes.byteLength > maxBytes) {
+      throw new Error(
+        `Upstream response exceeds maximum size of ${maxBytes} bytes`,
+      );
+    }
+    return new TextDecoder().decode(bytes);
+  }
+
+  const reader = upstream.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  let streamTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
+  const streamTimeoutPromise =
+    typeof timeoutMs === "number" && timeoutMs > 0
+      ? new Promise<never>((_resolve, reject) => {
+          streamTimeoutHandle = setTimeout(() => {
+            reject(
+              createTimeoutError(
+                `Upstream response body timed out after ${timeoutMs}ms`,
+              ),
+            );
+          }, timeoutMs);
+        })
+      : null;
+
+  try {
+    while (true) {
+      const { done, value } = streamTimeoutPromise
+        ? await Promise.race([reader.read(), streamTimeoutPromise])
+        : await reader.read();
+      if (done) break;
+      if (!value || value.byteLength === 0) continue;
+
+      totalBytes += value.byteLength;
+      if (totalBytes > maxBytes) {
+        throw new Error(
+          `Upstream response exceeds maximum size of ${maxBytes} bytes`,
+        );
+      }
+
+      chunks.push(value);
+    }
+  } catch (err) {
+    try {
+      await reader.cancel(err);
+    } catch {
+      // Best effort cleanup; keep original error.
+    }
+    throw err;
+  } finally {
+    if (streamTimeoutHandle !== null) {
+      clearTimeout(streamTimeoutHandle);
+    }
+    reader.releaseLock();
+  }
+
+  const output = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    output.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(output);
 }
 
 /**
@@ -9248,10 +9331,15 @@ async function handleRequest(
       );
 
       if (!upstream.ok) {
-        const upstreamBody = await upstream.text().catch(() => "");
+        const upstreamBody = await readResponseTextWithByteLimit(
+          upstream,
+          ELEVENLABS_ERROR_BODY_MAX_BYTES,
+          ELEVENLABS_FETCH_TIMEOUT_MS,
+        );
+        const upstreamSummary = upstreamBody.trim().slice(0, 240);
         error(
           res,
-          `ElevenLabs request failed (${upstream.status}): ${upstreamBody.slice(0, 240)}`,
+          `ElevenLabs request failed (${upstream.status})${upstreamSummary ? `: ${upstreamSummary}` : ""}`,
           upstream.status === 429 ? 429 : 502,
         );
         return;

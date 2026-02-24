@@ -2,6 +2,7 @@ import { EventEmitter } from "node:events";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   fetchWithTimeoutGuard,
+  readResponseTextWithByteLimit,
   streamResponseBodyWithByteLimit,
 } from "./server";
 
@@ -143,6 +144,51 @@ describe("ElevenLabs proxy guards", () => {
       1024,
       250,
     );
+    vi.advanceTimersByTime(250);
+
+    await expect(pending).rejects.toMatchObject({
+      message: "Upstream response body timed out after 250ms",
+      name: "TimeoutError",
+    });
+  });
+
+  it("rejects oversized upstream error text when content-length is too large", async () => {
+    const response = new Response("too large", {
+      headers: { "content-length": "11" },
+    });
+
+    await expect(readResponseTextWithByteLimit(response, 10)).rejects.toThrow(
+      "Upstream response exceeds maximum size of 10 bytes",
+    );
+  });
+
+  it("rejects oversized upstream error text when streamed body exceeds limit", async () => {
+    const response = new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new Uint8Array(8));
+          controller.enqueue(new Uint8Array(8));
+          controller.close();
+        },
+      }),
+    );
+
+    await expect(readResponseTextWithByteLimit(response, 10)).rejects.toThrow(
+      "Upstream response exceeds maximum size of 10 bytes",
+    );
+  });
+
+  it("times out stalled upstream error body reads", async () => {
+    vi.useFakeTimers();
+    const response = new Response(
+      new ReadableStream<Uint8Array>({
+        start() {
+          // Intentionally stall without enqueueing or closing.
+        },
+      }),
+    );
+
+    const pending = readResponseTextWithByteLimit(response, 1024, 250);
     vi.advanceTimersByTime(250);
 
     await expect(pending).rejects.toMatchObject({
