@@ -603,6 +603,27 @@ describe("knowledge routes", () => {
     expect(addKnowledgeMock).not.toHaveBeenCalled();
   });
 
+  test("blocks URL import when DNS resolution changes before fetch", async () => {
+    vi.spyOn(dns, "lookup")
+      .mockResolvedValueOnce([{ address: "93.184.216.34", family: 4 }])
+      .mockResolvedValueOnce([{ address: "127.0.0.1", family: 4 }]);
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+    const result = await invoke({
+      method: "POST",
+      pathname: "/api/knowledge/documents/url",
+      body: { url: "https://example.com/rebind" },
+    });
+
+    expect(result.status).toBe(400);
+    expect((result.payload as { error?: string }).error).toContain(
+      "resolution changed before fetch",
+    );
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(addKnowledgeMock).not.toHaveBeenCalled();
+  });
+
   test("allows URL import for public hosts", async () => {
     vi.spyOn(dns, "lookup").mockResolvedValue([
       { address: "93.184.216.34", family: 4 },

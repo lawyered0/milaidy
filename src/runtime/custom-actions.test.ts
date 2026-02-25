@@ -146,6 +146,22 @@ describe("custom action SSRF guard", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
+  it("blocks HTTP handlers when host resolution changes before fetch", async () => {
+    vi.mocked(dnsLookup)
+      .mockResolvedValueOnce([{ address: "93.184.216.34", family: 4 }])
+      .mockResolvedValueOnce([{ address: "127.0.0.1", family: 4 }]);
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const handler = buildTestHandler(
+      makeHttpAction("https://example.com/rebind"),
+    );
+
+    const result = await handler({});
+    expect(result.ok).toBe(false);
+    expect(result.output).toContain("resolution changed before request");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it("blocks redirect responses and uses manual redirect mode", async () => {
     vi.mocked(dnsLookup).mockResolvedValue([
       { address: "93.184.216.34", family: 4 },

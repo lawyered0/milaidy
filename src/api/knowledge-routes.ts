@@ -242,30 +242,53 @@ function isBlockedIp(ip: string): boolean {
   return isBlockedPrivateOrLinkLocalIp(ip);
 }
 
-async function resolveUrlSafetyRejection(url: string): Promise<string | null> {
+type ResolvedUrlTarget = {
+  hostname: string;
+  pinnedAddress: string | null;
+};
+
+async function resolveSafeUrlTarget(url: string): Promise<{
+  rejection: string | null;
+  target: ResolvedUrlTarget | null;
+}> {
   let parsed: URL;
   try {
     parsed = new URL(url);
   } catch {
-    return "Invalid URL format";
+    return { rejection: "Invalid URL format", target: null };
   }
 
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    return "Only http:// and https:// URLs are allowed";
+    return {
+      rejection: "Only http:// and https:// URLs are allowed",
+      target: null,
+    };
   }
 
   const hostname = normalizeHostLike(parsed.hostname);
-  if (!hostname) return "URL hostname is required";
+  if (!hostname) return { rejection: "URL hostname is required", target: null };
 
   if (BLOCKED_HOST_LITERALS.has(hostname)) {
-    return `URL host "${hostname}" is blocked for security reasons`;
+    return {
+      rejection: `URL host "${hostname}" is blocked for security reasons`,
+      target: null,
+    };
   }
 
   if (net.isIP(hostname)) {
     if (isBlockedIp(hostname)) {
-      return `URL host "${hostname}" is blocked for security reasons`;
+      return {
+        rejection: `URL host "${hostname}" is blocked for security reasons`,
+        target: null,
+      };
     }
-    return null;
+    return {
+      rejection: null,
+      target: {
+        hostname,
+        pinnedAddress: hostname,
+      },
+    };
   }
 
   let addresses: Array<{ address: string }>;
@@ -273,19 +296,87 @@ async function resolveUrlSafetyRejection(url: string): Promise<string | null> {
     const resolved = await dnsLookup(hostname, { all: true });
     addresses = Array.isArray(resolved) ? resolved : [resolved];
   } catch {
-    return `Could not resolve URL host "${hostname}"`;
+    return {
+      rejection: `Could not resolve URL host "${hostname}"`,
+      target: null,
+    };
   }
 
   if (addresses.length === 0) {
-    return `Could not resolve URL host "${hostname}"`;
+    return {
+      rejection: `Could not resolve URL host "${hostname}"`,
+      target: null,
+    };
   }
   for (const entry of addresses) {
     if (isBlockedIp(entry.address)) {
-      return `URL host "${hostname}" resolves to blocked address ${entry.address}`;
+      return {
+        rejection: `URL host "${hostname}" resolves to blocked address ${entry.address}`,
+        target: null,
+      };
+    }
+  }
+
+  return {
+    rejection: null,
+    target: {
+      hostname,
+      pinnedAddress: addresses[0]?.address ?? null,
+    },
+  };
+}
+
+async function resolveDnsRebindingRejection(
+  target: ResolvedUrlTarget,
+): Promise<string | null> {
+  if (!target.pinnedAddress || net.isIP(target.hostname)) {
+    return null;
+  }
+
+  let refreshed: Array<{ address: string }>;
+  try {
+    const resolved = await dnsLookup(target.hostname, { all: true });
+    refreshed = Array.isArray(resolved) ? resolved : [resolved];
+  } catch {
+    return `Could not resolve URL host "${target.hostname}"`;
+  }
+
+  const refreshedAddresses = new Set(
+    refreshed
+      .map((entry) => normalizeHostLike(entry.address))
+      .filter((address): address is string => Boolean(address)),
+  );
+
+  const normalizedPinned = normalizeHostLike(target.pinnedAddress);
+  if (!normalizedPinned || !refreshedAddresses.has(normalizedPinned)) {
+    return `URL host "${target.hostname}" resolution changed before fetch`;
+  }
+
+  for (const address of refreshedAddresses) {
+    if (isBlockedIp(address)) {
+      return `URL host "${target.hostname}" resolves to blocked address ${address}`;
     }
   }
 
   return null;
+}
+
+async function fetchWithSafety(
+  url: string,
+  init: RequestInit,
+  timeoutMs = URL_FETCH_TIMEOUT_MS,
+): Promise<Response> {
+  const { rejection, target } = await resolveSafeUrlTarget(url);
+  if (rejection || !target) {
+    throw new Error(rejection ?? "URL validation failed");
+  }
+
+  const rebindingRejection = await resolveDnsRebindingRejection(target);
+  if (rebindingRejection) {
+    throw new Error(rebindingRejection);
+  }
+
+  return fetchWithTimeout(url, init, timeoutMs);
 }
 
 function isYouTubeUrl(url: string): boolean {
@@ -315,7 +406,7 @@ function extractYouTubeVideoId(url: string): string | null {
 async function fetchYouTubeTranscript(videoId: string): Promise<string | null> {
   // Fetch the video page to get transcript data
   const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
-  const response = await fetchWithTimeout(watchUrl, {
+  const response = await fetchWithSafety(watchUrl, {
     headers: {
       "User-Agent":
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -357,7 +448,7 @@ async function fetchYouTubeTranscript(videoId: string): Promise<string | null> {
     .replace(/\\\//g, "/");
 
   // Fetch the transcript
-  const transcriptResponse = await fetchWithTimeout(captionUrl, {});
+  const transcriptResponse = await fetchWithSafety(captionUrl, {});
   if (!transcriptResponse.ok) {
     return null;
   }
@@ -528,7 +619,7 @@ async function fetchUrlContent(
   }
 
   // Regular URL fetch
-  const response = await fetchWithTimeout(url, {
+  const response = await fetchWithSafety(url, {
     redirect: "manual",
     headers: {
       "User-Agent":
@@ -915,11 +1006,6 @@ export async function handleKnowledgeRoutes(
     }
 
     const urlToFetch = body.url.trim();
-    const safetyRejection = await resolveUrlSafetyRejection(urlToFetch);
-    if (safetyRejection) {
-      error(res, safetyRejection);
-      return true;
-    }
 
     // Fetch and process the URL content
     let content: string;

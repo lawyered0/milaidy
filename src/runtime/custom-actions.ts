@@ -58,6 +58,11 @@ type VmRunner = {
 
 let vmRunner: VmRunner | null = null;
 
+type ResolvedUrlTarget = {
+  hostname: string;
+  pinnedAddress: string | null;
+};
+
 function resolveFetchInputUrl(input: RequestInfo | URL): string | null {
   if (typeof input === "string") return input;
   if (input instanceof URL) return input.toString();
@@ -72,10 +77,20 @@ async function safeCodeFetch(
   init?: RequestInit,
 ): Promise<Response> {
   const url = resolveFetchInputUrl(input);
-  if (!url || (await isBlockedUrl(url))) {
+  if (!url) {
     throw new Error(
       "Blocked: cannot make requests to internal network addresses",
     );
+  }
+
+  const safety = await resolveUrlSafety(url);
+  if (safety.blocked) {
+    throw new Error(
+      "Blocked: cannot make requests to internal network addresses",
+    );
+  }
+  if (safety.target && (await isDnsRebindingDetected(safety.target))) {
+    throw new Error("Blocked: URL host resolution changed before request");
   }
 
   const response = await fetch(input, { ...init, redirect: "manual" });
@@ -148,57 +163,106 @@ function isBlockedIp(ip: string): boolean {
   return isBlockedPrivateOrLinkLocalIp(ip);
 }
 
-/**
- * Check whether a URL targets a private/internal network (SSRF guard).
- * Blocks loopback, link-local, and RFC-1918 ranges except our own API.
- * Resolves hostnames to concrete IPs to prevent DNS-alias bypasses.
- */
-async function isBlockedUrl(url: string): Promise<boolean> {
+async function resolveUrlSafety(url: string): Promise<{
+  blocked: boolean;
+  target: ResolvedUrlTarget | null;
+}> {
+  let parsed: URL;
   try {
-    const parsed = new URL(url);
-    const hostname = normalizeHostLike(parsed.hostname);
+    parsed = new URL(url);
+  } catch {
+    return { blocked: true, target: null };
+  }
 
-    // Allow requests to our own API (terminal/run endpoint etc.)
-    if (
-      (hostname === "localhost" ||
-        hostname === "127.0.0.1" ||
-        hostname === "::1") &&
-      parsed.port === String(API_PORT)
-    ) {
-      return false;
-    }
+  const hostname = normalizeHostLike(parsed.hostname);
+  if (!hostname) return { blocked: true, target: null };
 
-    // Block common internal targets
-    if (
-      hostname === "localhost" ||
+  // Allow requests to our own API (terminal/run endpoint etc.)
+  if (
+    (hostname === "localhost" ||
       hostname === "127.0.0.1" ||
-      hostname === "::1" ||
-      hostname === "0.0.0.0" ||
-      hostname.endsWith(".local") ||
-      hostname === "[::1]" ||
-      hostname === "metadata.google.internal" ||
-      hostname === "169.254.169.254"
-    ) {
-      return true;
-    }
+      hostname === "::1") &&
+    parsed.port === String(API_PORT)
+  ) {
+    return { blocked: false, target: null };
+  }
 
-    // Direct IP literals can be checked immediately.
-    if (net.isIP(hostname)) {
-      return isBlockedIp(hostname);
-    }
+  // Block common internal targets
+  if (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "::1" ||
+    hostname === "0.0.0.0" ||
+    hostname.endsWith(".local") ||
+    hostname === "[::1]" ||
+    hostname === "metadata.google.internal" ||
+    hostname === "169.254.169.254"
+  ) {
+    return { blocked: true, target: null };
+  }
 
-    // Resolve hostnames to catch aliases (e.g. nip.io) pointing at blocked IPs.
+  // Direct IP literals can be checked immediately.
+  if (net.isIP(hostname)) {
+    if (isBlockedIp(hostname)) return { blocked: true, target: null };
+    return {
+      blocked: false,
+      target: {
+        hostname,
+        pinnedAddress: hostname,
+      },
+    };
+  }
+
+  // Resolve hostnames to catch aliases (e.g. nip.io) pointing at blocked IPs.
+  try {
     const records = await dnsLookup(hostname, { all: true });
     const addresses = Array.isArray(records) ? records : [records];
     for (const entry of addresses) {
       if (isBlockedIp(entry.address)) {
+        return { blocked: true, target: null };
+      }
+    }
+    return {
+      blocked: false,
+      target: {
+        hostname,
+        pinnedAddress: addresses[0]?.address ?? null,
+      },
+    };
+  } catch {
+    // Malformed URL or failed resolution — block it
+    return { blocked: true, target: null };
+  }
+}
+
+async function isDnsRebindingDetected(
+  target: ResolvedUrlTarget,
+): Promise<boolean> {
+  if (!target.pinnedAddress || net.isIP(target.hostname)) {
+    return false;
+  }
+
+  try {
+    const refreshed = await dnsLookup(target.hostname, { all: true });
+    const refreshedAddresses = new Set(
+      (Array.isArray(refreshed) ? refreshed : [refreshed])
+        .map((entry) => normalizeHostLike(entry.address))
+        .filter((address): address is string => Boolean(address)),
+    );
+
+    const normalizedPinned = normalizeHostLike(target.pinnedAddress);
+    if (!normalizedPinned || !refreshedAddresses.has(normalizedPinned)) {
+      return true;
+    }
+
+    for (const address of refreshedAddresses) {
+      if (isBlockedIp(address)) {
         return true;
       }
     }
 
     return false;
   } catch {
-    // Malformed URL or failed resolution — block it
     return true;
   }
 }
@@ -235,11 +299,18 @@ function buildHandler(
         }
 
         // SSRF guard — block requests to internal/private networks
-        if (await isBlockedUrl(url)) {
+        const safety = await resolveUrlSafety(url);
+        if (safety.blocked) {
           return {
             ok: false,
             output:
               "Blocked: cannot make requests to internal network addresses",
+          };
+        }
+        if (safety.target && (await isDnsRebindingDetected(safety.target))) {
+          return {
+            ok: false,
+            output: "Blocked: URL host resolution changed before request",
           };
         }
 
